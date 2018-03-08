@@ -10,12 +10,15 @@ Dim iSize As UInteger = xRtl.File.eRead(ExePath() & "\liblzma.a", @pBuff)
 
 Print "读取文件长度 : ", iSize, "Byte"
 
-Dim pOutBuff As Any Ptr = Allocate(iSize * 2)
-Dim iOutSize As UInteger
-Dim pProps As Any Ptr = Allocate(6)
+Dim pOutBuff As Any Ptr = Allocate(iSize)
+Dim iOutSize As UInteger = iSize
+Dim pProps As Any Ptr = Allocate(5)
 Dim iProps As UInteger = 5
 
-Print LzmaCompress(pOutBuff, @iOutSize, pBuff, iSize, pProps, @iProps, 5, 1 Shl 24, 3, 0, 2, 32, 2)
+If LzmaCompress(pOutBuff, @iOutSize, pBuff, iSize, pProps, @iProps) = SZ_OK Then
+	Print "压缩后的长度 : ", iOutSize, "Byte"
+	xRtl.File.Write(ExePath() & "\liblzma.a.压缩后的", pOutBuff, 0, iOutSize)
+EndIf
 
 
 
