@@ -1,0 +1,54 @@
+[Project]
+Version=3
+Description=xPack
+Api=fb (FreeBASIC),win (Windows)
+Grouping=1
+AddMainFiles=1
+AddModuleFiles=1
+ResExport=
+CompileIfNewer=0
+IncVersion=0
+RunCmd=0
+[Make]
+Module=Module Build,fbc -c
+Recompile=2
+Current=1
+1=Windows GUI,fbc -s gui
+2=Windows Console,fbc -s console
+3=Windows dll,fbc -s gui -dll -export
+4=Library,fbc -lib
+Output=
+Run=
+Delete=
+[File]
+1=xPack.bas
+2=Inc\Define.bi
+3=Inc\xPack.bi
+4=Inc\Core.bi
+5=Inc\Ext.bi
+6=Inc\Lib\File.bi
+7=Inc\Lib\lz4.bi
+8=Inc\Lib\lzma.bi
+9=Inc\Lib\xBsmm.bi
+[BreakPoint]
+1=
+2=
+9=
+8=
+7=
+6=
+5=
+4=
+3=
+[FileInfo]
+1=0,16,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2=0,11,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+9=0,38,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+8=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+7=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+6=0,109,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+5=0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+4=0,67,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+3=0,48,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+[TabOrder]
+TabOrder=1,2,3,4,5
