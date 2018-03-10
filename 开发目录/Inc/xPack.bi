@@ -39,7 +39,7 @@ Type xPack
 	
 	' 包操作
 	Declare Function Open(sFile As ZString Ptr) As Integer
-	Declare Function Create(sFile As ZString Ptr, iInfoSize As Integer) As Integer
+	Declare Function Create(sFile As ZString Ptr, iInfoSize As Integer = 0) As Integer
 	Declare Function Save(bIsRebuild As Integer) As Integer
 	Declare Sub Close()
 	
@@ -65,5 +65,10 @@ Type xPack
 	Declare Function DeleteFile(idx As UInteger, bUsePos As Integer = 0) As Integer
 	
 	' 数据
+	IsOpen As Integer				' 是否有打开的文件
+	IsChange As Integer				' 是否存在修改 [添加删除文件、修改Ext数据]
+	FileHandle As HANDLE			' 文件句柄 [打开文件后用于读写操作]
+	PackHead As xPack_FileHead		' 文件头
+	LDB As xBsmm Ptr				' 文件信息段数据
 	
 End Type
