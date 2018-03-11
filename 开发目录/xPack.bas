@@ -11,7 +11,5 @@
 
 
 
-#Include "Inc\Define.bi"
 #Include "Inc\xPack.bi"
 #Include "Inc\Core.bi"
-#Include "Inc\Ext.bi"

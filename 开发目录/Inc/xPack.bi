@@ -1,6 +1,30 @@
 
 
 
+#Define VerCpt	5
+#Define VerSub	0
+
+
+
+#Define XPACK_COMP_NULL		0
+#Define XPACK_COMP_LZMA		1
+#Define XPACK_COMP_LZ4		2
+#Define XPACK_COMP_USER		3
+
+
+
+#Define OnErr(a, b) If OnError Then OnError(a, b) : Return 0 : EndIf
+
+
+
+#Define XPACK_ERROR_1	"文件无法访问"
+#Define XPACK_ERROR_2	"文件格式不正确"
+#Define XPACK_ERROR_3	"文件版本不兼容"
+#Define XPACK_ERROR_4	"文件列表读取失败"
+#Define XPACK_ERROR_5	"文件列表数据已经被损坏"
+
+
+
 ' 包信息头		[ 40 Byte ]
 Type xPack_FileHead Field = 1
 	FileHead As ZString * 4			' 文件标识头 [xpk]
@@ -17,6 +41,8 @@ Type xPack_FileHead Field = 1
 	Ext_Hash As UInteger			' 附加数据哈希值
 End Type
 
+
+
 ' 文件信息头	[ 24 Byte ]
 Type xPack_FileInfo Field = 1
 	DataAddr As UInteger			' 数据位置
@@ -27,6 +53,8 @@ Type xPack_FileInfo Field = 1
 	FileRefs As UShort				' 文件引用计数
 	FileIndex As UInteger			' 文件 Index [访问ID]
 End Type
+
+
 
 
 
