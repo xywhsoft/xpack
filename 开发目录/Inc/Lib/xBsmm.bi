@@ -1,49 +1,49 @@
 /'
-	xywh Base Struct Memory Manage [Âü∫Êú¨ÁªìÊûÑÂåñÂÜÖÂ≠òÁÆ°ÁêÜÂô®]
+	xywh Base Struct Memory Manage [ª˘±æΩ·ππªØƒ⁄¥Êπ‹¿Ì∆˜]
 	
-	‚îå‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚î¨‚îÄ‚îÄ‚îê
-	‚îÇ01‚îÇ02‚îÇ03‚îÇ04‚îÇ05‚îÇ06‚îÇ07‚îÇ08‚îÇ09‚îÇ10‚îÇ11‚îÇ12‚îÇ .. ‚îÇ
-	‚îî‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚î¥‚îÄ‚îÄ‚îò
+	©∞©§©–©§©–©§©–©§©–©§©–©§©–©§©–©§©–©§©–©§©–©§©–©§©–©§©§©¥
+	©¶01©¶02©¶03©¶04©¶05©¶06©¶07©¶08©¶09©¶10©¶11©¶12©¶ .. ©¶
+	©∏©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©ÿ©§©§©º
 '/
 Type xBsmm
-	' ÁÆ°ÁêÜÂô®ÂÜÖÂ≠òÊåáÈíà
+	' π‹¿Ì∆˜ƒ⁄¥Ê÷∏’Î
 	StructMemory As Any Ptr
 	
-	' ÊàêÂëòÂç†Áî®ÂÜÖÂ≠òÈïøÂ∫¶
+	' ≥…‘±’º”√ƒ⁄¥Ê≥§∂»
 	StructLenght As UInteger
 	
-	' ÁÆ°ÁêÜÂô®‰∏≠Â≠òÂú®Â§öÂ∞ëÊàêÂëò
+	' π‹¿Ì∆˜÷–¥Ê‘⁄∂‡…Ÿ≥…‘±
 	StructCount As UInteger
 	
-	' Â∑≤ÁªèÁî≥ËØ∑ÁöÑÁªìÊûÑÊï∞Èáè
+	' “—æ≠…Í«ÎµƒΩ·ππ ˝¡ø
 	AllocCount As UInteger
 	
-	' È¢ÑÂàÜÈÖçÂÜÖÂ≠òÊ≠•Èïø
+	' ‘§∑÷≈‰ƒ⁄¥Ê≤Ω≥§
 	AllocStep As UInteger
 	
-	' ÊûÑÈÄ†ÂáΩÊï∞
+	' ππ‘Ï∫Ø ˝
 	Declare Constructor(iItemLenght As UInteger, PreassignStep As UInteger = 32, PreassignLenght As UInteger = 0)
 	
-	' ÊûêÊûÑÂáΩÊï∞
+	' Œˆππ∫Ø ˝
 	Declare Destructor()
 	
-	' Ê∑ªÂä†ÊàêÂëò
+	' ÃÌº”≥…‘±
 	Declare Function InsertStruct(iPos As UInteger, iCount As UInteger = 1) As UInteger
 	Declare Function AppendStruct(iCount As UInteger = 1) As UInteger
 	
-	' Âà†Èô§ÊàêÂëò
+	' …æ≥˝≥…‘±
 	Declare Function DeleteStruct(iPos As UInteger, iCount As UInteger = 1) As Integer
 	
-	' ÁßªÂä®ÊàêÂëò
+	' “∆∂Ø≥…‘±
 	Declare Function SwapStruct(iPosA As UInteger, iPosB As UInteger) As Integer
 	
-	' Ëé∑ÂèñÊàêÂëòÊåáÈíà
+	' ªÒ»°≥…‘±÷∏’Î
 	Declare Function GetPtrStruct(iPos As UInteger) As Any Ptr
 	
-	' ÂàÜÈÖçÂÜÖÂ≠ò
+	' ∑÷≈‰ƒ⁄¥Ê
 	Declare Function CallocMemory(iCount As UInteger) As Integer
 	
-	' ÈáçÁΩÆÔºàÈáäÊîæËµÑÊ∫êÔºâ
+	' ÷ÿ÷√£® Õ∑≈◊ ‘¥£©
 	Declare Sub ReInitManage()
 End Type
 
@@ -51,7 +51,7 @@ End Type
 
 
 
-' ÊûÑÈÄ†ÂáΩÊï∞
+' ππ‘Ï∫Ø ˝
 Constructor xBsmm(iItemLenght As UInteger, PreassignStep As UInteger = 32, PreassignLenght As UInteger = 0)
 	StructLenght = iItemLenght
 	AllocStep = PreassignStep
@@ -60,31 +60,31 @@ Constructor xBsmm(iItemLenght As UInteger, PreassignStep As UInteger = 32, Preas
 	EndIf
 End Constructor
 
-' ÊûêÊûÑÂáΩÊï∞
+' Œˆππ∫Ø ˝
 Destructor xBsmm()
 	ReInitManage()
 End Destructor
 
-' Ê∑ªÂä†ÊàêÂëò [ÊàêÂäüËøîÂõûidxÔºåÂ§±Ë¥•ËøîÂõû0]
+' ÃÌº”≥…‘± [≥…π¶∑µªÿidx£¨ ß∞‹∑µªÿ0]
 Function xBsmm.InsertStruct(iPos As UInteger, iCount As UInteger = 1) As UInteger
-	' ‰∏çËÉΩÊ∑ªÂä†0‰∏™ÊàêÂëò
+	' ≤ªƒ‹ÃÌº”0∏ˆ≥…‘±
 	If iCount = 0 Then
 		Return 0
 	EndIf
-	' ÂàÜÈÖçÂÜÖÂ≠ò
+	' ∑÷≈‰ƒ⁄¥Ê
 	If StructCount + iCount > AllocCount Then
 		If CallocMemory(StructCount + iCount + AllocStep) = 0 Then
 			Return 0
 		EndIf
 	EndIf
 	If iPos < StructCount Then
-		' ÊèíÂÖ•
+		' ≤Â»Î
 		memmove(StructMemory + ((iPos + iCount) * StructLenght), StructMemory + (iPos * StructLenght), (StructCount - iPos) * StructLenght)
 		'Function = StructMemory + (iPos * StructLenght)
 		Function = iPos + 1
 		StructCount += iCount
 	Else
-		' Ê∑ªÂä†
+		' ÃÌº”
 		'Function = StructMemory + (StructCount * StructLenght)
 		Function = StructCount + 1
 		StructCount += iCount
@@ -94,20 +94,20 @@ Function xBsmm.AppendStruct(iCount As UInteger = 1) As UInteger
 	Return InsertStruct(StructCount, iCount)
 End Function
 
-' Âà†Èô§ÊàêÂëò
+' …æ≥˝≥…‘±
 Function xBsmm.DeleteStruct(iPos As UInteger, iCount As UInteger = 1) As Integer
-	' ‰∏çËÉΩÂà†Èô§0‰∏™ÊàêÂëò
+	' ≤ªƒ‹…æ≥˝0∏ˆ≥…‘±
 	If iCount Then
-		' ËåÉÂõ¥Ê£ÄÊü•
+		' ∑∂ŒßºÏ≤È
 		If iPos Then
 			iPos -= 1
 			If iPos < StructCount Then
 				If iPos + iCount < StructCount Then
-					' ‰∏≠ÊÆµÂà†Èô§
+					' ÷–∂Œ…æ≥˝
 					memmove(StructMemory + (iPos * StructLenght), StructMemory + ((iPos + iCount) * StructLenght), (StructCount - (iPos + iCount)) * StructLenght)
 					StructCount -= iCount
 				Else
-					' Êú´Â∞æÂà†Èô§
+					' ƒ©Œ≤…æ≥˝
 					StructCount = iPos
 				EndIf
 				Return -1
@@ -116,29 +116,29 @@ Function xBsmm.DeleteStruct(iPos As UInteger, iCount As UInteger = 1) As Integer
 	EndIf
 End Function
 
-' ÁßªÂä®ÊàêÂëò
+' “∆∂Ø≥…‘±
 Function xBsmm.SwapStruct(iPosA As UInteger, iPosB As UInteger) As Integer
-	' ËåÉÂõ¥Ê£ÄÊü•
+	' ∑∂ŒßºÏ≤È
 	If (iPosA <> 0) And (iPosB <> 0) Then
 		iPosA -= 1
 		iPosB -= 1
 		If (iPosA < StructCount) And (iPosB < StructCount) Then
 			If iPosA <> iPosB Then
-				' ‰∫§Êç¢Êï∞ÊçÆ
+				' Ωªªª ˝æ›
 				Dim StuA As Any Ptr = Allocate(StructLenght)
 				memmove(StuA, StructMemory + (iPosA * StructLenght), StructLenght)
 				memmove(StructMemory + (iPosA * StructLenght), StructMemory + (iPosB * StructLenght), StructLenght)
 				memmove(StructMemory + (iPosB * StructLenght), StuA, StructLenght)
 				Return -1
 			Else
-				' ‰ΩçÁΩÆÁõ∏ÂêåÔºå‰∏çÈúÄË¶Å‰∫§Êç¢
+				' Œª÷√œ‡Õ¨£¨≤ª–Ë“™Ωªªª
 				Return -1
 			EndIf
 		EndIf
 	EndIf
 End Function
 
-' Ëé∑ÂèñÊàêÂëòÊåáÈíà
+' ªÒ»°≥…‘±÷∏’Î
 Function xBsmm.GetPtrStruct(iPos As UInteger) As Any Ptr
 	If iPos Then
 		iPos -= 1
@@ -148,10 +148,10 @@ Function xBsmm.GetPtrStruct(iPos As UInteger) As Any Ptr
 	EndIf
 End Function
 
-' ÂàÜÈÖçÂÜÖÂ≠ò
+' ∑÷≈‰ƒ⁄¥Ê
 Function xBsmm.CallocMemory(iCount As UInteger) As Integer
 	If iCount > AllocCount Then
-		' Â¢ûÈáè
+		' ‘ˆ¡ø
 		Dim NewMem As Any Ptr = ReAllocate(StructMemory, iCount * StructLenght)
 		If NewMem Then
 			AllocCount = iCount
@@ -159,28 +159,28 @@ Function xBsmm.CallocMemory(iCount As UInteger) As Integer
 			Return -1
 		EndIf
 	ElseIf iCount < AllocCount Then
-		' Ë£ÅÂâ™
+		' ≤√ºÙ
 		Dim NewMem As Any Ptr = ReAllocate(StructMemory, iCount * StructLenght)
 		If NewMem Then
 			AllocCount = iCount
 			StructMemory = NewMem
 			If iCount <= StructCount Then
-				' ÈúÄË¶ÅË£ÅÂâ™Êï∞ÊçÆ
+				' –Ë“™≤√ºÙ ˝æ›
 				StructCount = iCount
 			EndIf
 			Return -1
 		EndIf
 	ElseIf iCount = 0 Then
-		' Ê∏ÖÁ©∫
+		' «Âø’
 		ReInitManage()
 	Else
-		' ‰∏çÂèò
+		' ≤ª±‰
 		Return -1
 	EndIf
 	Return 0
 End Function
 
-' ÈáçÁΩÆÔºàÈáäÊîæËµÑÊ∫êÔºâ
+' ÷ÿ÷√£® Õ∑≈◊ ‘¥£©
 Sub xBsmm.ReInitManage()
 	If StructMemory Then
 		DeAllocate(StructMemory)

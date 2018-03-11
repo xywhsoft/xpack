@@ -49,13 +49,12 @@ Type xPack
 	
 	' 文件信息操作
 	Declare Function GetFileInfo(idx As UInteger, bUsePos As Integer = 0) As xPack_FileInfo Ptr
-	Declare Function GetFileSize(idx As UInteger) As UInteger
-	Declare Function GetDataSize(idx As UInteger) As UInteger
-	Declare Function GetFileFlag(idx As UInteger) As Integer
-	Declare Function GetFileHash(idx As UInteger) As Integer
+	Declare Function GetFileSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
+	Declare Function GetDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
+	Declare Function GetFileFlag(idx As UInteger, bUsePos As Integer = 0) As Integer
+	Declare Function GetFileHash(idx As UInteger, bUsePos As Integer = 0) As Integer
 	Declare Function GetFilePos(idx As UInteger) As UInteger
 	Declare Function GetFileIdx(iPos As UInteger) As UInteger
-	Declare Function ExistsIdx(idx As UInteger) As Integer
 	
 	' 文件操作
 	Declare Function AppendFile(sFile As ZString Ptr) As UInteger

@@ -119,35 +119,59 @@ End Function
 
 ' 文件信息操作
 Function xPack.GetFileInfo(idx As UInteger, bUsePos As Integer = 0) As xPack_FileInfo Ptr
-	
+	If bUsePos = 0 Then
+		idx = GetFilePos(idx)
+	EndIf
+	Return LDB->GetPtrStruct(idx)
 End Function
 
-Function xPack.GetFileSize(idx As UInteger) As UInteger
-	
+Function xPack.GetFileSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
+	Dim pInfo As xPack_FileInfo Ptr = GetFileInfo(idx, bUsePos)
+	If pInfo Then
+		Return pInfo->FileSize
+	EndIf
 End Function
 
-Function xPack.GetDataSize(idx As UInteger) As UInteger
-	
+Function xPack.GetDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
+	Dim pInfo As xPack_FileInfo Ptr = GetFileInfo(idx, bUsePos)
+	If pInfo Then
+		Return pInfo->DataSize
+	EndIf
 End Function
 
-Function xPack.GetFileFlag(idx As UInteger) As Integer
-	
+Function xPack.GetFileFlag(idx As UInteger, bUsePos As Integer = 0) As Integer
+	Dim pInfo As xPack_FileInfo Ptr = GetFileInfo(idx, bUsePos)
+	If pInfo Then
+		Return pInfo->FileFlag
+	EndIf
 End Function
 
-Function xPack.GetFileHash(idx As UInteger) As Integer
-	
+Function xPack.GetFileHash(idx As UInteger, bUsePos As Integer = 0) As Integer
+	Dim pInfo As xPack_FileInfo Ptr = GetFileInfo(idx, bUsePos)
+	If pInfo Then
+		Return pInfo->FileHash
+	EndIf
 End Function
 
 Function xPack.GetFilePos(idx As UInteger) As UInteger
-	
+	If LDB->StructCount Then
+		Dim pInfo As xPack_FileInfo Ptr
+		For i As Integer = 1 To LDB->StructCount
+			pInfo = LDB->GetPtrStruct(i)
+			If pInfo Then
+				If pInfo->FileIndex = idx Then
+					Return i
+				EndIf
+			EndIf
+		Next
+	EndIf
 End Function
 
 Function xPack.GetFileIdx(iPos As UInteger) As UInteger
-	
-End Function
-
-Function xPack.ExistsIdx(idx As UInteger) As Integer
-	
+	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iPos)
+	If pInfo Then
+		Return pInfo->FileIndex
+	EndIf
 End Function
 
 
