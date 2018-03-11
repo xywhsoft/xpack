@@ -118,14 +118,14 @@ Returns:
 '/
 
 Declare Function LzmaCompress(dest As UByte Ptr, destLen As UInteger Ptr, src As UByte Ptr, srcLen As UInteger, outProps As UByte Ptr,_
-outPropsSize As UInteger Ptr, _		/' *outPropsSize must be = 5 '/
-level As Integer = 5, _					/' 0 <= level <= 9, default = 5 '/
-dictSize As Integer = 1 Shl 24, _		/' default = (1 << 24) '/
-lc As Integer = 3, _					/' 0 <= lc <= 8, default = 3 '/
-lp As Integer = 0, _					/' 0 <= lp <= 4, default = 0 '/
-pb As Integer = 2, _					/' 0 <= pb <= 4, default = 2 '/
-fb As Integer = 32, _					/' 5 <= fb <= 273, default = 32 '/
-numThreads As Integer = 2 _				/' 1 or 2, default = 2 '/
+outPropsSize As UInteger Ptr, _			/' *outPropsSize must be = 5 '/
+level As Integer = -1, _				/' 0 <= level <= 9, default = 5 '/
+dictSize As Integer = 0, _				/' default = (1 << 24) '/
+lc As Integer = -1, _					/' 0 <= lc <= 8, default = 3 '/
+lp As Integer = -1, _					/' 0 <= lp <= 4, default = 0 '/
+pb As Integer = -1, _					/' 0 <= pb <= 4, default = 2 '/
+fb As Integer = -1, _					/' 5 <= fb <= 273, default = 32 '/
+numThreads As Integer = -1 _			/' 1 or 2, default = 2 '/
 ) As Integer
 
 
