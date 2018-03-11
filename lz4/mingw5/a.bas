@@ -1,20 +1,9 @@
-#Include "file.bas"
+#Include "file.bi"
+#Include "lz4.bi"
 
 
 
-#Inclib "lz4"
-
-
-
-Extern "Windows-MS"
-	Declare Function LZ4_compress_default(source As ZString Ptr, dest As ZString Ptr, sourceSize As Integer, maxDestSize As Integer) As Integer
-	Declare Function LZ4_decompress_safe(source As ZString Ptr, dest As ZString Ptr, compressedSize As Integer, maxDecompressedSize As Integer) As Integer
-	Declare Function LZ4_compressBound(inputSize As Integer) As Integer
-End Extern
-
-
-
-#Define FilePath	ExePath & "\111.xgi"
+#Define FilePath	ExePath & "\lz4.bi"
 #Define OutFile		FilePath & ".lz4"
 
 
