@@ -20,3 +20,5 @@
 #Define XPACK_ERROR_1	"文件无法访问"
 #Define XPACK_ERROR_2	"文件格式不正确"
 #Define XPACK_ERROR_3	"文件版本不兼容"
+#Define XPACK_ERROR_4	"文件列表读取失败"
+#Define XPACK_ERROR_5	"文件列表数据已经被损坏"

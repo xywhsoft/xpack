@@ -7,6 +7,7 @@
 #Include "Inc\Lib\xBsmm.bi"
 #Include "Inc\Lib\lzma.bi"
 #Include "Inc\Lib\lz4.bi"
+#Include "Inc\Lib\CityHash.bi"
 
 
 
