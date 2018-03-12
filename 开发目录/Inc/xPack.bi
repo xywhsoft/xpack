@@ -6,10 +6,10 @@
 
 
 
-#Define XPACK_COMP_NULL		0
-#Define XPACK_COMP_LZMA		1
-#Define XPACK_COMP_LZ4		2
-#Define XPACK_COMP_USER		3
+#Define XPACK_COMP_NOUSED	0
+#Define XPACK_COMP_LEVEL1	1
+#Define XPACK_COMP_LEVEL2	2
+#Define XPACK_COMP_LEVEL3	3
 
 
 
@@ -22,6 +22,12 @@
 #Define XPACK_ERROR_3	"文件版本不兼容"
 #Define XPACK_ERROR_4	"文件列表读取失败"
 #Define XPACK_ERROR_5	"文件列表数据已经被损坏"
+#Define XPACK_ERROR_6	"文件数据无法读取"
+#Define XPACK_ERROR_7	"文件列表添加失败"
+#Define XPACK_ERROR_8	"文件无法写入"
+#Define XPACK_ERROR_9	"文件列表数据压缩失败"
+#Define XPACK_ERROR_10	"文件列表数据写入失败"
+#Define XPACK_ERROR_11	"文件头数据写入失败"
 
 
 
@@ -85,8 +91,8 @@ Type xPack
 	Declare Function GetFileIdx(iPos As UInteger) As UInteger
 	
 	' 文件操作
-	Declare Function AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
-	Declare Function AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
+	Declare Function AppendFile(idx As UInteger, sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
+	Declare Function AppendData(idx As UInteger, pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
 	Declare Function UnpackFile(idx As UInteger, sFile As ZString Ptr) As UInteger
 	Declare Function UnpackData(idx As UInteger, sOutData As Any Ptr) As UInteger
 	Declare Function DeleteFile(idx As UInteger, bUsePos As Integer = 0) As Integer

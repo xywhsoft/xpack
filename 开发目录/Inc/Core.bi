@@ -82,7 +82,31 @@ Function xPack.Create(sFile As ZString Ptr, iInfoSize As Integer = 0) As Integer
 End Function
 
 Function xPack.Save(bIsRebuild As Integer) As Integer
-	
+	' 压缩文件列表
+	Dim iSize As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * LDB->StructCount
+	Dim pData As Any Ptr = malloc(iSize)
+	iSize = LZ4_compress_default(LDB->StructMemory, pData, iSize, iSize)
+	If iSize = 0 Then
+		free(pData)
+		OnErr(9, XPACK_ERROR_9)
+	EndIf
+	' 写入文件列表
+	Dim iRet As Integer = Put_File(FileHandle, pData, PackHead.LDB_Addr, iSize)
+	free(pData)
+	If iRet = 0 Then
+		OnErr(10, XPACK_ERROR_10)
+	EndIf
+	' 更新、写入文件头数据
+	PackHead.FileCount = LDB->StructCount
+	PackHead.LDB_Hash = CityHash32(LDB->StructMemory, iSize)
+	PackHead.LDB_Size = iSize
+	PackHead.Ver_Cpt = VerCpt
+	PackHead.Ver_Sub = VerSub
+	If Put_File(FileHandle, @PackHead, 0, SizeOf(xPack_FileHead)) = 0 Then
+		OnErr(11, XPACK_ERROR_11)
+	EndIf
+	IsChange = 0
+	Return -1
 End Function
 
 Sub xPack.Close()
@@ -177,35 +201,119 @@ End Function
 
 
 ' 文件操作
-Function xPack.AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
+Function xPack.AppendFile(idx As UInteger, sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
 	Dim pFile As HANDLE = Open_File(sFile)
-	If pFile Then
-		Dim iSize As UInteger = File_Len(pFile)
-		Dim pData As Any Ptr = malloc(iSize)
-		iSize = Get_File(pFile, pData, 0, iSize)
-		CloseHandle(pFile)
-		If iSize Then
-			Function = AppendData(pData, iSize, iCompLevel)
-		EndIf
+	If pFile = 0 Then
+		OnErr(2, XPACK_ERROR_2)
+	EndIf
+	' 读取文件到内存
+	Dim iSize As UInteger = File_Len(pFile)
+	Dim pData As Any Ptr = malloc(iSize)
+	iSize = Get_File(pFile, pData, 0, iSize)
+	CloseHandle(pFile)
+	' 添加文件数据
+	If iSize Then
+		Function = AppendData(idx, pData, iSize, iCompLevel)
 		free(pData)
+	Else
+		free(pData)
+		OnErr(6, XPACK_ERROR_6)
 	EndIf
 End Function
 
-Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
+Function xPack.AppendData(idx As UInteger, pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
 	If iCompLevel < 0 Then iCompLevel = Default_CompLevel
 	If iCompLevel > 3 Then iCompLevel = 3
+	' 创建文件列表项
+	Dim iFilePos As UInteger = LDB->AppendStruct()
+	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iFilePos)
+	If pInfo = NULL Then
+		OnErr(7, XPACK_ERROR_7)
+	EndIf
+	' 计算文件Hash值、写入固定属性
+	Dim iDataHash As UInteger = CityHash32(pInData, iInSize)
+	pInfo->FileHash = iDataHash
+	pInfo->DataAddr = PackHead.LDB_Addr
+	pInfo->FileSize = iInSize
+	pInfo->FileRefs = 0
+	pInfo->FileIndex = idx
+	' 写入文件
 	Select Case iCompLevel
-		Case 0
-			' 不压缩
 		Case 1
 			' LZ4压缩
+			Dim pData As Any Ptr = malloc(iInSize)
+			Dim iCompSize As UInteger = LZ4_compress_default(pInData, pData, iInSize, iInSize)
+			If iCompSize Then
+				If Put_File(FileHandle, pData, PackHead.LDB_Addr, iCompSize) Then
+					pInfo->DataSize = iCompSize
+					pInfo->FileFlag = XPACK_COMP_Level1
+					PackHead.LDB_Addr += iCompSize
+					free(pData)
+				Else
+					free(pData)
+					LDB->DeleteStruct(iFilePos)
+					OnErr(8, XPACK_ERROR_8)
+				EndIf
+			Else
+				free(pData)
+				iCompLevel = 0
+			EndIf
 		Case 2
 			' LZMA快速压缩
+			Dim pData As Any Ptr = malloc(iInSize)
+			Dim iCompSize As UInteger
+			Dim arrProps(4) As UByte
+			Dim iPropsSize As UInteger = 5
+			If LzmaCompress(pData, @iCompSize, pInData, iInSize, @arrProps(0), @iPropsSize, 1) = SZ_OK Then
+				If Put_File(FileHandle, pData, PackHead.LDB_Addr, iCompSize) Then
+					pInfo->DataSize = iCompSize
+					pInfo->FileFlag = XPACK_COMP_Level1
+					PackHead.LDB_Addr += iCompSize
+					free(pData)
+				Else
+					free(pData)
+					LDB->DeleteStruct(iFilePos)
+					OnErr(8, XPACK_ERROR_8)
+				EndIf
+			Else
+				free(pData)
+				iCompLevel = 0
+			EndIf
 		Case 3
 			' LZMA普通压缩
+			Dim pData As Any Ptr = malloc(iInSize)
+			Dim iCompSize As UInteger
+			Dim arrProps(4) As UByte
+			Dim iPropsSize As UInteger = 5
+			If LzmaCompress(pData, @iCompSize, pInData, iInSize, @arrProps(0), @iPropsSize, 6) = SZ_OK Then
+				If Put_File(FileHandle, pData, PackHead.LDB_Addr, iCompSize) Then
+					pInfo->DataSize = iCompSize
+					pInfo->FileFlag = XPACK_COMP_Level1
+					PackHead.LDB_Addr += iCompSize
+					free(pData)
+				Else
+					free(pData)
+					LDB->DeleteStruct(iFilePos)
+					OnErr(8, XPACK_ERROR_8)
+				EndIf
+			Else
+				free(pData)
+				iCompLevel = 0
+			EndIf
 	End Select
-	
-	'Put_File(FileHandle, )
+	If iCompLevel = 0 Then
+		' 不压缩
+		If Put_File(FileHandle, pInData, PackHead.LDB_Addr, iInSize) Then
+			pInfo->DataSize = iInSize
+			pInfo->FileFlag = XPACK_COMP_NOUSED
+			PackHead.LDB_Addr += iInSize
+		Else
+			LDB->DeleteStruct(iFilePos)
+			OnErr(8, XPACK_ERROR_8)
+		EndIf
+	EndIf
+	IsChange = -1
+	Return iFilePos
 End Function
 
 Function xPack.UnpackFile(idx As UInteger, sFile As ZString Ptr) As UInteger
