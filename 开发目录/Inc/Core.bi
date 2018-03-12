@@ -177,12 +177,35 @@ End Function
 
 
 ' 文件操作
-Function xPack.AppendFile(sFile As ZString Ptr) As UInteger
-	
+Function xPack.AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
+	Dim pFile As HANDLE = Open_File(sFile)
+	If pFile Then
+		Dim iSize As UInteger = File_Len(pFile)
+		Dim pData As Any Ptr = malloc(iSize)
+		iSize = Get_File(pFile, pData, 0, iSize)
+		CloseHandle(pFile)
+		If iSize Then
+			Function = AppendData(pData, iSize, iCompLevel)
+		EndIf
+		free(pData)
+	EndIf
 End Function
 
-Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger) As UInteger
+Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
+	If iCompLevel < 0 Then iCompLevel = Default_CompLevel
+	If iCompLevel > 3 Then iCompLevel = 3
+	Select Case iCompLevel
+		Case 0
+			' 不压缩
+		Case 1
+			' LZ4压缩
+		Case 2
+			' LZMA快速压缩
+		Case 3
+			' LZMA普通压缩
+	End Select
 	
+	'Put_File(FileHandle, )
 End Function
 
 Function xPack.UnpackFile(idx As UInteger, sFile As ZString Ptr) As UInteger

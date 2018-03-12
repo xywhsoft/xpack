@@ -85,13 +85,14 @@ Type xPack
 	Declare Function GetFileIdx(iPos As UInteger) As UInteger
 	
 	' 文件操作
-	Declare Function AppendFile(sFile As ZString Ptr) As UInteger
-	Declare Function AppendData(pInData As Any Ptr, iInSize As UInteger) As UInteger
+	Declare Function AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
+	Declare Function AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
 	Declare Function UnpackFile(idx As UInteger, sFile As ZString Ptr) As UInteger
 	Declare Function UnpackData(idx As UInteger, sOutData As Any Ptr) As UInteger
 	Declare Function DeleteFile(idx As UInteger, bUsePos As Integer = 0) As Integer
 	
 	' 数据
+	Default_CompLevel As Integer = 2	' 默认压缩方法
 	IsOpen As Integer				' 是否有打开的文件
 	IsChange As Integer				' 是否存在修改 [添加删除文件、修改Ext数据]
 	FileHandle As HANDLE			' 文件句柄 [打开文件后用于读写操作]
