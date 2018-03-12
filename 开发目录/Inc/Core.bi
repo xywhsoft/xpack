@@ -32,12 +32,19 @@ Function xPack.Open(sFile As ZString Ptr) As Integer
 		OnErr(3, XPACK_ERROR_3)
 	EndIf
 	' 读取、解压文件列表(LDB段)
+	LDB = New xBsmm(SizeOf(xPack_FileInfo) + PackHead.InfoSize, 32, PackHead.FileCount)
 	If PackHead.FileCount Then
-		LDB = New xBsmm(SizeOf(xPack_FileInfo) + PackHead.InfoSize, 32, PackHead.FileCount)
+		Print PackHead.LDB_Size
 		Dim LDB_Data As Any Ptr = malloc(PackHead.LDB_Size)
 		Get_File(FileHandle, LDB_Data, PackHead.LDB_Addr, PackHead.LDB_Size)
 		Dim LDB_DeCompSize As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * PackHead.FileCount
-		Dim DeCompSize As UInteger = LZ4_decompress_safe(LDB_Data, LDB->StructMemory, PackHead.LDB_Size, LDB_DeCompSize)
+		'Dim DeCompSize As UInteger = LZ4_decompress_safe(LDB_Data, LDB->StructMemory, PackHead.LDB_Size, LDB_DeCompSize)
+		Dim DeCompSize As UInteger = LDB_DeCompSize
+		Print DeCompSize
+		Dim arrProps(4) As UByte
+		Print LzmaUncompress(LDB->StructMemory, @DeCompSize, LDB_Data, @PackHead.LDB_Size, @arrProps(0), 5)
+		Print DeCompSize
+		Print PackHead.LDB_Size
 		free(LDB_Data)
 		' 校验文件列表数据
 		If DeCompSize <> LDB_DeCompSize Then
@@ -55,6 +62,7 @@ Function xPack.Open(sFile As ZString Ptr) As Integer
 			OnErr(5, XPACK_ERROR_5)
 		EndIf
 		' 文件打开成功
+		LDB->StructCount = PackHead.FileCount
 		IsOpen = -1
 	EndIf
 End Function
@@ -85,13 +93,15 @@ Function xPack.Save(bIsRebuild As Integer) As Integer
 	' 压缩文件列表
 	Dim iSize As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * LDB->StructCount
 	Dim pData As Any Ptr = malloc(iSize)
-	iSize = LZ4_compress_default(LDB->StructMemory, pData, iSize, iSize)
-	If iSize = 0 Then
+	PackHead.LDB_Size = iSize
+	Dim arrProps(4) As UByte
+	Dim iPropsSize As UInteger = 5
+	If LzmaCompress(pData, @PackHead.LDB_Size, LDB->StructMemory, iSize, @arrProps(0), @iPropsSize, 1) <> SZ_OK Then
 		free(pData)
 		OnErr(9, XPACK_ERROR_9)
 	EndIf
 	' 写入文件列表
-	Dim iRet As Integer = Put_File(FileHandle, pData, PackHead.LDB_Addr, iSize)
+	Dim iRet As Integer = Put_File(FileHandle, pData, PackHead.LDB_Addr, PackHead.LDB_Size)
 	free(pData)
 	If iRet = 0 Then
 		OnErr(10, XPACK_ERROR_10)
@@ -99,7 +109,6 @@ Function xPack.Save(bIsRebuild As Integer) As Integer
 	' 更新、写入文件头数据
 	PackHead.FileCount = LDB->StructCount
 	PackHead.LDB_Hash = CityHash32(LDB->StructMemory, iSize)
-	PackHead.LDB_Size = iSize
 	PackHead.Ver_Cpt = VerCpt
 	PackHead.Ver_Sub = VerSub
 	If Put_File(FileHandle, @PackHead, 0, SizeOf(xPack_FileHead)) = 0 Then
