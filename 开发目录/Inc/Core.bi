@@ -53,6 +53,7 @@ Function xPack_DeCompress(tpe As UByte, pSrc As Any Ptr, iSrcSize As UInteger, p
 			Return Lzma_Uncompress(pSrc, pDst, iSrcSize, iDstSize)
 		Case Else
 			' 不压缩则直接复制数据（以较短的数据为准）
+			Print "未解压"
 			Dim CopySize As UInteger = IIf(iDstSize > iSrcSize, iSrcSize, iDstSize)
 			CopyMemory(pDst, pSrc, CopySize)
 			Return CopySize
@@ -102,15 +103,20 @@ Function xPack.Open(sFile As ZString Ptr) As Integer
 		FileHandle = NULL
 		OnErr(3, XPACK_ERROR_3)
 	EndIf
-	' 解压文件列表(LDB段)
+	' 读取文件列表（文件列表没压缩时直接读入xBsmm）
 	If PackHead.FileCount Then
-		Dim LDB_Data As Any Ptr = malloc(PackHead.LDB_Size)
-		Get_File(FileHandle, LDB_Data, PackHead.LDB_Addr, PackHead.LDB_Size)
-		Dim LDB_DeCompSize As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * PackHead.FileCount
-		Dim DeCompSize As UInteger = xPack_DeCompress(PackHead.PackFlag, LDB_Data, PackHead.LDB_Size, LDB->StructMemory, LDB_DeCompSize)
-		free(LDB_Data)
+		Dim LDB_Size As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * PackHead.FileCount
+		If (PackHead.PackFlag And XPACK_COMP_BITS) = 0 Then
+			Get_File(FileHandle, LDB->StructMemory, PackHead.LDB_Addr, PackHead.LDB_Size)
+		Else
+			' 解压文件列表(LDB段)
+			Dim LDB_Data As Any Ptr = malloc(PackHead.LDB_Size)
+			Get_File(FileHandle, LDB_Data, PackHead.LDB_Addr, PackHead.LDB_Size)
+			xPack_DeCompress(PackHead.PackFlag, LDB_Data, PackHead.LDB_Size, LDB->StructMemory, LDB_Size)
+			free(LDB_Data)
+		EndIf
 		' 校验文件列表数据
-		If (DeCompSize <> LDB_DeCompSize) OrElse (CityHash32(LDB->StructMemory, LDB_DeCompSize) <> PackHead.LDB_Hash) Then
+		If CityHash32(LDB->StructMemory, LDB_Size) <> PackHead.LDB_Hash Then
 			CloseHandle(FileHandle)
 			FileHandle = NULL
 			Delete LDB
@@ -255,8 +261,16 @@ Function xPack.GetFileInfo(idx As UInteger, bUsePos As Integer = 0) As xPack_Fil
 	' 从LDB读取数据
 	If bUsePos = 0 Then
 		idx = GetFilePos(idx)
+		If idx = 0 Then
+			Return 0
+		EndIf
 	EndIf
-	Return LDB->GetPtrStruct(idx)
+	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(idx)
+	If pInfo Then
+		Return pInfo
+	Else
+		OnErr(11, XPACK_ERROR_11)
+	EndIf
 End Function
 
 Function xPack.GetFileSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
@@ -327,6 +341,7 @@ Function xPack.GetFilePos(idx As UInteger) As UInteger
 			EndIf
 		Next
 	EndIf
+	OnErr(10, XPACK_ERROR_10)
 End Function
 
 Function xPack.GetFileIdx(iPos As UInteger) As UInteger
@@ -337,6 +352,8 @@ Function xPack.GetFileIdx(iPos As UInteger) As UInteger
 	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iPos)
 	If pInfo Then
 		Return pInfo->FileIndex
+	Else
+		OnErr(11, XPACK_ERROR_11)
 	EndIf
 End Function
 
@@ -404,20 +421,50 @@ Function xPack.AppendData(idx As UInteger, pInData As Any Ptr, iInSize As UInteg
 	Return iFilePos
 End Function
 
-Function xPack.UnpackFile(idx As UInteger, sFile As ZString Ptr) As UInteger
-	' 必须先打开压缩包
-	If FileHandle = NULL Then
-		OnErr(5, XPACK_ERROR_5)
+Function xPack.UnpackFile(idx As UInteger, bUsePos As Integer = 0, sFile As ZString Ptr) As UInteger
+	Dim FileSize As UInteger = GetFileSize(idx, bUsePos)
+	If FileSize Then
+		Dim pData As Any Ptr = malloc(FileSize)
+		If UnpackData(idx, bUsePos, pData) Then
+			Dim iPutSize As UInteger = PutFile(sFile, pData, 0, FileSize)
+			free(pData)
+			If iPutSize = FileSize Then
+				Return -1
+			Else
+				OnErr(8, XPACK_ERROR_8)
+			EndIf
+		Else
+			free(pData)
+		EndIf
 	EndIf
-	
 End Function
 
-Function xPack.UnpackData(idx As UInteger, sOutData As Any Ptr) As UInteger
+Function xPack.UnpackData(idx As UInteger, bUsePos As Integer = 0, sOutData As Any Ptr) As UInteger
 	' 必须先打开压缩包
 	If FileHandle = NULL Then
 		OnErr(5, XPACK_ERROR_5)
 	EndIf
-	
+	' 读取文件信息
+	Dim pInfo As xPack_FileInfo Ptr
+	pInfo = GetFileInfo(idx, bUsePos)
+	If pInfo Then
+		If (pInfo->FileFlag And XPACK_COMP_BITS) = 0 Then
+			' 读取文件数据（不需要解压时直接读到目标缓冲不中转）
+			Get_File(FileHandle, sOutData, pInfo->DataAddr, pInfo->DataSize)
+		Else
+			' 解压文件数据
+			Dim pData As Any Ptr = malloc(pInfo->DataSize)
+			Get_File(FileHandle, pData, pInfo->DataAddr, pInfo->DataSize)
+			xPack_DeCompress(pInfo->FileFlag, pData, pInfo->DataSize, sOutData, pInfo->FileSize)
+			free(pData)
+		EndIf
+		' hash 校验
+		If pInfo->FileHash = CityHash32(sOutData, pInfo->FileSize) Then
+			Return pInfo->FileSize
+		Else
+			OnErr(12, XPACK_ERROR_12)
+		EndIf
+	EndIf
 End Function
 
 Function xPack.DeleteFile(idx As UInteger, bUsePos As Integer = 0) As Integer

@@ -29,8 +29,11 @@
 #Define XPACK_ERROR_5	"操作前必须先打开文件包"
 #Define XPACK_ERROR_6	"文件列表数据添加失败"
 #Define XPACK_ERROR_7	"不允许添加 0 字节数据"
-#Define XPACK_ERROR_8	"文件数据写入长度异常"
+#Define XPACK_ERROR_8	"文件数据写入失败"
 #Define XPACK_ERROR_9	"已经添加过文件的包无法修改文件信息段数据长度"
+#Define XPACK_ERROR_10	"文件 idx 无效"
+#Define XPACK_ERROR_11	"文件 pos 无效"
+#Define XPACK_ERROR_12	"文件 hash 校验失败"
 
 
 
@@ -52,7 +55,7 @@ End Type
 Type xPack_FileInfo Field = 1
 	DataAddr As UInteger			' 数据位置
 	DataSize As UInteger			' 数据大小
-	FileHash As Integer				' 文件哈希值 [解压后]
+	FileHash As UInteger			' 文件哈希值 [解压后]
 	FileSize As UInteger			' 文件大小 [解压后]
 	FileFlag As UByte				' 文件标记 [XX:压缩算法]
 	FileVers As UByte				' 文件版本
@@ -96,8 +99,8 @@ Type xPack
 	' 文件操作
 	Declare Function AppendFile(idx As UInteger, sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
 	Declare Function AppendData(idx As UInteger, pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
-	Declare Function UnpackFile(idx As UInteger, sFile As ZString Ptr) As UInteger
-	Declare Function UnpackData(idx As UInteger, sOutData As Any Ptr) As UInteger
+	Declare Function UnpackFile(idx As UInteger, bUsePos As Integer = 0, sFile As ZString Ptr) As UInteger
+	Declare Function UnpackData(idx As UInteger, bUsePos As Integer = 0, sOutData As Any Ptr) As UInteger
 	Declare Function DeleteFile(idx As UInteger, bUsePos As Integer = 0) As Integer
 	
 	' 数据
