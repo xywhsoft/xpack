@@ -13,21 +13,18 @@
 
 
 
-#Define OnErr(a, b) If OnError Then OnError(a, b) : Return 0 : EndIf
+#Define OnErr(a, b) If OnError Then : LastError = a : OnError(a, b) : Return 0 : EndIf
 
 
 
 #Define XPACK_ERROR_1	"文件无法访问"
 #Define XPACK_ERROR_2	"文件格式不正确"
-#Define XPACK_ERROR_3	"文件版本不兼容"
+#Define XPACK_ERROR_3	"内存不足"
 #Define XPACK_ERROR_4	"文件列表读取失败"
-#Define XPACK_ERROR_5	"文件列表数据已经被损坏"
-#Define XPACK_ERROR_6	"文件数据无法读取"
-#Define XPACK_ERROR_7	"文件列表添加失败"
-#Define XPACK_ERROR_8	"文件无法写入"
-#Define XPACK_ERROR_9	"文件列表数据压缩失败"
-#Define XPACK_ERROR_10	"文件列表数据写入失败"
-#Define XPACK_ERROR_11	"文件头数据写入失败"
+#Define XPACK_ERROR_5	"操作前必须先打开文件包"
+#Define XPACK_ERROR_6	"文件列表数据添加失败"
+#Define XPACK_ERROR_7	"不允许添加 0 字节数据"
+#Define XPACK_ERROR_8	"文件数据写入长度异常"
 
 
 
@@ -69,14 +66,16 @@ Type xPack
 	' 包操作
 	Declare Function Open(sFile As ZString Ptr) As Integer
 	Declare Function Save(bIsRebuild As Integer) As Integer
-	Declare Sub Close()
+	Declare Function Close() As Integer
+	Declare Function IsOpen() As Integer
 	
 	' 文件信息操作
 	Declare Function GetFileInfo(idx As UInteger, bUsePos As Integer = 0) As xPack_FileInfo Ptr
 	Declare Function GetFileSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
 	Declare Function GetDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
-	Declare Function GetFileFlag(idx As UInteger, bUsePos As Integer = 0) As Integer
 	Declare Function GetFileHash(idx As UInteger, bUsePos As Integer = 0) As Integer
+	
+	' idx 和 pos 转换
 	Declare Function GetFilePos(idx As UInteger) As UInteger
 	Declare Function GetFileIdx(iPos As UInteger) As UInteger
 	
@@ -88,11 +87,10 @@ Type xPack
 	Declare Function DeleteFile(idx As UInteger, bUsePos As Integer = 0) As Integer
 	
 	' 数据
-	Default_CompLevel As Integer = 2	' 默认压缩方法
-	IsOpen As Integer				' 是否有打开的文件
-	IsChange As Integer				' 是否存在修改 [添加删除文件、修改Ext数据]
-	FileHandle As HANDLE			' 文件句柄 [打开文件后用于读写操作]
-	PackHead As xPack_FileHead		' 文件头
-	LDB As xBsmm Ptr				' 文件信息段数据
+	LastError As Integer				' 最后一次记录的错误
+	IsChange As Integer					' 是否存在修改 [添加删除文件、修改Ext数据]
+	FileHandle As HANDLE				' 文件句柄 [打开文件后用于读写操作]
+	PackHead As xPack_FileHead			' 文件头
+	LDB As xBsmm Ptr					' 文件信息段数据
 	
 End Type
