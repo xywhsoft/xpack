@@ -38,7 +38,7 @@ Type xPack_FileHead Field = 1
 	Ver_Sub As UByte				' 子版本
 	InfoSize As UShort				' 文件信息头 附加数据长度
 	FileCount As UInteger			' 文件数量
-	LDB_Addr As UInteger			' 文件表位置 [文件表使用 LZ4 压缩]
+	LDB_Addr As UInteger			' 文件表位置 [文件表使用 LZMA 压缩]
 	LDB_Size As UInteger			' 文件表大小
 	LDB_Hash As UInteger			' 文件表哈希值
 	Ext_Addr As UInteger			' 附加数据位置 [附加数据使用 LZ4 压缩]

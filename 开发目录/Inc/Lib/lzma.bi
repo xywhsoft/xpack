@@ -154,3 +154,24 @@ Declare Function LzmaUncompress(dest As UByte Ptr, destLen As UInteger Ptr, src 
 
 
 End Extern
+
+
+
+Function Lzma_Compress(source As ZString Ptr, dest As Any Ptr, sourceSize As Integer, maxDestSize As Integer) As UInteger
+	If maxDestSize > 5 Then
+		ZeroMemory(dest, LZMA_PROPS_SIZE)
+		Dim DestLen As UInteger = maxDestSize - LZMA_PROPS_SIZE
+		Dim PropLen As UInteger = LZMA_PROPS_SIZE
+		If LzmaCompress(dest + LZMA_PROPS_SIZE, @DestLen, source, sourceSize, dest, @PropLen, 1) = SZ_OK Then
+			Return DestLen + LZMA_PROPS_SIZE
+		EndIf
+	EndIf
+End Function
+
+Function Lzma_Uncompress(source As ZString Ptr, dest As ZString Ptr, compressedSize As Integer, maxDecompressedSize As Integer) As UInteger
+	If compressedSize > LZMA_PROPS_SIZE Then
+		If LzmaUncompress(dest, @maxDecompressedSize, source + LZMA_PROPS_SIZE, @compressedSize, source, LZMA_PROPS_SIZE) = SZ_OK Then
+			Return maxDecompressedSize
+		EndIf
+	EndIf
+End Function

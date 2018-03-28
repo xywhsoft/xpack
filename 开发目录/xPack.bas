@@ -24,17 +24,11 @@ Dim xpk As xPack
 
 xpk.OnError = @OnError
 
-Print "Open Start"
 xpk.Open(ExePath() & "\1.xpk")
-Print "Open Over"
 xpk.AppendData(1, @"1234567890", 10, 0)
-Print 1
 xpk.AppendData(2, @"1234567890", 10, 0)
-Print 2
 xpk.AppendData(3, @"1234567890", 10, 0)
-Print 3
 xpk.AppendData(4, @"1234567890", 10, 0)
-Print 4
 xpk.Save(0)
 xpk.Close()
 

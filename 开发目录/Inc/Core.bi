@@ -34,17 +34,10 @@ Function xPack.Open(sFile As ZString Ptr) As Integer
 	' 读取、解压文件列表(LDB段)
 	LDB = New xBsmm(SizeOf(xPack_FileInfo) + PackHead.InfoSize, 32, PackHead.FileCount)
 	If PackHead.FileCount Then
-		Print PackHead.LDB_Size
 		Dim LDB_Data As Any Ptr = malloc(PackHead.LDB_Size)
 		Get_File(FileHandle, LDB_Data, PackHead.LDB_Addr, PackHead.LDB_Size)
 		Dim LDB_DeCompSize As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * PackHead.FileCount
-		'Dim DeCompSize As UInteger = LZ4_decompress_safe(LDB_Data, LDB->StructMemory, PackHead.LDB_Size, LDB_DeCompSize)
-		Dim DeCompSize As UInteger = LDB_DeCompSize
-		Print DeCompSize
-		Dim arrProps(4) As UByte
-		Print LzmaUncompress(LDB->StructMemory, @DeCompSize, LDB_Data, @PackHead.LDB_Size, @arrProps(0), 5)
-		Print DeCompSize
-		Print PackHead.LDB_Size
+		Dim DeCompSize As UInteger = Lzma_Uncompress(LDB_Data, LDB->StructMemory, PackHead.LDB_Size, LDB_DeCompSize)
 		free(LDB_Data)
 		' 校验文件列表数据
 		If DeCompSize <> LDB_DeCompSize Then
@@ -93,10 +86,8 @@ Function xPack.Save(bIsRebuild As Integer) As Integer
 	' 压缩文件列表
 	Dim iSize As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * LDB->StructCount
 	Dim pData As Any Ptr = malloc(iSize)
-	PackHead.LDB_Size = iSize
-	Dim arrProps(4) As UByte
-	Dim iPropsSize As UInteger = 5
-	If LzmaCompress(pData, @PackHead.LDB_Size, LDB->StructMemory, iSize, @arrProps(0), @iPropsSize, 1) <> SZ_OK Then
+	PackHead.LDB_Size = Lzma_Compress(LDB->StructMemory, pData, iSize, iSize)
+	If PackHead.LDB_Size = 0 Then
 		free(pData)
 		OnErr(9, XPACK_ERROR_9)
 	EndIf
