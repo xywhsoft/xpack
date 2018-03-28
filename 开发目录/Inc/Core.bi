@@ -75,7 +75,7 @@ Function xPack.Open(sFile As ZString Ptr) As Integer
 		Dim NewPackHead As xPack_FileHead
 		NewPackHead.FileHead = "xpk"
 		NewPackHead.PackVers = XPACK_VERSION
-		NewPackHead.PackFlag = XPACK_COMP_LEVEL2 Or (XPACK_COMP_LEVEL2 Shl 2)
+		NewPackHead.PackFlag = XPACK_DEFAULT_LDBCOMP Or (XPACK_DEFAULT_FILECOMP Shl 2)
 		NewPackHead.InfoSize = 0
 		NewPackHead.FileCount = 0
 		NewPackHead.LDB_Addr = SizeOf(xPack_FileHead)
@@ -169,7 +169,7 @@ Function xPack.Close() As Integer
 	CloseHandle(FileHandle)
 	FileHandle = NULL
 	If LDB Then
-		free(LDB)
+		Delete(LDB)
 		LDB = NULL
 	EndIf
 	Return -1
@@ -177,6 +177,71 @@ End Function
 
 Function xPack.IsOpen() As Integer
 	Return IIf(FileHandle, -1, 0)
+End Function
+
+
+
+' 包信息操作
+Function xPack.FileCount() As UInteger
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 读取数据
+	Return LDB->StructCount
+End Function
+
+Function xPack.SetFileInfoExtSize(iNewVal As UShort) As Integer
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 已经添加过文件就不能调整了
+	If LDB->StructCount > 0 Then
+		OnErr(9, XPACK_ERROR_9)
+	EndIf
+	' 重新申请LDB
+	Dim NewLDB As xBsmm Ptr = New xBsmm(SizeOf(xPack_FileInfo) + iNewVal, 32, 0)
+	If NewLDB = NULL Then
+		OnErr(3, XPACK_ERROR_3)
+	EndIf
+	Delete(LDB)
+	LDB = NewLDB
+	' 写入数据
+	PackHead.InfoSize = iNewVal
+	IsChange = -1
+	Return -1
+End Function
+
+Function xPack.GetFileInfoExtSize() As UShort
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 读取数据
+	Return PackHead.InfoSize
+End Function
+
+Function xPack.SetDefaultCompressLevel(iNewVal As UInteger) As Integer
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 写入数据
+	If iNewVal > 3 Then iNewVal = 3
+	PackHead.PackFlag And= Not(XPACK_COMP_BITS Shl 2)
+	PackHead.PackFlag Or= (iNewVal Shl 2)
+	IsChange = -1
+	Return -1
+End Function
+
+Function xPack.GetDefaultCompressLevel() As UInteger
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 读取数据
+	Return (PackHead.PackFlag Shr 2) And XPACK_COMP_BITS
 End Function
 
 
@@ -206,7 +271,7 @@ Function xPack.GetFileSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
 	EndIf
 End Function
 
-Function xPack.GetDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
+Function xPack.GetFileDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
 	' 必须先打开压缩包
 	If FileHandle = NULL Then
 		OnErr(5, XPACK_ERROR_5)
@@ -227,6 +292,18 @@ Function xPack.GetFileHash(idx As UInteger, bUsePos As Integer = 0) As Integer
 	Dim pInfo As xPack_FileInfo Ptr = GetFileInfo(idx, bUsePos)
 	If pInfo Then
 		Return pInfo->FileHash
+	EndIf
+End Function
+
+Function xPack.GetFileCompLevel(idx As UInteger, bUsePos As Integer = 0) As UInteger
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 从LDB读取数据
+	Dim pInfo As xPack_FileInfo Ptr = GetFileInfo(idx, bUsePos)
+	If pInfo Then
+		Return pInfo->FileFlag
 	EndIf
 End Function
 
@@ -305,6 +382,7 @@ Function xPack.AppendData(idx As UInteger, pInData As Any Ptr, iInSize As UInteg
 	pInfo->FileHash = CityHash32(pInData, iInSize)
 	pInfo->DataAddr = PackHead.LDB_Addr
 	pInfo->FileSize = iInSize
+	pInfo->FileVers = 0
 	pInfo->FileRefs = 0
 	pInfo->FileIndex = idx
 	If iCompLevel < 0 Then iCompLevel = (PackHead.PackFlag Shr 2) And XPACK_COMP_BITS

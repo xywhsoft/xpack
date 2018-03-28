@@ -1,15 +1,20 @@
 
 
 
-#Define XPACK_VERSION	5
+#Define XPACK_VERSION			5
 
 
 
-#Define XPACK_COMP_NOUSED	0
-#Define XPACK_COMP_LEVEL1	1
-#Define XPACK_COMP_LEVEL2	2
-#Define XPACK_COMP_LEVEL3	3
-#Define XPACK_COMP_BITS		3
+#Define XPACK_COMP_NOUSED		0
+#Define XPACK_COMP_LEVEL1		1
+#Define XPACK_COMP_LEVEL2		2
+#Define XPACK_COMP_LEVEL3		3
+#Define XPACK_COMP_BITS			3
+
+
+
+#Define XPACK_DEFAULT_LDBCOMP	XPACK_COMP_NOUSED
+#Define XPACK_DEFAULT_FILECOMP	XPACK_COMP_LEVEL2
 
 
 
@@ -25,6 +30,7 @@
 #Define XPACK_ERROR_6	"文件列表数据添加失败"
 #Define XPACK_ERROR_7	"不允许添加 0 字节数据"
 #Define XPACK_ERROR_8	"文件数据写入长度异常"
+#Define XPACK_ERROR_9	"已经添加过文件的包无法修改文件信息段数据长度"
 
 
 
@@ -69,11 +75,19 @@ Type xPack
 	Declare Function Close() As Integer
 	Declare Function IsOpen() As Integer
 	
+	' 包信息操作
+	Declare Function FileCount() As UInteger
+	Declare Function SetFileInfoExtSize(iNewVal As UShort) As Integer
+	Declare Function GetFileInfoExtSize() As UShort
+	Declare Function SetDefaultCompressLevel(iNewVal As UInteger) As Integer
+	Declare Function GetDefaultCompressLevel() As UInteger
+	
 	' 文件信息操作
 	Declare Function GetFileInfo(idx As UInteger, bUsePos As Integer = 0) As xPack_FileInfo Ptr
 	Declare Function GetFileSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
-	Declare Function GetDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
+	Declare Function GetFileDataSize(idx As UInteger, bUsePos As Integer = 0) As UInteger
 	Declare Function GetFileHash(idx As UInteger, bUsePos As Integer = 0) As Integer
+	Declare Function GetFileCompLevel(idx As UInteger, bUsePos As Integer = 0) As UInteger
 	
 	' idx 和 pos 转换
 	Declare Function GetFilePos(idx As UInteger) As UInteger
@@ -88,7 +102,8 @@ Type xPack
 	
 	' 数据
 	LastError As Integer				' 最后一次记录的错误
-	IsChange As Integer					' 是否存在修改 [添加删除文件、修改Ext数据]
+	IsChange As Integer					' 是否存在修改 [添加删除文件、修改设置]
+	Protected:
 	FileHandle As HANDLE				' 文件句柄 [打开文件后用于读写操作]
 	PackHead As xPack_FileHead			' 文件头
 	LDB As xBsmm Ptr					' 文件信息段数据
