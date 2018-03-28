@@ -157,12 +157,12 @@ End Extern
 
 
 
-Function Lzma_Compress(source As ZString Ptr, dest As Any Ptr, sourceSize As Integer, maxDestSize As Integer) As UInteger
+Function Lzma_Compress(source As ZString Ptr, dest As Any Ptr, sourceSize As Integer, maxDestSize As Integer, level As Integer) As UInteger
 	If maxDestSize > 5 Then
 		ZeroMemory(dest, LZMA_PROPS_SIZE)
 		Dim DestLen As UInteger = maxDestSize - LZMA_PROPS_SIZE
 		Dim PropLen As UInteger = LZMA_PROPS_SIZE
-		If LzmaCompress(dest + LZMA_PROPS_SIZE, @DestLen, source, sourceSize, dest, @PropLen, 1) = SZ_OK Then
+		If LzmaCompress(dest + LZMA_PROPS_SIZE, @DestLen, source, sourceSize, dest, @PropLen, level) = SZ_OK Then
 			Return DestLen + LZMA_PROPS_SIZE
 		EndIf
 	EndIf

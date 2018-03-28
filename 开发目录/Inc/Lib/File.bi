@@ -54,8 +54,15 @@
 	
 	Function FileExists(ByVal FileName As ZString Ptr) As Integer
 		Dim FileHdr As HANDLE = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL)
-		If FileHdr <> INVALID_HANDLE_VALUE Then
-			CloseHandle(FileHdr)
+		Dim ErrorID As Integer = GetLastError()
+		CloseHandle(FileHdr)
+		If FileHdr = INVALID_HANDLE_VALUE Then
+			If ErrorID = 2 Then
+				Return 0
+			Else
+				Return -1
+			EndIf
+		Else
 			Return -1
 		EndIf
 	End Function

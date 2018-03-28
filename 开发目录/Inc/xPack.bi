@@ -1,8 +1,7 @@
 
 
 
-#Define VerCpt	5
-#Define VerSub	0
+#Define XPACK_VERSION	5
 
 
 
@@ -10,6 +9,7 @@
 #Define XPACK_COMP_LEVEL1	1
 #Define XPACK_COMP_LEVEL2	2
 #Define XPACK_COMP_LEVEL3	3
+#Define XPACK_COMP_BITS		3
 
 
 
@@ -31,20 +31,16 @@
 
 
 
-' 包信息头		[ 40 Byte ]
+' 包信息头		[ 24 Byte ]
 Type xPack_FileHead Field = 1
 	FileHead As ZString * 4			' 文件标识头 [xpk]
-	Ver_Cpt As UByte				' 兼容版本
-	Ver_Sub As UByte				' 子版本
+	PackVers As UByte				' 包文件版本
+	PackFlag As UByte				' 包标记 [XX:LDB压缩算法、00XX:文件默认压缩算法、0000XXXX:暂未使用]
 	InfoSize As UShort				' 文件信息头 附加数据长度
 	FileCount As UInteger			' 文件数量
-	LDB_Addr As UInteger			' 文件表位置 [文件表使用 LZMA 压缩]
+	LDB_Addr As UInteger			' 文件表位置 [文件表默认使用 Level2 压缩]
 	LDB_Size As UInteger			' 文件表大小
 	LDB_Hash As UInteger			' 文件表哈希值
-	Ext_Addr As UInteger			' 附加数据位置 [附加数据使用 LZ4 压缩]
-	Ext_Comp As UInteger			' 附加数据大小 [压缩后]
-	Ext_Size As UInteger			' 附加数据大小 [压缩前]
-	Ext_Hash As UInteger			' 附加数据哈希值
 End Type
 
 
@@ -55,9 +51,10 @@ Type xPack_FileInfo Field = 1
 	DataSize As UInteger			' 数据大小
 	FileHash As Integer				' 文件哈希值 [解压后]
 	FileSize As UInteger			' 文件大小 [解压后]
-	FileFlag As UShort				' 文件标记
+	FileFlag As UByte				' 文件标记 [XX:压缩算法]
+	FileVers As UByte				' 文件版本
 	FileRefs As UShort				' 文件引用计数
-	FileIndex As UInteger			' 文件 Index [访问ID]
+	FileIndex As Integer			' 文件 Index [访问ID]
 End Type
 
 
@@ -67,19 +64,12 @@ End Type
 Type xPack
 	
 	' 回调函数
-	OnError As Function(iErrCode As Integer, sErrText As ZString Ptr) As Integer		' [错误号码, 错误描述(中文)]
-	OnCompress As Function(pInData As Any Ptr, iInSize As UInteger, pOutData As Any Ptr, iOutSize As UInteger, iLevel As Integer) As UInteger		' [输入数据, 输入数据长度, 输出数据(内存已经分配好), 输出缓冲区长度, 压缩级别]
-	OnDeCompress As Function(pInData As Any Ptr, iInSize As UInteger, pOutData As Any Ptr, iOutSize As UInteger) As UInteger						' [输入数据, 输入数据长度, 输出数据(内存已经分配好), 输出缓冲区长度]
+	OnError As Sub(iErrCode As Integer, sErrText As ZString Ptr)			' [错误号码, 错误描述(中文)]
 	
 	' 包操作
 	Declare Function Open(sFile As ZString Ptr) As Integer
-	Declare Function Create(sFile As ZString Ptr, iInfoSize As Integer = 0) As Integer
 	Declare Function Save(bIsRebuild As Integer) As Integer
 	Declare Sub Close()
-	
-	' 包信息操作
-	Declare Function GetExtData(pOutData As Any Ptr) As Integer
-	Declare Function SetExtData(pInData As Any Ptr, iInSize As UInteger) As Integer
 	
 	' 文件信息操作
 	Declare Function GetFileInfo(idx As UInteger, bUsePos As Integer = 0) As xPack_FileInfo Ptr

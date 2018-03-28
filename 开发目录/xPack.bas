@@ -16,12 +16,15 @@
 
 
 
-Function OnError(iErrCode As Integer, sErrText As ZString Ptr) As Integer
+Sub OnError(iErrCode As Integer, sErrText As ZString Ptr)
 	Print iErrCode, *sErrText
-End Function
+End Sub
 
 Dim xpk As xPack
 
+
+
+'/'
 xpk.OnError = @OnError
 
 xpk.Open(ExePath() & "\1.xpk")
@@ -31,5 +34,6 @@ xpk.AppendData(3, @"1234567890", 10, 0)
 xpk.AppendData(4, @"1234567890", 10, 0)
 xpk.Save(0)
 xpk.Close()
+'/
 
 Sleep
