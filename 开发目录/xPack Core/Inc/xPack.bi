@@ -42,6 +42,7 @@
 #Define XPACK_ERROR_4	"文件列表读取失败"
 #Define XPACK_ERROR_5	"操作前必须先打开文件包"
 #Define XPACK_ERROR_6	"文件列表数据添加失败"
+#Define XPACK_ERROR_7	"不允许添加 0 字节数据"
 #Define XPACK_ERROR_8	"文件数据写入失败"
 #Define XPACK_ERROR_9	"已经添加过文件的包无法修改文件信息段数据长度"
 #Define XPACK_ERROR_10	"无效的文件位置"
@@ -505,6 +506,10 @@ Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As
 	If FileHandle = NULL Then
 		OnErr(5, XPACK_ERROR_5)
 	EndIf
+	' 添加数据长度为 0
+	If iInSize = 0 Then
+		OnErr(7, XPACK_ERROR_7)
+	EndIf
 	' 创建文件列表项
 	Dim iFilePos As UInteger = LDB->AppendStruct()
 	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iFilePos)
@@ -512,29 +517,24 @@ Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As
 		OnErr(6, XPACK_ERROR_6)
 	EndIf
 	' 计算文件Hash值、写入固定属性
+	pInfo->FileHash = CityHash32(pInData, iInSize)
 	pInfo->DataAddr = PackHead.LDB_Addr
 	pInfo->FileSize = iInSize
 	pInfo->FileType = iFileType
 	pInfo->Reserve = 0
 	If iCompLevel < 0 Then iCompLevel = (PackHead.PackFlag Shr 2) And XPACK_COMP_BITS
 	pInfo->CompLevel = IIf(iCompLevel > 3, 3, iCompLevel)
-	If iInSize Then
-		' 写入文件数据
-		pInfo->FileHash = CityHash32(pInData, iInSize)
-		Dim pData As Any Ptr
-		Dim iSize As UInteger = xPack_Compress(@pInfo->CompLevel, pInData, iInSize, @pData, iInSize)
-		Dim iPutSize As UInteger = Put_File(FileHandle, pData, FileOffset + PackHead.LDB_Addr, iSize)
-		free(pData)
-		If iPutSize = iSize Then
-			pInfo->DataSize = iSize
-			PackHead.LDB_Addr += iSize
-		Else
-			LDB->DeleteStruct(iFilePos)
-			OnErr(8, XPACK_ERROR_8)
-		EndIf
+	' 写入文件数据
+	Dim pData As Any Ptr
+	Dim iSize As UInteger = xPack_Compress(@pInfo->CompLevel, pInData, iInSize, @pData, iInSize)
+	Dim iPutSize As UInteger = Put_File(FileHandle, pData, FileOffset + PackHead.LDB_Addr, iSize)
+	free(pData)
+	If iPutSize = iSize Then
+		pInfo->DataSize = iSize
+		PackHead.LDB_Addr += iSize
 	Else
-		' 添加数据长度为 0
-		pInfo->FileHash = 0
+		LDB->DeleteStruct(iFilePos)
+		OnErr(8, XPACK_ERROR_8)
 	EndIf
 	' 设置修改标记，返回文件 pos
 	IsChange = -1
