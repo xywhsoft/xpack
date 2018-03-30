@@ -109,8 +109,10 @@ Type xPack
 	' 文件操作
 	Declare Function AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger
 	Declare Function AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger
-	Declare Function UnpackFile(iPos As UInteger, sFile As ZString Ptr) As UInteger
-	Declare Function UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integer = 0) As UInteger
+	Declare Function ChangeFile(iPos As UInteger, sFile As ZString Ptr, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As xPack_FileInfo Ptr
+	Declare Function ChangeData(iPos As UInteger, pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As xPack_FileInfo Ptr
+	Declare Function UnpackFile(iPos As UInteger, sFile As ZString Ptr) As xPack_FileInfo Ptr
+	Declare Function UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integer = 0) As xPack_FileInfo Ptr
 	Declare Function DeleteFile(iPos As UInteger) As Integer
 	
 	' 数据
@@ -493,12 +495,16 @@ Function xPack.AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1, iFil
 	EndIf
 	' 读取文件到内存
 	Dim iSize As UInteger = File_Len(pFile)
-	Dim pData As Any Ptr = malloc(iSize)
-	iSize = Get_File(pFile, pData, 0, iSize)
-	CloseHandle(pFile)
-	' 添加文件数据
-	Function = AppendData(pData, iSize, iCompLevel, iFileType)
-	free(pData)
+	If iSize Then
+		Dim pData As Any Ptr = malloc(iSize)
+		iSize = Get_File(pFile, pData, 0, iSize)
+		CloseHandle(pFile)
+		' 添加文件数据
+		Function = AppendData(pData, iSize, iCompLevel, iFileType)
+		free(pData)
+	Else
+		OnErr(7, XPACK_ERROR_7)
+	EndIf
 End Function
 
 Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger XPACK_EXPORT
@@ -541,14 +547,78 @@ Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As
 	Return iFilePos
 End Function
 
-Function xPack.UnpackFile(iPos As UInteger, sFile As ZString Ptr) As UInteger XPACK_EXPORT
-	Dim pData As Any Ptr
-	Dim iSize As UInteger = UnpackData(iPos, @pData, -1)
+Function xPack.ChangeFile(iPos As UInteger, sFile As ZString Ptr, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As xPack_FileInfo Ptr
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 打开文件
+	Dim pFile As HANDLE = Open_File(sFile)
+	If pFile = 0 Then
+		OnErr(1, XPACK_ERROR_1)
+	EndIf
+	' 读取文件到内存
+	Dim iSize As UInteger = File_Len(pFile)
 	If iSize Then
-		Dim iPutSize As UInteger = PutFile(sFile, pData, 0, iSize)
+		Dim pData As Any Ptr = malloc(iSize)
+		iSize = Get_File(pFile, pData, 0, iSize)
+		CloseHandle(pFile)
+		' 修改文件数据
+		Function = ChangeData(iPos, pData, iSize, iCompLevel, iFileType)
 		free(pData)
-		If iPutSize = iSize Then
-			Return -1
+	Else
+		OnErr(7, XPACK_ERROR_7)
+	EndIf
+End Function
+
+Function xPack.ChangeData(iPos As UInteger, pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As xPack_FileInfo Ptr
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 添加数据长度为 0
+	If iInSize = 0 Then
+		OnErr(7, XPACK_ERROR_7)
+	EndIf
+	' 获取文件列表项
+	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iPos)
+	If pInfo = NULL Then
+		OnErr(10, XPACK_ERROR_10)
+	EndIf
+	' 写入文件数据
+	Dim pData As Any Ptr
+	Dim CompLevel As UByte
+	Dim iSize As UInteger = xPack_Compress(@CompLevel, pInData, iInSize, @pData, iInSize)
+	Dim iPutSize As UInteger = Put_File(FileHandle, pData, FileOffset + PackHead.LDB_Addr, iSize)
+	free(pData)
+	If iPutSize = iSize Then
+		pInfo->DataSize = iSize
+		PackHead.LDB_Addr += iSize
+	Else
+		OnErr(8, XPACK_ERROR_8)
+	EndIf
+	' 计算文件Hash值、写入固定属性
+	pInfo->FileHash = CityHash32(pInData, iInSize)
+	pInfo->DataAddr = PackHead.LDB_Addr
+	pInfo->FileSize = iInSize
+	pInfo->CompLevel = CompLevel
+	pInfo->FileType = iFileType
+	pInfo->Reserve = 0
+	If iCompLevel < 0 Then iCompLevel = (PackHead.PackFlag Shr 2) And XPACK_COMP_BITS
+	pInfo->CompLevel = IIf(iCompLevel > 3, 3, iCompLevel)
+	' 设置修改标记，返回结构指针
+	IsChange = -1
+	Return pInfo
+End Function
+
+Function xPack.UnpackFile(iPos As UInteger, sFile As ZString Ptr) As xPack_FileInfo Ptr XPACK_EXPORT
+	Dim pData As Any Ptr
+	Dim pInfo As xPack_FileInfo Ptr = UnpackData(iPos, @pData, -1)
+	If pInfo Then
+		Dim iPutSize As UInteger = PutFile(sFile, pData, 0, pInfo->FileSize)
+		free(pData)
+		If iPutSize = pInfo->FileSize Then
+			Return pInfo
 		Else
 			OnErr(8, XPACK_ERROR_8)
 		EndIf
@@ -557,7 +627,7 @@ Function xPack.UnpackFile(iPos As UInteger, sFile As ZString Ptr) As UInteger XP
 	If pData Then free(pData)
 End Function
 
-Function xPack.UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integer = 0) As UInteger XPACK_EXPORT
+Function xPack.UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integer = 0) As xPack_FileInfo Ptr XPACK_EXPORT
 	' 必须先打开压缩包
 	If FileHandle = NULL Then
 		OnErr(5, XPACK_ERROR_5)
@@ -590,7 +660,7 @@ Function xPack.UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integ
 		EndIf
 		' hash 校验
 		If pInfo->FileHash = CityHash32(pOut, pInfo->FileSize) Then
-			Return pInfo->FileSize
+			Return pInfo
 		Else
 			OnErr(11, XPACK_ERROR_11)
 		EndIf
