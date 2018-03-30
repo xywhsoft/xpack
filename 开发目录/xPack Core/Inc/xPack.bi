@@ -103,6 +103,8 @@ Type xPack
 	Declare Function GetFileDataSize(iPos As UInteger) As UInteger
 	Declare Function GetFileHash(iPos As UInteger) As Integer
 	Declare Function GetFileCompLevel(iPos As UInteger) As UInteger
+	Declare Function GetFileType(iPos As UInteger) As UByte
+	Declare Function SetFileType(iPos As UInteger, iNewVal As UByte) As Integer
 	
 	' 文件操作
 	Declare Function AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger
@@ -442,6 +444,35 @@ Function xPack.GetFileCompLevel(iPos As UInteger) As UInteger XPACK_EXPORT
 	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iPos)
 	If pInfo Then
 		Return pInfo->CompLevel
+	Else
+		OnErr(10, XPACK_ERROR_10)
+	EndIf
+End Function
+
+Function xPack.GetFileType(iPos As UInteger) As UByte
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 从LDB读取数据
+	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iPos)
+	If pInfo Then
+		Return pInfo->FileType
+	Else
+		OnErr(10, XPACK_ERROR_10)
+	EndIf
+End Function
+
+Function xPack.SetFileType(iPos As UInteger, iNewVal As UByte) As Integer
+	' 必须先打开压缩包
+	If FileHandle = NULL Then
+		OnErr(5, XPACK_ERROR_5)
+	EndIf
+	' 修改数据
+	Dim pInfo As xPack_FileInfo Ptr = LDB->GetPtrStruct(iPos)
+	If pInfo Then
+		pInfo->FileType = iNewVal
+		Return -1
 	Else
 		OnErr(10, XPACK_ERROR_10)
 	EndIf
