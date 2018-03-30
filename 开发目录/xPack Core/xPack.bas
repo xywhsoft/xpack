@@ -26,7 +26,7 @@
 	Dim xpk As xPack
 	
 	xpk.OnError = @OnError
-	xpk.Open(ExePath() & "\1.xpk")
+	xpk.Open(ExePath() & "\1.xpk", 100)
 	
 	Dim s As ZString * 128
 	If xpk.FileCount > 0 Then

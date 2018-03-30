@@ -1,12 +1,6 @@
 
 
 
-#Define XPACK_TYPE_OTHER		0
-#Define XPACK_TYPE_XGI			1
-#Define XPACK_TYPE_STB			2
-#Define XPACK_TYPE_BASS			101
-#Define XPACK_TYPE_TEXT			201
-
 
 /'
 ' idx ºÍ pos ×ª»»

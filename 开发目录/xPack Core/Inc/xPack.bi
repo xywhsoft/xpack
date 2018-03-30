@@ -3,24 +3,36 @@
 
 #Define XPACK_EXPORT Export
 
-#Define XPACK_VERSION			5
+#Define XPACK_VERSION			5			' 包结构版本
+
+#Define XPACK_CLASS_CORE		&H0			' 使用 iPos 访问的压缩包 [二次开发核心]
+#Define XPACK_CLASS_INDEX		&H10		' 使用 Index 访问的压缩包
+#Define XPACK_CLASS_PATH		&H20		' 使用路径结构访问的压缩包
+#Define XPACK_CLASS_SPATH		&H30		' 使用单层路径访问的压缩包
+
+#Define XPACK_FILETYPE_OTHER	0			' 任意类型
+#Define XPACK_FILETYPE_XGI		1			' xgi 图像格式
+#Define XPACK_FILETYPE_STB		2			' stb 支持的图像格式
+#Define XPACK_FILETYPE_SOUND	101			' 声音格式
+#Define XPACK_FILETYPE_TEXT		201			' 文本格式
+#Define XPACK_FILETYPE_WTEXT	202			' UNICODE 文本格式
+#Define XPACK_FILETYPE_UTEXT	203			' UTF-8 文本格式
+#Define XPACK_FILETYPE_DIR		255			' 目录
+
+#Define XPACK_COMP_NOUSED		0			' 存储
+#Define XPACK_COMP_LEVEL1		1			' 极速压缩
+#Define XPACK_COMP_LEVEL2		2			' 标准压缩
+#Define XPACK_COMP_LEVEL3		3			' 极限压缩
+#Define XPACK_COMP_BITS			3			' 压缩位掩码
 
 
 
-#Define XPACK_COMP_NOUSED		0
-#Define XPACK_COMP_LEVEL1		1
-#Define XPACK_COMP_LEVEL2		2
-#Define XPACK_COMP_LEVEL3		3
-#Define XPACK_COMP_BITS			3
+#Define XPACK_DEFAULT_LDBCOMP	XPACK_COMP_LEVEL2		' 默认 LDB 压缩级别
+#Define XPACK_DEFAULT_FILECOMP	XPACK_COMP_LEVEL2		' 默认文件压缩级别
 
 
 
-#Define XPACK_DEFAULT_LDBCOMP	XPACK_COMP_LEVEL2
-#Define XPACK_DEFAULT_FILECOMP	XPACK_COMP_LEVEL2
-
-
-
-#Define OnErr(a, b) If OnError Then : LastError = a : OnError(a, b) : Return 0 : EndIf
+#Define OnErr(a, b) If OnError Then : /'LastError = a'/ : OnError(a, b) : Return 0 : EndIf
 
 
 
@@ -42,7 +54,7 @@
 Type xPack_FileHead Field = 1
 	FileHead As ZString * 4			' 文件标识头 [xpk]
 	PackVers As UByte				' 包文件版本
-	PackFlag As UByte				' 包标记 [XX:LDB压缩算法、00XX:文件默认压缩算法、0000XXXX:暂未使用]
+	PackFlag As UByte				' 包标记 [XX:LDB压缩算法、00XX:文件默认压缩算法、0000XXXX:压缩包类型（0:普通、&H10:Idx包、&H20:Path包、&H30:SPath包）]
 	InfoSize As UShort				' 文件信息头 附加数据长度
 	FileCount As UInteger			' 文件数量
 	LDB_Addr As UInteger			' 文件表位置 [文件表默认使用 Level2 压缩]
@@ -59,8 +71,8 @@ Type xPack_FileInfo Field = 1
 	FileSize As UInteger			' 文件大小 [解压后]
 	FileHash As UInteger			' 文件哈希值 [解压后]
 	CompLevel As UByte				' 压缩级别 [0:不压缩、1:快速压缩、2:均衡压缩、3:最大压缩]
-	Reserve1 As UByte				' 未使用数据
-	Reserve2 As UShort				' 未使用数据
+	FileType As UByte				' 文件类型
+	Reserve As UShort				' 未使用数据
 End Type
 
 
@@ -73,7 +85,7 @@ Type xPack
 	OnError As Sub(iErrCode As Integer, sErrText As ZString Ptr)			' [错误号码, 错误描述(中文)]
 	
 	' 包操作
-	Declare Function Open(sFile As ZString Ptr) As Integer
+	Declare Function Open(sFile As ZString Ptr, iOffset As UInteger = 0) As Integer
 	Declare Function Save(bIsRebuild As Integer) As Integer
 	Declare Function Close() As Integer
 	Declare Function IsOpen() As Integer
@@ -93,17 +105,17 @@ Type xPack
 	Declare Function GetFileCompLevel(iPos As UInteger) As UInteger
 	
 	' 文件操作
-	Declare Function AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger
-	Declare Function AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger
+	Declare Function AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger
+	Declare Function AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger
 	Declare Function UnpackFile(iPos As UInteger, sFile As ZString Ptr) As UInteger
 	Declare Function UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integer = 0) As UInteger
 	Declare Function DeleteFile(iPos As UInteger) As Integer
 	
 	' 数据
-	LastError As Integer				' 最后一次记录的错误
 	IsChange As Integer					' 是否存在修改 [添加删除文件、修改设置]
 	Protected:
 	FileHandle As HANDLE				' 文件句柄 [打开文件后用于读写操作]
+	FileOffset As UInteger				' 文件偏移
 	PackHead As xPack_FileHead			' 文件头
 	LDB As xBsmm Ptr					' 文件信息段数据
 	
@@ -165,7 +177,6 @@ Function xPack_DeCompress(tpe As UByte, pSrc As Any Ptr, iSrcSize As UInteger, p
 			Return Lzma_Uncompress(pSrc, pDst, iSrcSize, iDstSize)
 		Case Else
 			' 不压缩则直接复制数据（以较短的数据为准）
-			Print "未解压"
 			Dim CopySize As UInteger = IIf(iDstSize > iSrcSize, iSrcSize, iDstSize)
 			CopyMemory(pDst, pSrc, CopySize)
 			Return CopySize
@@ -177,7 +188,7 @@ End Function
 
 
 ' 包操作
-Function xPack.Open(sFile As ZString Ptr) As Integer XPACK_EXPORT
+Function xPack.Open(sFile As ZString Ptr, iOffset As UInteger = 0) As Integer XPACK_EXPORT
 	' 已经打开过文件则先关闭
 	If FileHandle Then
 		Close()
@@ -194,15 +205,16 @@ Function xPack.Open(sFile As ZString Ptr) As Integer XPACK_EXPORT
 		NewPackHead.LDB_Addr = SizeOf(xPack_FileHead)
 		NewPackHead.LDB_Size = 0
 		NewPackHead.LDB_Hash = 0
-		PutFile(sFile, @NewPackHead, 0, SizeOf(xPack_FileHead))
+		PutFile(sFile, @NewPackHead, iOffset, SizeOf(xPack_FileHead))
 	EndIf
 	' 打开文件
+	FileOffset = iOffset
 	FileHandle = Open_File(sFile)
 	If FileHandle = 0 Then
 		OnErr(1, XPACK_ERROR_1)
 	EndIf
 	' 读取信息段，验证文件头和版本
-	Get_File(FileHandle, @PackHead, 0, SizeOf(xPack_FileHead))
+	Get_File(FileHandle, @PackHead, iOffset, SizeOf(xPack_FileHead))
 	If (PackHead.FileHead <> "xpk") OrElse (PackHead.PackVers <> XPACK_VERSION) Then
 		CloseHandle(FileHandle)
 		FileHandle = NULL
@@ -219,11 +231,11 @@ Function xPack.Open(sFile As ZString Ptr) As Integer XPACK_EXPORT
 	If PackHead.FileCount Then
 		Dim LDB_Size As UInteger = (SizeOf(xPack_FileInfo) + PackHead.InfoSize) * PackHead.FileCount
 		If (PackHead.PackFlag And XPACK_COMP_BITS) = 0 Then
-			Get_File(FileHandle, LDB->StructMemory, PackHead.LDB_Addr, PackHead.LDB_Size)
+			Get_File(FileHandle, LDB->StructMemory, iOffset + PackHead.LDB_Addr, PackHead.LDB_Size)
 		Else
 			' 解压文件列表(LDB段)
 			Dim LDB_Data As Any Ptr = malloc(PackHead.LDB_Size)
-			Get_File(FileHandle, LDB_Data, PackHead.LDB_Addr, PackHead.LDB_Size)
+			Get_File(FileHandle, LDB_Data, iOffset + PackHead.LDB_Addr, PackHead.LDB_Size)
 			xPack_DeCompress(PackHead.PackFlag, LDB_Data, PackHead.LDB_Size, LDB->StructMemory, LDB_Size)
 			free(LDB_Data)
 		EndIf
@@ -256,7 +268,7 @@ Function xPack.Save(bIsRebuild As Integer) As Integer XPACK_EXPORT
 		Dim pData As Any Ptr
 		PackHead.LDB_Size = xPack_Compress(@PackHead.PackFlag, LDB->StructMemory, iSize, @pData, iSize)
 		' 写入文件列表
-		Dim iRet As Integer = Put_File(FileHandle, pData, PackHead.LDB_Addr, PackHead.LDB_Size)
+		Dim iRet As Integer = Put_File(FileHandle, pData, FileOffset + PackHead.LDB_Addr, PackHead.LDB_Size)
 		If PackHead.PackFlag And XPACK_COMP_BITS <> 0 Then
 			free(pData)
 		EndIf
@@ -267,7 +279,7 @@ Function xPack.Save(bIsRebuild As Integer) As Integer XPACK_EXPORT
 		PackHead.LDB_Hash = 0
 	EndIf
 	' 写入文件头数据
-	If Put_File(FileHandle, @PackHead, 0, SizeOf(xPack_FileHead)) = 0 Then
+	If Put_File(FileHandle, @PackHead, FileOffset, SizeOf(xPack_FileHead)) = 0 Then
 		OnErr(8, XPACK_ERROR_8)
 	EndIf
 	IsChange = 0
@@ -438,7 +450,7 @@ End Function
 
 
 ' 文件操作
-Function xPack.AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As UInteger XPACK_EXPORT
+Function xPack.AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger XPACK_EXPORT
 	' 必须先打开压缩包
 	If FileHandle = NULL Then
 		OnErr(5, XPACK_ERROR_5)
@@ -454,11 +466,11 @@ Function xPack.AppendFile(sFile As ZString Ptr, iCompLevel As Integer = -1) As U
 	iSize = Get_File(pFile, pData, 0, iSize)
 	CloseHandle(pFile)
 	' 添加文件数据
-	Function = AppendData(pData, iSize, iCompLevel)
+	Function = AppendData(pData, iSize, iCompLevel, iFileType)
 	free(pData)
 End Function
 
-Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1) As UInteger XPACK_EXPORT
+Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As Integer = -1, iFileType As UByte = XPACK_FILETYPE_OTHER) As UInteger XPACK_EXPORT
 	' 必须先打开压缩包
 	If FileHandle = NULL Then
 		OnErr(5, XPACK_ERROR_5)
@@ -477,14 +489,14 @@ Function xPack.AppendData(pInData As Any Ptr, iInSize As UInteger, iCompLevel As
 	pInfo->FileHash = CityHash32(pInData, iInSize)
 	pInfo->DataAddr = PackHead.LDB_Addr
 	pInfo->FileSize = iInSize
-	pInfo->Reserve1 = 0
-	pInfo->Reserve2 = 0
+	pInfo->FileType = iFileType
+	pInfo->Reserve = 0
 	If iCompLevel < 0 Then iCompLevel = (PackHead.PackFlag Shr 2) And XPACK_COMP_BITS
 	pInfo->CompLevel = IIf(iCompLevel > 3, 3, iCompLevel)
 	' 写入文件数据
 	Dim pData As Any Ptr
 	Dim iSize As UInteger = xPack_Compress(@pInfo->CompLevel, pInData, iInSize, @pData, iInSize)
-	Dim iPutSize As UInteger = Put_File(FileHandle, pData, PackHead.LDB_Addr, iSize)
+	Dim iPutSize As UInteger = Put_File(FileHandle, pData, FileOffset + PackHead.LDB_Addr, iSize)
 	free(pData)
 	If iPutSize = iSize Then
 		pInfo->DataSize = iSize
@@ -537,11 +549,11 @@ Function xPack.UnpackData(iPos As UInteger, sOutData As Any Ptr, bAlloc As Integ
 		EndIf
 		' 读取文件数据（不需要解压时直接读到目标缓冲不中转）
 		If (pInfo->CompLevel And XPACK_COMP_BITS) = 0 Then
-			Get_File(FileHandle, pOut, pInfo->DataAddr, pInfo->DataSize)
+			Get_File(FileHandle, pOut, FileOffset + pInfo->DataAddr, pInfo->DataSize)
 		Else
 			' 解压文件数据
 			Dim pData As Any Ptr = malloc(pInfo->DataSize)
-			Get_File(FileHandle, pData, pInfo->DataAddr, pInfo->DataSize)
+			Get_File(FileHandle, pData, FileOffset + pInfo->DataAddr, pInfo->DataSize)
 			xPack_DeCompress(pInfo->CompLevel, pData, pInfo->DataSize, pOut, pInfo->FileSize)
 			free(pData)
 		EndIf
