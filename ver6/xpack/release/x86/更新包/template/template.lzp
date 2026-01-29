@@ -1,0 +1,40 @@
+{
+    "Version": 1,
+    "Project": {
+        "Description": "$Project_Description",
+        "AppPath": "$Project_AppPath",
+        "Icon": "$Project_Icon"
+    },
+    "Status": {
+        "ProjExpand": true,
+        "FileExpand": true,
+        "LibsExpand": true
+    },
+    "Build": {
+        "File": "$Build_File",
+        "Icon": "$Build_Icon",
+        "ProcessName": "GeekBot",
+        "Comments": "Power By GeekBot (http://xxrpa.com)",
+        "CompanyName": "xxrpa",
+        "FileDescription": "GeekBot Application",
+        "LegalCopyright": "Copyright 2019 - 2022 GeekBot All right reserved",
+        "LegalTrademarks": "GeekBot",
+        "ProductName": "GeekBot Application",
+        "ProductVersion": "1.0.0.0",
+        "UseFileVersion": true,
+        "OriginalFilename": "GeekBot.exe",
+        "FileVersion1": 1,
+        "FileVersion2": 0,
+        "FileVersion3": 0,
+        "FileVersion4": 0,
+        "FileVersionAutoAdd": 2,
+        "Charset": "UTF-8"
+    },
+    "Library": [
+		$Project_Library
+	],
+    "File": [
+		$Project_Files
+	],
+    "BootCode": ""
+}

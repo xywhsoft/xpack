@@ -1,0 +1,27 @@
+
+
+
+// 禁用输入法
+XXAPI int IME_Disable(HWND hWindow)
+{
+	if ( xCore.hCurKL == NULL ) { xCore.hCurKL = GetKeyboardLayout(0); }
+	LoadKeyboardLayout("00000409", KLF_ACTIVATE);
+	if ( xCore.hIMC == NULL ) { ImmAssociateContext(hWindow, NULL); }
+	return TRUE;
+}
+
+// 启用输入法
+XXAPI int IME_Enable(HWND hWindow)
+{
+	if ( xCore.hCurKL ) {
+		ActivateKeyboardLayout(xCore.hCurKL, 0);
+		xCore.hCurKL = NULL;
+	}
+	if ( xCore.hIMC ) {
+		ImmAssociateContext(hWindow, xCore.hIMC);
+		xCore.hIMC = NULL;
+	}
+	return TRUE;
+}
+
+
