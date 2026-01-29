@@ -64,11 +64,11 @@ int xpkCompressRouter(int level, const void* src, uint32_t srcSize,
         }
             
         case XPK_ALG_ZSTD: {
-            // ZSTD 压缩（禁用内置 checksum，xPack 使用 xrtHash32 验证）
+            // ZSTD 压缩
             ZSTD_CCtx* cctx = ZSTD_createCCtx();
             if (!cctx) return -1;
             
-            // 禁用 checksum（我们使用 xrtHash32 代替）
+            // 禁用 checksum（xPack 使用 xrtHash32 代替）
             ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0);
             ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, map->nativeLevel);
             
