@@ -40,6 +40,20 @@ extern "C" {
 #define XPK_ALG_LZ4         1               // LZ4
 #define XPK_ALG_LZ4HC       2               // LZ4-HC
 #define XPK_ALG_ZSTD        3               // ZSTD
+#define XPK_ALG_LZMA2       4               // LZMA2
+
+// ============================================================================
+// ZSTD 策略常量（与 ZSTD_strategy 枚举对应）
+// ============================================================================
+#define XPK_ZSTD_FAST       1               // ZSTD_fast
+#define XPK_ZSTD_DFAST      2               // ZSTD_dfast
+#define XPK_ZSTD_GREEDY     3               // ZSTD_greedy
+#define XPK_ZSTD_LAZY       4               // ZSTD_lazy
+#define XPK_ZSTD_LAZY2      5               // ZSTD_lazy2
+#define XPK_ZSTD_BTLAZY2    6               // ZSTD_btlazy2
+#define XPK_ZSTD_BTOPT      7               // ZSTD_btopt
+#define XPK_ZSTD_BTULTRA    8               // ZSTD_btultra
+#define XPK_ZSTD_BTULTRA2   9               // ZSTD_btultra2
 
 // ============================================================================
 // 文件类型标识（可选，用户自定义）
@@ -61,7 +75,7 @@ extern "C" {
 // ============================================================================
 // 默认值
 // ============================================================================
-#define XPK_COMP_DEFAULT    6               // 默认压缩级别
+#define XPK_COMP_DEFAULT    7               // 默认压缩级别 (ZSTD greedy)
 #define XPK_LDB_COMP        8               // LDB 默认压缩级别
 
 // ============================================================================
@@ -224,22 +238,22 @@ typedef struct {
 // 压缩级别映射表
 // ============================================================================
 static const xpkCompMap xpkCompTable[16] = {
-    { XPK_ALG_STORE,  0 },              // 0:  无压缩
-    { XPK_ALG_LZ4,    1 },              // 1:  LZ4 default
-    { XPK_ALG_LZ4HC,  4 },              // 2:  LZ4-HC level 4
-    { XPK_ALG_LZ4HC,  9 },              // 3:  LZ4-HC level 9
-    { XPK_ALG_ZSTD,   1 },              // 4:  ZSTD level 1
-    { XPK_ALG_ZSTD,   2 },              // 5:  ZSTD level 2
-    { XPK_ALG_ZSTD,   4 },              // 6:  ZSTD level 4  [DEFAULT]
-    { XPK_ALG_ZSTD,   6 },              // 7:  ZSTD level 6
-    { XPK_ALG_ZSTD,   8 },              // 8:  ZSTD level 8
-    { XPK_ALG_ZSTD,  10 },              // 9:  ZSTD level 10
-    { XPK_ALG_ZSTD,  12 },              // 10: ZSTD level 12
-    { XPK_ALG_ZSTD,  14 },              // 11: ZSTD level 14
-    { XPK_ALG_ZSTD,  16 },              // 12: ZSTD level 16
-    { XPK_ALG_ZSTD,  18 },              // 13: ZSTD level 18
-    { XPK_ALG_ZSTD,  20 },              // 14: ZSTD level 20
-    { XPK_ALG_ZSTD,  22 },              // 15: ZSTD level 22
+    { XPK_ALG_STORE,  0 },                  // 0:  无压缩
+    { XPK_ALG_LZ4,    1 },                  // 1:  LZ4 fast
+    { XPK_ALG_LZ4,    2 },                  // 2:  LZ4 fast (64KB)
+    { XPK_ALG_LZ4HC,  4 },                  // 3:  LZ4-HC level 4
+    { XPK_ALG_LZ4HC, 12 },                  // 4:  LZ4-HC level 12
+    { XPK_ALG_ZSTD,  XPK_ZSTD_FAST },       // 5:  ZSTD fast
+    { XPK_ALG_ZSTD,  XPK_ZSTD_DFAST },      // 6:  ZSTD dfast
+    { XPK_ALG_ZSTD,  XPK_ZSTD_GREEDY },     // 7:  ZSTD greedy [DEFAULT]
+    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY },       // 8:  ZSTD lazy
+    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY2 },      // 9:  ZSTD lazy2
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTLAZY2 },    // 10: ZSTD btlazy2
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTOPT },      // 11: ZSTD btopt
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA },    // 12: ZSTD btultra
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA2 },   // 13: ZSTD btultra2
+    { XPK_ALG_LZMA2, 6 },                   // 14: LZMA2 level 6
+    { XPK_ALG_LZMA2, 9 },                   // 15: LZMA2 level 9
 };
 
 // ============================================================================

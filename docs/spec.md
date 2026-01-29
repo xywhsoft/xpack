@@ -14,7 +14,7 @@ xPack 是一个轻量级文件压缩包库，提供高效的文件打包、压�
 
 ### 1.2 设计目标
 
-- **简化压缩方案**：采用纯 ZSTD 方案，移除 LZMA2/XZ
+- **多级压缩方案**：LZ4/ZSTD 为主力，LZMA2 作为最高压缩级别
 - **压缩级别体系**：0-15 级，保证严格单调性
 - **统一依赖库**：整合使用 xrt 库
 - **位域结构**：使用位域替代 MASK 掩码运算
@@ -35,21 +35,21 @@ xPack 是一个轻量级文件压缩包库，提供高效的文件打包、压�
 | 级别 | 算法 | 原生参数 | 压缩比 | 压缩速度 | 解压速度 |
 |:----:|------|----------|:------:|:--------:|:--------:|
 | 0 | 无压缩 | - | 1.00 | ∞ | ∞ |
-| 1 | LZ4 | default | ~2.10 | 780 MB/s | 4500 MB/s |
-| 2 | LZ4-HC | level 4 | ~2.45 | 120 MB/s | 4500 MB/s |
-| 3 | LZ4-HC | level 9 | ~2.72 | 40 MB/s | 4500 MB/s |
-| 4 | ZSTD | level 1 | ~2.88 | 500 MB/s | 1400 MB/s |
-| 5 | ZSTD | level 2 | ~2.95 | 400 MB/s | 1380 MB/s |
-| **6** | **ZSTD** | **level 4** | **~3.08** | **250 MB/s** | **1350 MB/s** |
-| 7 | ZSTD | level 6 | ~3.15 | 130 MB/s | 1300 MB/s |
-| 8 | ZSTD | level 8 | ~3.22 | 70 MB/s | 1260 MB/s |
-| 9 | ZSTD | level 10 | ~3.28 | 45 MB/s | 1220 MB/s |
-| 10 | ZSTD | level 12 | ~3.33 | 30 MB/s | 1180 MB/s |
-| 11 | ZSTD | level 14 | ~3.38 | 18 MB/s | 1140 MB/s |
-| 12 | ZSTD | level 16 | ~3.43 | 10 MB/s | 1100 MB/s |
-| 13 | ZSTD | level 18 | ~3.47 | 6 MB/s | 1050 MB/s |
-| 14 | ZSTD | level 20 | ~3.50 | 4 MB/s | 1000 MB/s |
-| 15 | ZSTD | level 22 | ~3.52 | 2 MB/s | 950 MB/s |
+| 1 | LZ4 | fast | ~2.00 | 800 MB/s | 4500 MB/s |
+| 2 | LZ4 | fast (64KB) | ~2.10 | 750 MB/s | 4500 MB/s |
+| 3 | LZ4-HC | level 4 | ~2.45 | 120 MB/s | 4500 MB/s |
+| 4 | LZ4-HC | level 12 | ~2.72 | 40 MB/s | 4500 MB/s |
+| 5 | ZSTD | fast | ~2.88 | 500 MB/s | 1400 MB/s |
+| 6 | ZSTD | dfast | ~2.95 | 400 MB/s | 1380 MB/s |
+| **7** | **ZSTD** | **greedy** | **~3.08** | **250 MB/s** | **1350 MB/s** |
+| 8 | ZSTD | lazy | ~3.15 | 130 MB/s | 1300 MB/s |
+| 9 | ZSTD | lazy2 | ~3.22 | 70 MB/s | 1260 MB/s |
+| 10 | ZSTD | btlazy2 | ~3.28 | 45 MB/s | 1220 MB/s |
+| 11 | ZSTD | btopt | ~3.35 | 18 MB/s | 1140 MB/s |
+| 12 | ZSTD | btultra | ~3.43 | 10 MB/s | 1100 MB/s |
+| 13 | ZSTD | btultra2 | ~3.50 | 4 MB/s | 1000 MB/s |
+| 14 | LZMA2 | level 6 | ~3.70 | 3 MB/s | 150 MB/s |
+| 15 | LZMA2 | level 9 | ~3.90 | 1.5 MB/s | 150 MB/s |
 
 ### 2.2 单调性约束
 
@@ -62,12 +62,13 @@ xPack 是一个轻量级文件压缩包库，提供高效的文件打包、压�
 #define XPK_ALG_LZ4     1   // LZ4
 #define XPK_ALG_LZ4HC   2   // LZ4-HC
 #define XPK_ALG_ZSTD    3   // ZSTD
+#define XPK_ALG_LZMA2   4   // LZMA2
 ```
 
 ### 2.4 默认值
 
 ```c
-#define XPK_COMP_DEFAULT    6   // 默认压缩级别 (ZSTD level 4)
+#define XPK_COMP_DEFAULT    7   // 默认压缩级别 (ZSTD greedy)
 #define XPK_LDB_COMP        8   // LDB 默认压缩级别
 ```
 
@@ -320,6 +321,7 @@ const char* xpkLastErrorMsg(void);
 | xrt | latest | 文件操作、内存管理、哈希、数组 |
 | lz4 | 1.9+ | LZ4/LZ4-HC 压缩 |
 | zstd | 1.5+ | ZSTD 压缩 |
+| lzma | 2501+ | LZMA2 压缩 (LZMA SDK) |
 
 ### 7.2 头文件引用
 
@@ -328,6 +330,8 @@ const char* xpkLastErrorMsg(void);
 #include <lz4/lz4.h>
 #include <lz4/lz4hc.h>
 #include <zstd/zstd.h>
+#include <lzma/Lzma2Enc.h>
+#include <lzma/Lzma2Dec.h>
 ```
 
 ### 7.3 xrt 功能映射
@@ -393,23 +397,34 @@ const char* xpkLastErrorMsg(void);
 ## 附录 A: 压缩级别映射表
 
 ```c
+// ZSTD 策略常量
+#define XPK_ZSTD_FAST       1
+#define XPK_ZSTD_DFAST      2
+#define XPK_ZSTD_GREEDY     3
+#define XPK_ZSTD_LAZY       4
+#define XPK_ZSTD_LAZY2      5
+#define XPK_ZSTD_BTLAZY2    6
+#define XPK_ZSTD_BTOPT      7
+#define XPK_ZSTD_BTULTRA    8
+#define XPK_ZSTD_BTULTRA2   9
+
 static const xpkCompMap xpkCompTable[16] = {
-    { XPK_ALG_STORE,  0 },  // 0
-    { XPK_ALG_LZ4,    1 },  // 1
-    { XPK_ALG_LZ4HC,  4 },  // 2
-    { XPK_ALG_LZ4HC,  9 },  // 3
-    { XPK_ALG_ZSTD,   1 },  // 4
-    { XPK_ALG_ZSTD,   2 },  // 5
-    { XPK_ALG_ZSTD,   4 },  // 6 [DEFAULT]
-    { XPK_ALG_ZSTD,   6 },  // 7
-    { XPK_ALG_ZSTD,   8 },  // 8
-    { XPK_ALG_ZSTD,  10 },  // 9
-    { XPK_ALG_ZSTD,  12 },  // 10
-    { XPK_ALG_ZSTD,  14 },  // 11
-    { XPK_ALG_ZSTD,  16 },  // 12
-    { XPK_ALG_ZSTD,  18 },  // 13
-    { XPK_ALG_ZSTD,  20 },  // 14
-    { XPK_ALG_ZSTD,  22 },  // 15
+    { XPK_ALG_STORE,  0 },                  // 0:  无压缩
+    { XPK_ALG_LZ4,    1 },                  // 1:  LZ4 fast
+    { XPK_ALG_LZ4,    2 },                  // 2:  LZ4 fast (64KB)
+    { XPK_ALG_LZ4HC,  4 },                  // 3:  LZ4-HC level 4
+    { XPK_ALG_LZ4HC, 12 },                  // 4:  LZ4-HC level 12
+    { XPK_ALG_ZSTD,  XPK_ZSTD_FAST },       // 5:  ZSTD fast
+    { XPK_ALG_ZSTD,  XPK_ZSTD_DFAST },      // 6:  ZSTD dfast
+    { XPK_ALG_ZSTD,  XPK_ZSTD_GREEDY },     // 7:  ZSTD greedy [DEFAULT]
+    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY },       // 8:  ZSTD lazy
+    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY2 },      // 9:  ZSTD lazy2
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTLAZY2 },    // 10: ZSTD btlazy2
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTOPT },      // 11: ZSTD btopt
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA },    // 12: ZSTD btultra
+    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA2 },   // 13: ZSTD btultra2
+    { XPK_ALG_LZMA2, 6 },                   // 14: LZMA2 level 6
+    { XPK_ALG_LZMA2, 9 },                   // 15: LZMA2 level 9
 };
 ```
 

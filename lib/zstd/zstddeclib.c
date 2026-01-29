@@ -1,11 +1,20 @@
 /**
- * \file zstddeclib.c
- * Single-file Zstandard decompressor.
+ * \file xpack_zstddec.c
+ * xPack Ver7 - Minified Zstandard decompressor only
  *
  * Generate using:
  * \code
- *	python combine.py -r ../../lib -x legacy/zstd_legacy.h -o zstddeclib.c zstddeclib-in.c
+ *   cd D:/other-git/zstd/build/single_file_libs
+ *   python combine.py -r ../../lib -x legacy/zstd_legacy.h -o d:/git/xPack/lib/zstd/zstddeclib.c d:/git/xPack/lib/zstd/xpack_zstddec-in.c
  * \endcode
+ *
+ * Optimizations applied (based on ZSTD_LIB_MINIFY):
+ *   - No legacy format support (ZSTD_LEGACY_SUPPORT=0)
+ *   - Decompression only (no compress/*.c)
+ *   - HUF_FORCE_DECOMPRESS_X1 - single Huffman decoder
+ *   - ZSTD_FORCE_DECOMPRESS_SEQUENCES_SHORT - short sequence decoder only
+ *   - ZSTD_STRIP_ERROR_STRINGS - remove error messages
+ *   - ZSTD_NO_INLINE - reduce code size
  */
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
@@ -16,23 +25,13 @@
  * in the COPYING file in the root directory of this source tree).
  * You may select, at your option, one of the above-listed licenses.
  */
-/*
- * Settings to bake for the standalone decompressor.
- *
- * Note: It's important that none of these affects 'zstd.h' (only the
- * implementation files we're amalgamating).
- *
- * Note: MEM_MODULE stops xxhash redefining BYTE, U16, etc., which are also
- * defined in mem.h (breaking C99 compatibility).
- *
- * Note: the undefs for xxHash allow Zstd's implementation to coincide with
- * standalone xxHash usage (with global defines).
- *
- * Note: if you enable ZSTD_LEGACY_SUPPORT the combine.py script will need
- * re-running without the "-x legacy/zstd_legacy.h" option (it excludes the
- * legacy support at the source level).
- */
+
+/*=== Debug & Assertion Control ===*/
 #define DEBUGLEVEL 0
+#define ZSTD_ASSERTIONS 0
+#define NDEBUG
+
+/*=== XXHash Configuration ===*/
 #define MEM_MODULE
 #undef  XXH_NAMESPACE
 #define XXH_NAMESPACE ZSTD_
@@ -40,11 +39,17 @@
 #define XXH_PRIVATE_API
 #undef  XXH_INLINE_ALL
 #define XXH_INLINE_ALL
+
+/*=== Feature Disable ===*/
 #define ZSTD_LEGACY_SUPPORT 0
-#define ZSTD_STRIP_ERROR_STRINGS
 #define ZSTD_TRACE 0
-/* TODO: Can't amalgamate ASM function */
 #define ZSTD_DISABLE_ASM 1
+
+/*=== ZSTD_LIB_MINIFY Optimizations ===*/
+#define HUF_FORCE_DECOMPRESS_X1 1
+#define ZSTD_FORCE_DECOMPRESS_SEQUENCES_SHORT 1
+#define ZSTD_NO_INLINE 1
+#define ZSTD_STRIP_ERROR_STRINGS 1
 
 /* Include zstd_deps.h first with all the options we need enabled. */
 #define ZSTD_DEPS_NEED_MALLOC
@@ -174,6 +179,7 @@
 #endif /* ZSTD_DEPS_NEED_STDINT */
 /**** ended inlining common/zstd_deps.h ****/
 
+/*=== Common Files ===*/
 /**** start inlining common/debug.c ****/
 /* ******************************************************************
  * debug
@@ -15067,6 +15073,7 @@ int ZSTD_isDeterministicBuild(void)
 }
 /**** ended inlining common/zstd_common.c ****/
 
+/*=== Decompression Files ===*/
 /**** start inlining decompress/huf_decompress.c ****/
 /* ******************************************************************
  * huff0 huffman decoder,
