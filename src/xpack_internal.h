@@ -43,6 +43,13 @@ typedef struct xpkStruct {
 // 内部辅助函数
 // ============================================================================
 
+// xrt 数组是 1-based 的，这些宏用于转换
+// XPK_LDB_GET: 用 0-based 索引获取元素 (传入 0 返回第一个元素)
+// XPK_LDB_POS: 将 xrtArrayAppend 返回的 1-based 位置转为 0-based
+#define XPK_LDB_GET(xpk, pos0) xrtArrayGet(&(xpk)->ldb, (pos0) + 1)
+#define XPK_LDB_POS(pos1) ((pos1) - 1)
+#define XPK_LDB_REMOVE(xpk, pos0, count) xrtArrayRemove(&(xpk)->ldb, (pos0) + 1, count)
+
 // 压缩/解压路由
 int xpkCompressRouter(int level, const void* src, uint32_t srcSize, 
                       void* dst, uint32_t dstCapacity, uint32_t* outSize);

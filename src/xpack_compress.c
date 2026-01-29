@@ -64,9 +64,17 @@ int xpkCompressRouter(int level, const void* src, uint32_t srcSize,
         }
             
         case XPK_ALG_ZSTD: {
-            // ZSTD 压缩
-            size_t compSize = ZSTD_compress(dst, dstCapacity, src, srcSize, 
-                                            map->nativeLevel);
+            // ZSTD 压缩（禁用内置 checksum，xPack 使用 xrtHash32 验证）
+            ZSTD_CCtx* cctx = ZSTD_createCCtx();
+            if (!cctx) return -1;
+            
+            // 禁用 checksum（我们使用 xrtHash32 代替）
+            ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 0);
+            ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, map->nativeLevel);
+            
+            size_t compSize = ZSTD_compress2(cctx, dst, dstCapacity, src, srcSize);
+            ZSTD_freeCCtx(cctx);
+            
             if (ZSTD_isError(compSize)) {
                 // 压缩失败，回退到无压缩
                 if (dstCapacity < srcSize) return -1;

@@ -141,7 +141,7 @@ init_new_pack:
         xpk->head.version = XPK_VERSION;
         xpk->head.flag.packType = XPK_TYPE_CORE;
         xpk->head.flag.ldbComp = XPK_LDB_COMP;
-        xpk->head.createTime = (uint32_t)xrtToUnixTime(xrtTimeNow());
+        xpk->head.createTime = (uint32_t)xrtToUnixTime(xrtNow());
         xpk->head.modifyTime = xpk->head.createTime;
         
         // 初始化 LDB 数组（默认 Core 模式）
@@ -163,7 +163,7 @@ XPKAPI int xpkSave(xpkObject xpk) {
     if (!xpk->modified) return 0;  // 无修改
     
     // 更新修改时间
-    xpk->head.modifyTime = (uint32_t)xrtToUnixTime(xrtTimeNow());
+    xpk->head.modifyTime = (uint32_t)xrtToUnixTime(xrtNow());
     xpk->head.fileCount = xpk->ldb.Count;
     
     // 移动到文件开始位置

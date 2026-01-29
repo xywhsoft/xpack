@@ -76,7 +76,7 @@ XPKAPI uint32_t xpkAppendData(xpkObject xpk, const void* data, uint32_t size, in
     
     // 如果有现有文件，计算下一个数据偏移
     if (xpk->ldb.Count > 0) {
-        xpkFileInfo* lastInfo = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, xpk->ldb.Count - 1);
+        xpkFileInfo* lastInfo = (xpkFileInfo*)XPK_LDB_GET(xpk, xpk->ldb.Count - 1);
         if (lastInfo) {
             dataOffset = lastInfo->dataOffset + lastInfo->dataSize;
         }
@@ -92,8 +92,8 @@ XPKAPI uint32_t xpkAppendData(xpkObject xpk, const void* data, uint32_t size, in
     free(compData);
     
     // 追加文件信息到 LDB
-    uint32_t pos = xrtArrayAppend(&xpk->ldb, 1);
-    xpkFileInfo* info = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, pos);
+    uint32_t pos1 = xrtArrayAppend(&xpk->ldb, 1);  // 1-based position
+    xpkFileInfo* info = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, pos1);
     if (!info) {
         xpkSetError(3, "Failed to allocate file info");
         return UINT32_MAX;
@@ -109,7 +109,7 @@ XPKAPI uint32_t xpkAppendData(xpkObject xpk, const void* data, uint32_t size, in
     info->flag.fileType = XPK_FTYPE_UNKNOWN;
     
     xpk->modified = 1;
-    return pos;
+    return pos1 - 1;  // Return 0-based position
 }
 
 // ============================================================================
@@ -135,7 +135,7 @@ XPKAPI void* xpkExtractData(xpkObject xpk, uint32_t pos, uint32_t* outSize) {
         return NULL;
     }
     
-    xpkFileInfo* info = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, pos);
+    xpkFileInfo* info = (xpkFileInfo*)XPK_LDB_GET(xpk, pos);
     if (!info) {
         xpkSetError(6, "Failed to get file info");
         return NULL;
@@ -211,7 +211,7 @@ XPKAPI int xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint32_t
         return -1;
     }
     
-    xpkFileInfo* info = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, pos);
+    xpkFileInfo* info = (xpkFileInfo*)XPK_LDB_GET(xpk, pos);
     if (!info) {
         xpkSetError(6, "Failed to get file info");
         return -1;
@@ -292,7 +292,7 @@ XPKAPI int xpkRemove(xpkObject xpk, uint32_t pos) {
     }
     
     // 从 LDB 中删除
-    if (!xrtArrayRemove(&xpk->ldb, pos, 1)) {
+    if (!XPK_LDB_REMOVE(xpk, pos, 1)) {
         xpkSetError(3, "Failed to remove from LDB");
         return -1;
     }
@@ -307,7 +307,7 @@ XPKAPI int xpkRemove(xpkObject xpk, uint32_t pos) {
 
 XPKAPI void* xpkInfo(xpkObject xpk, uint32_t pos) {
     if (!xpk || pos >= xpk->ldb.Count) return NULL;
-    return xrtArrayGet(&xpk->ldb, pos);
+    return XPK_LDB_GET(xpk, pos);
 }
 
 XPKAPI uint32_t xpkInfoSize(xpkObject xpk, uint32_t pos) {
