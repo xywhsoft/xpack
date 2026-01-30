@@ -50,6 +50,9 @@ xpkPathUpdateFile
 xpkRebuild
 xpkRemove
 xpkSave
+xpkSolidBlockInfo
+xpkSolidMode
+xpkSolidModeSet
 xpkStatGet
 xpkType
 xpkTypeSet

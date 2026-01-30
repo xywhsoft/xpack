@@ -33,119 +33,131 @@ XPKAPI uint32_t xpkIndexFind(xpkObject xpk, int32_t index) {
 // 添加操作
 // ============================================================================
 
-XPKAPI xpkFileInfoIndex* xpkIndexAppendFile(xpkObject xpk, int32_t index, 
+XPKAPI xpkFileInfoIndex* xpkIndexAppendFile(xpkObject xpk, int32_t index,
                                              const char* path, int level) {
-    if (!xpk || !path) return NULL;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot append in readonly mode");
-        return NULL;
-    }
-    if (xpkType(xpk) != XPK_TYPE_INDEX) {
-        xpkSetError(11, "Pack type is not Index");
-        return NULL;
-    }
-    
-    // 读取文件内容
-    size_t fileSize = 0;
-    void* fileData = xrtFileGetAll((str)path, &fileSize);
-    if (!fileData) {
-        xpkSetError(2, "Failed to read source file");
-        return NULL;
-    }
-    
-    xpkFileInfoIndex* info = xpkIndexAppendData(xpk, index, fileData, 
-                                                  (uint32_t)fileSize, level);
-    free(fileData);
-    
-    return info;
+	if (!xpk || !path) return NULL;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot append in readonly mode");
+		return NULL;
+	}
+	if (xpkType(xpk) != XPK_TYPE_INDEX) {
+		xpkSetError(11, "Pack type is not Index");
+		return NULL;
+	}
+	
+	// 固实包禁止追加
+	if (xpk->head.flag.solidMode) {
+		xpkSetError(11, "Cannot append to solid archive pack");
+		return NULL;
+	}
+	
+	// 读取文件内容
+	size_t fileSize = 0;
+	void* fileData = xrtFileGetAll((str)path, &fileSize);
+	if (!fileData) {
+		xpkSetError(2, "Failed to read source file");
+		return NULL;
+	}
+	
+	xpkFileInfoIndex* info = xpkIndexAppendData(xpk, index, fileData,
+	                                                  (uint32_t)fileSize, level);
+	free(fileData);
+	
+	return info;
 }
 
-XPKAPI xpkFileInfoIndex* xpkIndexAppendData(xpkObject xpk, int32_t index, 
+XPKAPI xpkFileInfoIndex* xpkIndexAppendData(xpkObject xpk, int32_t index,
                                              const void* data, uint32_t size, int level) {
-    if (!xpk) return NULL;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot append in readonly mode");
-        return NULL;
-    }
-    if (xpkType(xpk) != XPK_TYPE_INDEX) {
-        xpkSetError(11, "Pack type is not Index");
-        return NULL;
-    }
-    
-    // 检查索引是否已存在
-    if (xpkIndexFind(xpk, index) != UINT32_MAX) {
-        xpkSetError(11, "Index already exists");
-        return NULL;
-    }
-    
-    // 处理空数据
-    if (!data || size == 0) {
-        data = "";
-        size = 0;
-    }
-    
-    // 限制压缩级别
-    level = level & 0x0F;
-    
-    // 计算压缩缓冲区大小
-    uint32_t compBound = xpkCompressBound(level, size);
-    void* compData = malloc(compBound);
-    if (!compData) {
-        xpkSetError(3, "Failed to allocate compression buffer");
-        return NULL;
-    }
-    
-    // 压缩数据
-    uint32_t compSize = 0;
-    if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
-        free(compData);
-        xpkSetError(7, "Compression failed");
-        return NULL;
-    }
-    
-    // 计算文件哈希
-    uint32_t fileHash = xrtHash32((ptr)data, size);
-    
-    // 计算数据偏移
-    uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
-    if (xpk->ldb.Count > 0) {
-        xpkFileInfoIndex* lastInfo = (xpkFileInfoIndex*)XPK_LDB_GET(xpk, 
-                                                                     xpk->ldb.Count - 1);
-        if (lastInfo) {
-            dataOffset = lastInfo->dataOffset + lastInfo->dataSize;
-        }
-    }
-    
-    // 写入压缩数据
-    xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-    if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
-        free(compData);
-        xpkSetError(2, "Failed to write data");
-        return NULL;
-    }
-    free(compData);
-    
-    // 追加文件信息
-    uint32_t pos = xrtArrayAppend(&xpk->ldb, 1);
-    xpkFileInfoIndex* info = (xpkFileInfoIndex*)xrtArrayGet(&xpk->ldb, pos);
-    if (!info) {
-        xpkSetError(3, "Failed to allocate file info");
-        return NULL;
-    }
-    
-    // 填充文件信息
-    info->dataOffset = dataOffset;
-    info->dataSize = compSize;
-    info->fileSize = size;
-    info->fileHash = fileHash;
-    info->flag.value = 0;
-    info->flag.compLevel = level;
-    info->flag.fileType = XPK_FTYPE_UNKNOWN;
-    info->fileIndex = index;
-    info->userData = 0;
-    
-    xpk->modified = 1;
-    return info;
+	if (!xpk) return NULL;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot append in readonly mode");
+		return NULL;
+	}
+	if (xpkType(xpk) != XPK_TYPE_INDEX) {
+		xpkSetError(11, "Pack type is not Index");
+		return NULL;
+	}
+	
+	// 固实包禁止追加
+	if (xpk->head.flag.solidMode) {
+		xpkSetError(11, "Cannot append to solid archive pack");
+		return NULL;
+	}
+	
+	// 检查索引是否已存在
+	if (xpkIndexFind(xpk, index) != UINT32_MAX) {
+		xpkSetError(11, "Index already exists");
+		return NULL;
+	}
+	
+	// 处理空数据
+	if (!data || size == 0) {
+		data = "";
+		size = 0;
+	}
+	
+	// 限制压缩级别
+	level = level & 0x0F;
+	
+	// 计算压缩缓冲区大小
+	uint32_t compBound = xpkCompressBound(level, size);
+	void* compData = malloc(compBound);
+	if (!compData) {
+		xpkSetError(3, "Failed to allocate compression buffer");
+		return NULL;
+	}
+	
+	// 压缩数据
+	uint32_t compSize = 0;
+	if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
+		free(compData);
+		xpkSetError(7, "Compression failed");
+		return NULL;
+	}
+	
+	// 计算文件哈希
+	uint32_t fileHash = xrtHash32((ptr)data, size);
+	
+	// 计算数据偏移
+	uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
+	if (xpk->ldb.Count > 0) {
+		xpkFileInfoIndex* lastInfo = (xpkFileInfoIndex*)XPK_LDB_GET(xpk,
+		                                                             xpk->ldb.Count - 1);
+		if (lastInfo) {
+			dataOffset = lastInfo->dataOffset + lastInfo->dataSize;
+		}
+	}
+	
+	// 写入压缩数据
+	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
+	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+		free(compData);
+		xpkSetError(2, "Failed to write data");
+		return NULL;
+	}
+	free(compData);
+	
+	// 追加文件信息
+	uint32_t pos = xrtArrayAppend(&xpk->ldb, 1);
+	xpkFileInfoIndex* info = (xpkFileInfoIndex*)xrtArrayGet(&xpk->ldb, pos);
+	if (!info) {
+		xpkSetError(3, "Failed to allocate file info");
+		return NULL;
+	}
+	
+	// 填充文件信息
+	info->dataOffset = dataOffset;
+	info->dataSize = compSize;
+	info->fileSize = size;
+	info->fileHash = fileHash;
+	info->flag.value = 0;
+	info->flag.compLevel = level;
+	info->flag.fileType = XPK_FTYPE_UNKNOWN;
+	info->fileIndex = index;
+	info->userData = 0;
+	
+	xpk->modified = 1;
+	return info;
 }
 
 // ============================================================================

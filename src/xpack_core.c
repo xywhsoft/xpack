@@ -37,79 +37,84 @@ XPKAPI uint32_t xpkAppendFile(xpkObject xpk, const char* path, int level) {
 }
 
 XPKAPI uint32_t xpkAppendData(xpkObject xpk, const void* data, uint32_t size, int level) {
-    if (!xpk) return UINT32_MAX;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot append in readonly mode");
-        return UINT32_MAX;
-    }
-    
-    // 处理空数据
-    if (!data || size == 0) {
-        data = "";
-        size = 0;
-    }
-    
-    // 限制压缩级别
-    level = level & 0x0F;
-    
-    // 计算压缩缓冲区大小
-    uint32_t compBound = xpkCompressBound(level, size);
-    void* compData = malloc(compBound);
-    if (!compData) {
-        xpkSetError(3, "Failed to allocate compression buffer");
-        return UINT32_MAX;
-    }
-    
-    // 压缩数据
-    uint32_t compSize = 0;
-    if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
-        free(compData);
-        xpkSetError(7, "Compression failed");
-        return UINT32_MAX;
-    }
-    
-    // 计算文件哈希
-    uint32_t fileHash = xrtHash32((ptr)data, size);
-    
-    // 计算数据偏移
-    uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
-    
-    // 如果有现有文件，计算下一个数据偏移
-    if (xpk->ldb.Count > 0) {
-        xpkFileInfo* lastInfo = (xpkFileInfo*)XPK_LDB_GET(xpk, xpk->ldb.Count - 1);
-        if (lastInfo) {
-            dataOffset = lastInfo->dataOffset + lastInfo->dataSize;
-        }
-    }
-    
-    // 写入压缩数据到文件
-    xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-    if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
-        free(compData);
-        xpkSetError(2, "Failed to write data");
-        return UINT32_MAX;
-    }
-    free(compData);
-    
-    // 追加文件信息到 LDB
-    uint32_t pos1 = xrtArrayAppend(&xpk->ldb, 1);  // 1-based position
-    xpkFileInfo* info = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, pos1);
-    if (!info) {
-        xpkSetError(3, "Failed to allocate file info");
-        return UINT32_MAX;
-    }
-    
-    // 填充文件信息
-    info->dataOffset = dataOffset;
-    info->dataSize = compSize;
-    info->fileSize = size;
-    info->fileHash = fileHash;
-    info->flag.value = 0;
-    info->flag.compLevel = level;
-    info->flag.fileType = XPK_FTYPE_UNKNOWN;
-    
-    xpk->modified = 1;
-    return pos1 - 1;  // Return 0-based position
+	if (!xpk) return UINT32_MAX;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot append in readonly mode");
+		return UINT32_MAX;
+	}
+	
+	// 固实模式：使用固实压缩函数
+	if (xpk->head.flag.solidMode) {
+		return xpkSolidAppendData(xpk, data, size, level);
+	}
+	
+	// 处理空数据
+	if (!data || size == 0) {
+		data = "";
+		size = 0;
+	}
+	
+	// 限制压缩级别
+	level = level & 0x0F;
+	
+	// 计算压缩缓冲区大小
+	uint32_t compBound = xpkCompressBound(level, size);
+	void* compData = malloc(compBound);
+	if (!compData) {
+		xpkSetError(3, "Failed to allocate compression buffer");
+		return UINT32_MAX;
+	}
+	
+	// 压缩数据
+	uint32_t compSize = 0;
+	if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
+		free(compData);
+		xpkSetError(7, "Compression failed");
+		return UINT32_MAX;
+	}
+	
+	// 计算文件哈希
+	uint32_t fileHash = xrtHash32((ptr)data, size);
+	
+	// 计算数据偏移
+	uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
+	
+	// 如果有现有文件，计算下一个数据偏移
+	if (xpk->ldb.Count > 0) {
+		xpkFileInfo* lastInfo = (xpkFileInfo*)XPK_LDB_GET(xpk, xpk->ldb.Count - 1);
+		if (lastInfo) {
+			dataOffset = lastInfo->dataOffset + lastInfo->dataSize;
+		}
+	}
+	
+	// 写入压缩数据到文件
+	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
+	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+		free(compData);
+		xpkSetError(2, "Failed to write data");
+		return UINT32_MAX;
+	}
+	free(compData);
+	
+	// 追加文件信息到 LDB
+	uint32_t pos1 = xrtArrayAppend(&xpk->ldb, 1);  // 1-based position
+	xpkFileInfo* info = (xpkFileInfo*)xrtArrayGet(&xpk->ldb, pos1);
+	if (!info) {
+		xpkSetError(3, "Failed to allocate file info");
+		return UINT32_MAX;
+	}
+	
+	// 填充文件信息
+	info->dataOffset = dataOffset;
+	info->dataSize = compSize;
+	info->fileSize = size;
+	info->fileHash = fileHash;
+	info->flag.value = 0;
+	info->flag.compLevel = level;
+	info->flag.fileType = XPK_FTYPE_UNKNOWN;
+	
+	xpk->modified = 1;
+	return pos1 - 1;  // Return 0-based position
 }
 
 // ============================================================================
@@ -130,49 +135,55 @@ XPKAPI int xpkExtractFile(xpkObject xpk, uint32_t pos, const char* path) {
 }
 
 XPKAPI void* xpkExtractData(xpkObject xpk, uint32_t pos, uint32_t* outSize) {
-    if (!xpk || pos >= xpk->ldb.Count) {
-        xpkSetError(6, "Invalid file position");
-        return NULL;
-    }
-    
-    xpkFileInfo* info = (xpkFileInfo*)XPK_LDB_GET(xpk, pos);
-    if (!info) {
-        xpkSetError(6, "Failed to get file info");
-        return NULL;
-    }
-    
-    // 读取压缩数据
-    xrtSeek(xpk->file, xpk->baseOffset + info->dataOffset, XRT_SEEK_SET);
-    size_t readSize = 0;
-    void* compData = xrtGet(xpk->file, info->dataSize, &readSize);
-    if (!compData || readSize != info->dataSize) {
-        if (compData) free(compData);
-        xpkSetError(2, "Failed to read compressed data");
-        return NULL;
-    }
-    
-    // 分配解压缓冲区
-    void* rawData = malloc(info->fileSize > 0 ? info->fileSize : 1);
-    if (!rawData) {
-        free(compData);
-        xpkSetError(3, "Failed to allocate decompression buffer");
-        return NULL;
-    }
-    
-    // 解压数据
-    if (info->fileSize > 0) {
-        if (xpkDecompressRouter(info->flag.compLevel, compData, info->dataSize,
-                                 rawData, info->fileSize) != 0) {
-            free(compData);
-            free(rawData);
-            xpkSetError(8, "Decompression failed");
-            return NULL;
-        }
-    }
-    free(compData);
-    
-    if (outSize) *outSize = info->fileSize;
-    return rawData;
+	if (!xpk || pos >= xpk->ldb.Count) {
+		xpkSetError(6, "Invalid file position");
+		return NULL;
+	}
+	
+	xpkFileInfo* info = (xpkFileInfo*)XPK_LDB_GET(xpk, pos);
+	if (!info) {
+		xpkSetError(6, "Failed to get file info");
+		return NULL;
+	}
+	
+	// 固实模式：使用固实解压
+	if (xpk->head.flag.solidMode) {
+		return xpkSolidExtractData(xpk, pos, info, outSize);
+	}
+	
+	// 独立模式：标准解压
+	// 读取压缩数据
+	xrtSeek(xpk->file, xpk->baseOffset + info->dataOffset, XRT_SEEK_SET);
+	size_t readSize = 0;
+	void* compData = xrtGet(xpk->file, info->dataSize, &readSize);
+	if (!compData || readSize != info->dataSize) {
+		if (compData) free(compData);
+		xpkSetError(2, "Failed to read compressed data");
+		return NULL;
+	}
+	
+	// 分配解压缓冲区
+	void* rawData = malloc(info->fileSize > 0 ? info->fileSize : 1);
+	if (!rawData) {
+		free(compData);
+		xpkSetError(3, "Failed to allocate decompression buffer");
+		return NULL;
+	}
+	
+	// 解压数据
+	if (info->fileSize > 0) {
+		if (xpkDecompressRouter(info->flag.compLevel, compData, info->dataSize,
+		                     rawData, info->fileSize) != 0) {
+			free(compData);
+			free(rawData);
+			xpkSetError(8, "Decompression failed");
+			return NULL;
+		}
+	}
+	free(compData);
+	
+	if (outSize) *outSize = info->fileSize;
+	return rawData;
 }
 
 // ============================================================================
@@ -201,79 +212,86 @@ XPKAPI int xpkUpdateFile(xpkObject xpk, uint32_t pos, const char* path, int leve
 }
 
 XPKAPI int xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint32_t size, int level) {
-    if (!xpk) return -1;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot update in readonly mode");
-        return -1;
-    }
-    if (pos >= xpk->ldb.Count) {
-        xpkSetError(6, "Invalid file position");
-        return -1;
-    }
-    
-    xpkFileInfo* info = (xpkFileInfo*)XPK_LDB_GET(xpk, pos);
-    if (!info) {
-        xpkSetError(6, "Failed to get file info");
-        return -1;
-    }
-    
-    // 处理空数据
-    if (!data || size == 0) {
-        data = "";
-        size = 0;
-    }
-    
-    // 限制压缩级别
-    level = level & 0x0F;
-    
-    // 计算压缩缓冲区大小
-    uint32_t compBound = xpkCompressBound(level, size);
-    void* compData = malloc(compBound);
-    if (!compData) {
-        xpkSetError(3, "Failed to allocate compression buffer");
-        return -1;
-    }
-    
-    // 压缩数据
-    uint32_t compSize = 0;
-    if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
-        free(compData);
-        xpkSetError(7, "Compression failed");
-        return -1;
-    }
-    
-    // 计算文件哈希
-    uint32_t fileHash = xrtHash32((ptr)data, size);
-    
-    // 如果新数据大小不超过原数据大小，可以原地更新
-    // 否则需要追加到文件末尾（留下空洞，需要 rebuild 优化）
-    uint32_t dataOffset;
-    if (compSize <= info->dataSize) {
-        dataOffset = info->dataOffset;
-    } else {
-        // 追加到文件末尾
-        xrtSeek(xpk->file, 0, XRT_SEEK_END);
-        dataOffset = (uint32_t)xrtTell(xpk->file) - xpk->baseOffset;
-    }
-    
-    // 写入压缩数据
-    xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-    if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
-        free(compData);
-        xpkSetError(2, "Failed to write data");
-        return -1;
-    }
-    free(compData);
-    
-    // 更新文件信息
-    info->dataOffset = dataOffset;
-    info->dataSize = compSize;
-    info->fileSize = size;
-    info->fileHash = fileHash;
-    info->flag.compLevel = level;
-    
-    xpk->modified = 1;
-    return 0;
+	if (!xpk) return -1;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot update in readonly mode");
+		return -1;
+	}
+	
+	// 固实包禁止更新
+	if (xpk->head.flag.solidMode) {
+		xpkSetError(11, "Cannot update solid archive pack");
+		return -1;
+	}
+	
+	if (pos >= xpk->ldb.Count) {
+		xpkSetError(6, "Invalid file position");
+		return -1;
+	}
+	
+	xpkFileInfo* info = (xpkFileInfo*)XPK_LDB_GET(xpk, pos);
+	if (!info) {
+		xpkSetError(6, "Failed to get file info");
+		return -1;
+	}
+	
+	// 处理空数据
+	if (!data || size == 0) {
+		data = "";
+		size = 0;
+	}
+	
+	// 限制压缩级别
+	level = level & 0x0F;
+	
+	// 计算压缩缓冲区大小
+	uint32_t compBound = xpkCompressBound(level, size);
+	void* compData = malloc(compBound);
+	if (!compData) {
+		xpkSetError(3, "Failed to allocate compression buffer");
+		return -1;
+	}
+	
+	// 压缩数据
+	uint32_t compSize = 0;
+	if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
+		free(compData);
+		xpkSetError(7, "Compression failed");
+		return -1;
+	}
+	
+	// 计算文件哈希
+	uint32_t fileHash = xrtHash32((ptr)data, size);
+	
+	// 如果新数据大小不超过原数据大小，可以原地更新
+	// 否则需要追加到文件末尾（留下空洞，需要 rebuild 优化）
+	uint32_t dataOffset;
+	if (compSize <= info->dataSize) {
+		dataOffset = info->dataOffset;
+	} else {
+		// 追加到文件末尾
+		xrtSeek(xpk->file, 0, XRT_SEEK_END);
+		dataOffset = (uint32_t)xrtTell(xpk->file) - xpk->baseOffset;
+	}
+	
+	// 写入压缩数据
+	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
+	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+		free(compData);
+		xpkSetError(2, "Failed to write data");
+		return -1;
+	}
+	free(compData);
+	
+	// 更新文件信息
+	info->dataOffset = dataOffset;
+	info->dataSize = compSize;
+	info->fileSize = size;
+	info->fileHash = fileHash;
+	info->flag.compLevel = level;
+	
+	xpk->modified = 1;
+	return 0;
 }
 
 // ============================================================================
@@ -281,24 +299,31 @@ XPKAPI int xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint32_t
 // ============================================================================
 
 XPKAPI int xpkRemove(xpkObject xpk, uint32_t pos) {
-    if (!xpk) return -1;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot remove in readonly mode");
-        return -1;
-    }
-    if (pos >= xpk->ldb.Count) {
-        xpkSetError(6, "Invalid file position");
-        return -1;
-    }
-    
-    // 从 LDB 中删除
-    if (!XPK_LDB_REMOVE(xpk, pos, 1)) {
-        xpkSetError(3, "Failed to remove from LDB");
-        return -1;
-    }
-    
-    xpk->modified = 1;
-    return 0;
+	if (!xpk) return -1;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot remove in readonly mode");
+		return -1;
+	}
+	
+	// 固实包禁止删除
+	if (xpk->head.flag.solidMode) {
+		xpkSetError(11, "Cannot remove from solid archive pack");
+		return -1;
+	}
+	
+	if (pos >= xpk->ldb.Count) {
+		xpkSetError(6, "Invalid file position");
+		return -1;
+	}
+	
+	// 从 LDB 中删除
+	if (!XPK_LDB_REMOVE(xpk, pos, 1)) {
+		xpkSetError(3, "Failed to remove from LDB");
+		return -1;
+	}
+	
+	xpk->modified = 1;
+	return 0;
 }
 
 // ============================================================================

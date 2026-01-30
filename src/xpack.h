@@ -20,6 +20,7 @@
 #define XPACK_H
 
 #include <stdint.h>
+#include <xrt/xrt.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,42 +107,41 @@ typedef union {
     struct {
         uint32_t packType   : 4;        // [0-3]   包类型 (0-3)
         uint32_t ldbComp    : 4;        // [4-7]   LDB 压缩级别 (0-15)
-        uint32_t reserved1  : 8;        // [8-15]  保留
-        uint32_t reserved2  : 16;       // [16-31] 保留
+        uint32_t solidMode  : 1;        // [8]     固实压缩模式 (0=独立,1=固实)
+        uint32_t reserved   : 23;       // [9-31]  保留
     };
 } xpkFlag;
 
 // ============================================================================
-// 包信息头 (48 bytes)
+// 包信息头 (60 bytes)
 // ============================================================================
 #pragma pack(push, 1)
 typedef struct {
     // 基础标识 (4 bytes)
     uint32_t        fileHead;           // [0-3]   文件头标识 "xpk" + 版本号
-    
-    // 文件信息扩展 (4 bytes)
-    uint8_t         reserved0;          // [4]     保留
-    uint16_t        infoExtSize;        // [5-6]   文件信息扩展大小
-    uint8_t         reserved1;          // [7]     保留
-    
+
     // 包标记 (4 bytes)
-    xpkFlag         flag;               // [8-11]  包标记位域
-    
+    xpkFlag         flag;               // [4-7]   包标记位域
+
     // 文件信息 (12 bytes)
-    uint32_t        fileCount;          // [12-15] 文件数量
-    uint32_t        headExtSize;        // [16-19] 包头扩展数据大小
-    uint32_t        discCode;           // [20-23] 识别代码(用户自定义)
-    
+    uint32_t        fileCount;          // [8-11]  文件数量
+    uint32_t        headExtSize;        // [12-15] 包头扩展数据大小
+    uint32_t        discCode;           // [16-19] 识别代码(用户自定义)
+
+    // 文件信息扩展 (8 bytes)
+    uint32_t        infoExtSize;        // [20-23] 文件信息扩展大小
+    uint32_t        reserved;           // [24-27] 保留
+
     // LDB 信息 (16 bytes)
-    uint32_t        ldbOffset;          // [24-27] LDB 偏移位置
-    uint32_t        ldbSize;            // [28-31] LDB 压缩后大小
-    uint32_t        ldbRawSize;         // [32-35] LDB 原始大小
-    uint32_t        ldbHash;            // [36-39] LDB 哈希值
-    
-    // 时间戳 (8 bytes)
-    uint32_t        createTime;         // [40-43] 创建时间
-    uint32_t        modifyTime;         // [44-47] 修改时间
-    
+    uint32_t        ldbOffset;          // [28-31] LDB 偏移位置
+    uint32_t        ldbSize;            // [32-35] LDB 压缩后大小
+    uint32_t        ldbRawSize;         // [36-39] LDB 原始大小
+    uint32_t        ldbHash;            // [40-43] LDB 哈希值
+
+    // 时间戳 (16 bytes)
+	xtime           createTime;         // [44-51] 创建时间
+	xtime           modifyTime;         // [52-59] 修改时间
+
 } xpkHead;
 #pragma pack(pop)
 
@@ -216,22 +216,31 @@ typedef struct {
 // ============================================================================
 #pragma pack(push, 1)
 typedef struct {
-    // 基础信息 (20 bytes)
-    uint32_t        dataOffset;         // [0-3]   数据偏移位置
-    uint32_t        dataSize;           // [4-7]   压缩后大小
-    uint32_t        fileSize;           // [8-11]  原始大小
-    uint32_t        fileHash;           // [12-15] 文件哈希值
-    xpkFileFlag     flag;               // [16-19] 文件标记位域
-    
-    // 路径信息 (208 bytes)
-    char            filePath[XPK_PATH_MAX];  // [20-219]  文件路径
-    uint32_t        pathHash;           // [220-223] 路径哈希值(转小写)
-    
-    // 文件属性 (12 bytes)
-    uint32_t        fileAttr;           // [224-227] 文件属性
-    uint32_t        createTime;         // [228-231] 创建时间
-    uint32_t        modifyTime;         // [232-235] 修改时间
+	// 基础信息 (20 bytes)
+	uint32_t        dataOffset;         // [0-3]   数据偏移位置
+	uint32_t        dataSize;           // [4-7]   压缩后大小
+	uint32_t        fileSize;           // [8-11]  原始大小
+	uint32_t        fileHash;           // [12-15] 文件哈希值
+	xpkFileFlag     flag;               // [16-19] 文件标记位域
+	
+	// 路径信息 (208 bytes)
+	char            filePath[XPK_PATH_MAX];  // [20-219]  文件路径
+	uint32_t        pathHash;           // [220-223] 路径哈希值(转小写)
+	
+	// 文件属性 (12 bytes)
+	uint32_t        fileAttr;           // [224-227] 文件属性
+	uint32_t        createTime;         // [228-231] 创建时间
+	uint32_t        modifyTime;         // [232-235] 修改时间
 } xpkFileInfoWin32;
+#pragma pack(pop)
+
+// ============================================================================
+// 固实文件信息扩展 (固实压缩模式下使用)
+// ============================================================================
+#pragma pack(push, 1)
+typedef struct {
+	uint32_t        dataOffsetInBlock;  // [0-3]   在固实块中的数据偏移
+} xpkFileInfoSolid;
 #pragma pack(pop)
 
 // ============================================================================
@@ -311,6 +320,13 @@ XPKAPI uint32_t     xpkDiscCode(xpkObject xpk);
 XPKAPI int          xpkDiscCodeSet(xpkObject xpk, uint32_t code);
 XPKAPI void         xpkOnError(xpkObject xpk, xpkErrorProc callback);
 XPKAPI xpkHead*     xpkGetHead(xpkObject xpk);
+
+// ============================================================================
+// 固实压缩控制接口
+// ============================================================================
+XPKAPI int          xpkSolidMode(xpkObject xpk);
+XPKAPI int          xpkSolidModeSet(xpkObject xpk, int enabled);
+XPKAPI int          xpkSolidBlockInfo(xpkObject xpk, uint32_t* offset, uint32_t* size);
 
 // ============================================================================
 // 文件操作 - Core 模式（按位置）

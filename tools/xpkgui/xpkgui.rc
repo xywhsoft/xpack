@@ -3,57 +3,60 @@
 
 IDR_MAINMENU MENU
 BEGIN
-	POPUP "ÎÄ¼þ(&F)"
+	POPUP "ï¿½Ä¼ï¿½(&F)"
 	BEGIN
-		MENUITEM "ÐÂ½¨(&N)...\tCtrl+N",		ID_FILE_NEW
-		MENUITEM "´ò¿ª(&O)...\tCtrl+O",		ID_FILE_OPEN
+		MENUITEM "ï¿½Â½ï¿½(&N)...\tCtrl+N",		ID_FILE_NEW
+		MENUITEM "ï¿½ï¿½(&O)...\tCtrl+O",		ID_FILE_OPEN
 		MENUITEM SEPARATOR
-		MENUITEM "¹Ø±Õ(&C)",				ID_FILE_CLOSE
-		MENUITEM "±£´æ(&S)\tCtrl+S",		ID_FILE_SAVE
+		MENUITEM "ï¿½Ø±ï¿½(&C)",				ID_FILE_CLOSE
+		MENUITEM "ï¿½ï¿½ï¿½ï¿½(&S)\tCtrl+S",		ID_FILE_SAVE
 		MENUITEM SEPARATOR
-		MENUITEM "Ìí¼ÓÎÄ¼þ(&A)...",			ID_FILE_ADD
-		MENUITEM "½âÑ¹(&E)...",				ID_FILE_EXTRACT
-		MENUITEM "É¾³ý(&D)",				ID_FILE_DELETE
-		MENUITEM "ÖØÃüÃû(&R)...",			ID_FILE_RENAME
+		MENUITEM "ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½(&A)...",			ID_FILE_ADD
+		MENUITEM "ï¿½ï¿½Ñ¹(&E)...",				ID_FILE_EXTRACT
+		MENUITEM "É¾ï¿½ï¿½(&D)",				ID_FILE_DELETE
+		MENUITEM "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(&R)...",			ID_FILE_RENAME
 		MENUITEM SEPARATOR
-		MENUITEM "ÖØ½¨(&B)",				ID_FILE_REBUILD
-		MENUITEM "ÊôÐÔ(&P)...",				ID_FILE_PROPERTIES
+		MENUITEM "ï¿½Ø½ï¿½(&B)",				ID_FILE_REBUILD
+		MENUITEM "ï¿½ï¿½ï¿½ï¿½(&P)...",				ID_FILE_PROPERTIES
 		MENUITEM SEPARATOR
-		MENUITEM "ÍË³ö(&X)",				ID_FILE_EXIT
+		MENUITEM "ï¿½Ë³ï¿½(&X)",				ID_FILE_EXIT
 	END
 
-	POPUP "²é¿´(&V)"
+	POPUP "ï¿½é¿´(&V)"
 	BEGIN
-		MENUITEM "Ë¢ÐÂ(&R)\tF5",			ID_VIEW_REFRESH
+		MENUITEM "Ë¢ï¿½ï¿½(&R)\tF5",			ID_VIEW_REFRESH
 		MENUITEM SEPARATOR
-		MENUITEM "ÏêÏ¸ÐÅÏ¢",				ID_VIEW_DETAILS
+		MENUITEM "ï¿½ï¿½Ï¸ï¿½ï¿½Ï¢",				ID_VIEW_DETAILS
 	END
 
-	POPUP "¹¤¾ß(&T)"
+	POPUP "ï¿½ï¿½ï¿½ï¿½(&T)"
 	BEGIN
-		MENUITEM "ÑéÖ¤(&V)",					ID_TOOLS_VERIFY
-		MENUITEM "È«²¿½âÑ¹(&A)...",			ID_TOOLS_EXTRACTALL
+		MENUITEM "ï¿½ï¿½Ö¤(&V)",					ID_TOOLS_VERIFY
+		MENUITEM "È«ï¿½ï¿½ï¿½ï¿½Ñ¹(&A)...",			ID_TOOLS_EXTRACTALL
+		MENUITEM SEPARATOR
+		MENUITEM "ï¿½Êµï¿½ï¿½ï¿½ï¿½Ä£Ê½(&S)",		ID_TOOLS_SOLIDMODE
 	END
 
-	POPUP "°ïÖú(&H)"
+	POPUP "ï¿½ï¿½ï¿½ï¿½(&H)"
 	BEGIN
-		MENUITEM "¹ØÓÚ(&A)...",				ID_HELP_ABOUT
+		MENUITEM "ï¿½ï¿½ï¿½ï¿½(&A)...",				ID_HELP_ABOUT
 	END
 END
 
 STRINGTABLE
 BEGIN
-	ID_FILE_NEW		"´´½¨ÐÂµÄ xPack Ñ¹Ëõ°ü"
-	ID_FILE_OPEN		"´ò¿ªÏÖÓÐµÄ xPack Ñ¹Ëõ°ü"
-	ID_FILE_CLOSE		"¹Ø±Õµ±Ç°Ñ¹Ëõ°ü"
-	ID_FILE_SAVE		"±£´æµ±Ç°Ñ¹Ëõ°ü"
-	ID_FILE_ADD		"Ìí¼ÓÎÄ¼þµ½Ñ¹Ëõ°ü"
-	ID_FILE_EXTRACT	"½âÑ¹Ñ¡ÖÐµÄÎÄ¼þ"
-	ID_FILE_DELETE		"É¾³ýÑ¡ÖÐµÄÎÄ¼þ"
-	ID_FILE_RENAME		"ÖØÃüÃûÑ¡ÖÐµÄÎÄ¼þ"
-	ID_FILE_REBUILD	"ÖØ½¨Ñ¹Ëõ°üÒÔÓÅ»¯´æ´¢"
-	ID_FILE_PROPERTIES	"²é¿´Ñ¹Ëõ°üÊôÐÔ"
-	ID_VIEW_REFRESH	"Ë¢ÐÂÎÄ¼þÁÐ±í"
-	ID_TOOLS_VERIFY	"ÑéÖ¤Ñ¹Ëõ°üÍêÕûÐÔ"
-	ID_TOOLS_EXTRACTALL	"½âÑ¹ËùÓÐÎÄ¼þ"
+	ID_FILE_NEW		"ï¿½ï¿½ï¿½ï¿½ï¿½Âµï¿½ xPack Ñ¹ï¿½ï¿½ï¿½ï¿½"
+	ID_FILE_OPEN		"ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ xPack Ñ¹ï¿½ï¿½ï¿½ï¿½"
+	ID_FILE_CLOSE		"ï¿½Ø±Õµï¿½Ç°Ñ¹ï¿½ï¿½ï¿½ï¿½"
+	ID_FILE_SAVE		"ï¿½ï¿½ï¿½æµ±Ç°Ñ¹ï¿½ï¿½ï¿½ï¿½"
+	ID_FILE_ADD		"ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½"
+	ID_FILE_EXTRACT	"ï¿½ï¿½Ñ¹Ñ¡ï¿½Ðµï¿½ï¿½Ä¼ï¿½"
+	ID_FILE_DELETE		"É¾ï¿½ï¿½Ñ¡ï¿½Ðµï¿½ï¿½Ä¼ï¿½"
+	ID_FILE_RENAME		"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½Ðµï¿½ï¿½Ä¼ï¿½"
+	ID_FILE_REBUILD	"ï¿½Ø½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å»ï¿½ï¿½æ´¢"
+	ID_FILE_PROPERTIES	"ï¿½é¿´Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"
+	ID_VIEW_REFRESH	"Ë¢ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½Ð±ï¿½"
+	ID_TOOLS_VERIFY	"ï¿½ï¿½Ö¤Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"
+	ID_TOOLS_EXTRACTALL	"ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½"
+	ID_TOOLS_SOLIDMODE	"Ð»ï¿½Êµï¿½ï¿½ï¿½ï¿½Ä£Ê½"
 END

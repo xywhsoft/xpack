@@ -66,6 +66,8 @@ int CreateNewPackage(void);
 int RebuildPackage(void);
 int VerifyPackage(void);
 int GetPackageProperties(void);
+int ToggleSolidMode(void);
+int NewPackageDialog(HWND hwnd, char* path, int* solidMode);
 void ShowAboutDialog(void);
 int BrowseForFolder(HWND hwnd, char* path, const char* title);
 int BrowseForFiles(HWND hwnd, char* files, int* fileCount, const char* filter);
@@ -243,6 +245,10 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
 					ExtractAll();
 					break;
 
+				case ID_TOOLS_SOLIDMODE:
+					ToggleSolidMode();
+					break;
+
 				case ID_HELP_ABOUT:
 					ShowAboutDialog();
 					break;
@@ -387,8 +393,9 @@ void UpdateStatusBar(void)
 		if ( xpkStatGet(g_xpk, &stat) == 0 ) {
 			char sizeBuf[64];
 			FormatSize(stat.totalSize, sizeBuf, sizeof(sizeBuf));
-			sprintf_s(buf, sizeof(buf), "文件: %u | 总大小: %s | 压缩率: %.1f%%",
-				stat.fileCount, sizeBuf, stat.ratio * 100);
+			int solidMode = xpkSolidMode(g_xpk);
+			sprintf_s(buf, sizeof(buf), "文件: %u | 总大小: %s | 压缩率: %.1f%% | %s",
+				stat.fileCount, sizeBuf, stat.ratio * 100, solidMode ? "固实模式" : "独立模式");
 		}
 	} else {
 		strcpy(buf, "未打开压缩包");
@@ -727,16 +734,9 @@ int RenameFiles(void)
 int CreateNewPackage(void)
 {
 	char path[MAX_PATH] = {0};
-	OPENFILENAME ofn = {0};
-	ofn.lStructSize = sizeof(OPENFILENAME);
-	ofn.hwndOwner = g_hMainWnd;
-	ofn.lpstrFilter = "xPack 文件 (*.xpk)\0*.xpk\0所有文件 (*.*)\0*.*\0";
-	ofn.lpstrFile = path;
-	ofn.nMaxFile = MAX_PATH;
-	ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
-	ofn.lpstrDefExt = "xpk";
+	int solidMode = 0;
 
-	if ( !GetSaveFileName(&ofn) ) {
+	if ( NewPackageDialog(g_hMainWnd, path, &solidMode) != IDOK ) {
 		return -1;
 	}
 
@@ -754,6 +754,13 @@ int CreateNewPackage(void)
 
 	if ( xpkTypeSet(g_xpk, XPK_TYPE_WIN32) != 0 ) {
 		ErrorMsg(g_hMainWnd, "设置包类型失败");
+		xpkClose(g_xpk);
+		g_xpk = NULL;
+		return -1;
+	}
+
+	if ( solidMode && xpkSolidModeSet(g_xpk, 1) != 0 ) {
+		ErrorMsg(g_hMainWnd, "设置固实模式失败");
 		xpkClose(g_xpk);
 		g_xpk = NULL;
 		return -1;
@@ -811,6 +818,39 @@ int VerifyPackage(void)
 	return 0;
 }
 
+int ToggleSolidMode(void)
+{
+	if ( g_xpk == NULL ) {
+		ErrorMsg(g_hMainWnd, "请先打开一个压缩包");
+		return -1;
+	}
+
+	int currentMode = xpkSolidMode(g_xpk);
+	int newMode = currentMode ? 0 : 1;
+
+	if ( xpkCount(g_xpk) > 0 ) {
+		ErrorMsg(g_hMainWnd, "只能在空压缩包中切换固实模式");
+		return -1;
+	}
+
+	char msg[256];
+	sprintf_s(msg, sizeof(msg), "确定要%s固实压缩模式吗?\n\n固实模式会将所有文件作为一个整体压缩,\n可以获得更好的压缩比，但解压时需要解压整个块。",
+		newMode ? "启用" : "禁用");
+
+	if ( MessageBox(g_hMainWnd, msg, "确认切换固实模式", MB_YESNO | MB_ICONQUESTION) != IDYES ) {
+		return -1;
+	}
+
+	if ( xpkSolidModeSet(g_xpk, newMode) == 0 ) {
+		UpdateStatusBar();
+		InfoMsg(g_hMainWnd, newMode ? "已启用固实压缩模式" : "已禁用固实压缩模式");
+		return 0;
+	} else {
+		ErrorMsg(g_hMainWnd, "切换固实模式失败");
+		return -1;
+	}
+}
+
 int GetPackageProperties(void)
 {
 	if ( g_xpk == NULL ) {
@@ -832,6 +872,7 @@ int GetPackageProperties(void)
 
 	char msg[512];
 	const char* typeStr = "Unknown";
+	int solidMode = xpkSolidMode(g_xpk);
 
 	switch ( xpkType(g_xpk) ) {
 		case XPK_TYPE_CORE:
@@ -855,12 +896,14 @@ int GetPackageProperties(void)
 		"总大小: %s\n"
 		"压缩后: %llu 字节\n"
 		"压缩率: %.1f%%\n"
+		"压缩模式: %s\n"
 		"识别代码: 0x%08X\n",
 		typeStr,
 		head->fileCount,
 		sizeBuf,
 		stat.packedSize,
 		stat.ratio * 100,
+		solidMode ? "固实模式" : "独立模式",
 		head->discCode
 	);
 
@@ -1053,6 +1096,132 @@ int InputBox(HWND hwnd, const char* title, const char* prompt, char* buffer, int
 		if ( msg.message == WM_COMMAND ) {
 			if ( LOWORD(msg.wParam) == IDOK ) {
 				GetWindowText(hEdit, buffer, bufferSize);
+				result = IDOK;
+				break;
+			} else if ( LOWORD(msg.wParam) == IDCANCEL ) {
+				result = IDCANCEL;
+				break;
+			}
+		}
+	}
+
+	DestroyWindow(hDlg);
+	EnableWindow(hwnd, TRUE);
+	SetForegroundWindow(hwnd);
+
+	return result;
+}
+
+int NewPackageDialog(HWND hwnd, char* path, int* solidMode)
+{
+	HWND hDlg;
+	HWND hEditPath;
+	HWND hBtnBrowse;
+	HWND hCheckSolid;
+	HWND hOK, hCancel;
+	HWND hPrompt, hPrompt2;
+	MSG msg;
+	BOOL bRet;
+	int result = IDCANCEL;
+	char filePath[MAX_PATH] = {0};
+
+	hDlg = CreateWindowEx(
+		WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
+		WC_DIALOG,
+		"新建 xPack 压缩包",
+		WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME,
+		CW_USEDEFAULT, CW_USEDEFAULT,
+		400, 200,
+		hwnd, NULL, g_hInstance, NULL
+	);
+
+	if ( !hDlg ) {
+		return IDCANCEL;
+	}
+
+	RECT rc;
+	GetClientRect(hDlg, &rc);
+	MoveWindow(hDlg, 0, 0, 400, 200, TRUE);
+
+	hPrompt = CreateWindowEx(
+		0, "STATIC", "请输入压缩包文件路径:",
+		WS_CHILD | WS_VISIBLE,
+		10, 10, 380, 20,
+		hDlg, NULL, g_hInstance, NULL
+	);
+
+	hEditPath = CreateWindowEx(
+		WS_EX_CLIENTEDGE, "EDIT", filePath,
+		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+		10, 35, 300, 20,
+		hDlg, NULL, g_hInstance, NULL
+	);
+
+	hBtnBrowse = CreateWindowEx(
+		0, "BUTTON", "浏览...",
+		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+		320, 35, 70, 20,
+		hDlg, (HMENU)1001, g_hInstance, NULL
+	);
+
+	hPrompt2 = CreateWindowEx(
+		0, "STATIC", "压缩模式:",
+		WS_CHILD | WS_VISIBLE,
+		10, 70, 380, 20,
+		hDlg, NULL, g_hInstance, NULL
+	);
+
+	hCheckSolid = CreateWindowEx(
+		0, "BUTTON", "启用固实压缩 (更好的压缩比，但解压整个块)",
+		WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+		10, 95, 380, 20,
+		hDlg, (HMENU)1002, g_hInstance, NULL
+	);
+
+	hOK = CreateWindowEx(
+		0, "BUTTON", "确定",
+		WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+		100, 140, 80, 25,
+		hDlg, (HMENU)IDOK, g_hInstance, NULL
+	);
+
+	hCancel = CreateWindowEx(
+		0, "BUTTON", "取消",
+		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+		220, 140, 80, 25,
+		hDlg, (HMENU)IDCANCEL, g_hInstance, NULL
+	);
+
+	SetFocus(hEditPath);
+	ShowWindow(hDlg, SW_SHOW);
+	EnableWindow(hwnd, FALSE);
+
+	while ( (bRet = GetMessage(&msg, NULL, 0, 0)) != 0 ) {
+		if ( bRet == -1 ) {
+			break;
+		} else if ( !IsDialogMessage(hDlg, &msg) ) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+
+		if ( msg.message == WM_COMMAND ) {
+			if ( LOWORD(msg.wParam) == 1001 ) {
+				OPENFILENAME ofn = {0};
+				char savePath[MAX_PATH] = {0};
+				ofn.lStructSize = sizeof(OPENFILENAME);
+				ofn.hwndOwner = hDlg;
+				ofn.lpstrFilter = "xPack 文件 (*.xpk)\0*.xpk\0所有文件 (*.*)\0*.*\0";
+				ofn.lpstrFile = savePath;
+				ofn.nMaxFile = MAX_PATH;
+				ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+				ofn.lpstrDefExt = "xpk";
+
+				if ( GetSaveFileName(&ofn) ) {
+					SetWindowText(hEditPath, savePath);
+				}
+			} else if ( LOWORD(msg.wParam) == IDOK ) {
+				GetWindowText(hEditPath, path, MAX_PATH);
+				*solidMode = SendMessage(hCheckSolid, BM_GETCHECK, 0, 0) == BST_CHECKED ? 1 : 0;
 				result = IDOK;
 				break;
 			} else if ( LOWORD(msg.wParam) == IDCANCEL ) {

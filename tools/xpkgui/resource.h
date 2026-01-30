@@ -23,6 +23,7 @@
 #define ID_TOOLS_VERIFY         300
 #define ID_TOOLS_EXTRACTALL     301
 #define ID_TOOLS_COMPRESS       302
+#define ID_TOOLS_SOLIDMODE      303
 
 #define ID_HELP_ABOUT           400
 

@@ -97,152 +97,164 @@ XPKAPI int xpkPathExists(xpkObject xpk, const char* filePath) {
 // 添加操作
 // ============================================================================
 
-XPKAPI void* xpkPathAppendFile(xpkObject xpk, const char* filePath, 
+XPKAPI void* xpkPathAppendFile(xpkObject xpk, const char* filePath,
                                 const char* srcPath, int level) {
-    if (!xpk || !filePath || !srcPath) return NULL;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot append in readonly mode");
-        return NULL;
-    }
-    
-    int packType = xpkType(xpk);
-    if (packType != XPK_TYPE_LINUX && packType != XPK_TYPE_WIN32) {
-        xpkSetError(11, "Pack type is not Linux or Win32");
-        return NULL;
-    }
-    
-    // 读取文件内容
-    size_t fileSize = 0;
-    void* fileData = xrtFileGetAll((str)srcPath, &fileSize);
-    if (!fileData) {
-        xpkSetError(2, "Failed to read source file");
-        return NULL;
-    }
-    
-    void* info = xpkPathAppendData(xpk, filePath, fileData, (uint32_t)fileSize, level);
-    free(fileData);
-    
-    return info;
+	if (!xpk || !filePath || !srcPath) return NULL;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot append in readonly mode");
+		return NULL;
+	}
+	
+	int packType = xpkType(xpk);
+	if (packType != XPK_TYPE_LINUX && packType != XPK_TYPE_WIN32) {
+		xpkSetError(11, "Pack type is not Linux or Win32");
+		return NULL;
+	}
+	
+	// 固实包禁止追加
+	if (xpk->head.flag.solidMode) {
+		xpkSetError(11, "Cannot append to solid archive pack");
+		return NULL;
+	}
+	
+	// 读取文件内容
+	size_t fileSize = 0;
+	void* fileData = xrtFileGetAll((str)srcPath, &fileSize);
+	if (!fileData) {
+		xpkSetError(2, "Failed to read source file");
+		return NULL;
+	}
+	
+	void* info = xpkPathAppendData(xpk, filePath, fileData, (uint32_t)fileSize, level);
+	free(fileData);
+	
+	return info;
 }
 
-XPKAPI void* xpkPathAppendData(xpkObject xpk, const char* filePath, 
+XPKAPI void* xpkPathAppendData(xpkObject xpk, const char* filePath,
                                 const void* data, uint32_t size, int level) {
-    if (!xpk || !filePath) return NULL;
-    if (xpk->readonly) {
-        xpkSetError(10, "Cannot append in readonly mode");
-        return NULL;
-    }
-    
-    int packType = xpkType(xpk);
-    if (packType != XPK_TYPE_LINUX && packType != XPK_TYPE_WIN32) {
-        xpkSetError(11, "Pack type is not Linux or Win32");
-        return NULL;
-    }
-    
-    // 检查路径是否已存在
-    if (xpkPathFind(xpk, filePath) != UINT32_MAX) {
-        xpkSetError(11, "Path already exists");
-        return NULL;
-    }
-    
-    // 检查路径长度
-    size_t pathLen = strlen(filePath);
-    if (pathLen >= XPK_PATH_MAX) {
-        xpkSetError(11, "Path too long");
-        return NULL;
-    }
-    
-    // 处理空数据
-    if (!data || size == 0) {
-        data = "";
-        size = 0;
-    }
-    
-    // 限制压缩级别
-    level = level & 0x0F;
-    
-    // 计算压缩缓冲区大小
-    uint32_t compBound = xpkCompressBound(level, size);
-    void* compData = malloc(compBound);
-    if (!compData) {
-        xpkSetError(3, "Failed to allocate compression buffer");
-        return NULL;
-    }
-    
-    // 压缩数据
-    uint32_t compSize = 0;
-    if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
-        free(compData);
-        xpkSetError(7, "Compression failed");
-        return NULL;
-    }
-    
-    // 计算文件哈希
-    uint32_t fileHash = xrtHash32((ptr)data, size);
-    
-    // 计算数据偏移
-    uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
-    if (xpk->ldb.Count > 0) {
-        void* lastInfo = XPK_LDB_GET(xpk, xpk->ldb.Count - 1);
-        if (lastInfo) {
-            xpkFileInfo* base = (xpkFileInfo*)lastInfo;
-            dataOffset = base->dataOffset + base->dataSize;
-        }
-    }
-    
-    // 写入压缩数据
-    xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-    if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
-        free(compData);
-        xpkSetError(2, "Failed to write data");
-        return NULL;
-    }
-    free(compData);
-    
-    // 追加文件信息
-    uint32_t pos1 = xrtArrayAppend(&xpk->ldb, 1);
-    void* info = xrtArrayGet(&xpk->ldb, pos1);
-    if (!info) {
-        xpkSetError(3, "Failed to allocate file info");
-        return NULL;
-    }
-    
-    // 获取当前时间
-    uint32_t nowTime = (uint32_t)xrtToUnixTime(xrtNow());
-    
-    if (packType == XPK_TYPE_LINUX) {
-        xpkFileInfoLinux* linuxInfo = (xpkFileInfoLinux*)info;
-        linuxInfo->dataOffset = dataOffset;
-        linuxInfo->dataSize = compSize;
-        linuxInfo->fileSize = size;
-        linuxInfo->fileHash = fileHash;
-        linuxInfo->flag.value = 0;
-        linuxInfo->flag.compLevel = level;
-        linuxInfo->flag.fileType = XPK_FTYPE_UNKNOWN;
-        memset(linuxInfo->filePath, 0, XPK_PATH_MAX);
-        strncpy(linuxInfo->filePath, filePath, XPK_PATH_MAX - 1);
-        linuxInfo->pathHash = xpkPathHashLinux(filePath);
-        linuxInfo->fileAttr = 0;
-        linuxInfo->modifyTime = nowTime;
-    } else {
-        xpkFileInfoWin32* win32Info = (xpkFileInfoWin32*)info;
-        win32Info->dataOffset = dataOffset;
-        win32Info->dataSize = compSize;
-        win32Info->fileSize = size;
-        win32Info->fileHash = fileHash;
-        win32Info->flag.value = 0;
-        win32Info->flag.compLevel = level;
-        win32Info->flag.fileType = XPK_FTYPE_UNKNOWN;
-        memset(win32Info->filePath, 0, XPK_PATH_MAX);
-        strncpy(win32Info->filePath, filePath, XPK_PATH_MAX - 1);
-        win32Info->pathHash = xpkPathHashWin32(filePath);
-        win32Info->fileAttr = 0;
-        win32Info->createTime = nowTime;
-        win32Info->modifyTime = nowTime;
-    }
-    
-    xpk->modified = 1;
-    return info;
+	if (!xpk || !filePath) return NULL;
+	if (xpk->readonly) {
+		xpkSetError(10, "Cannot append in readonly mode");
+		return NULL;
+	}
+	
+	int packType = xpkType(xpk);
+	if (packType != XPK_TYPE_LINUX && packType != XPK_TYPE_WIN32) {
+		xpkSetError(11, "Pack type is not Linux or Win32");
+		return NULL;
+	}
+	
+	// 固实包禁止追加
+	if (xpk->head.flag.solidMode) {
+		xpkSetError(11, "Cannot append to solid archive pack");
+		return NULL;
+	}
+	
+	// 检查路径是否已存在
+	if (xpkPathFind(xpk, filePath) != UINT32_MAX) {
+		xpkSetError(11, "Path already exists");
+		return NULL;
+	}
+	
+	// 检查路径长度
+	size_t pathLen = strlen(filePath);
+	if (pathLen >= XPK_PATH_MAX) {
+		xpkSetError(11, "Path too long");
+		return NULL;
+	}
+	
+	// 处理空数据
+	if (!data || size == 0) {
+		data = "";
+		size = 0;
+	}
+	
+	// 限制压缩级别
+	level = level & 0x0F;
+	
+	// 计算压缩缓冲区大小
+	uint32_t compBound = xpkCompressBound(level, size);
+	void* compData = malloc(compBound);
+	if (!compData) {
+		xpkSetError(3, "Failed to allocate compression buffer");
+		return NULL;
+	}
+	
+	// 压缩数据
+	uint32_t compSize = 0;
+	if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
+		free(compData);
+		xpkSetError(7, "Compression failed");
+		return NULL;
+	}
+	
+	// 计算文件哈希
+	uint32_t fileHash = xrtHash32((ptr)data, size);
+	
+	// 计算数据偏移
+	uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
+	if (xpk->ldb.Count > 0) {
+		void* lastInfo = XPK_LDB_GET(xpk, xpk->ldb.Count - 1);
+		if (lastInfo) {
+			xpkFileInfo* base = (xpkFileInfo*)lastInfo;
+			dataOffset = base->dataOffset + base->dataSize;
+		}
+	}
+	
+	// 写入压缩数据
+	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
+	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+		free(compData);
+		xpkSetError(2, "Failed to write data");
+		return NULL;
+	}
+	free(compData);
+	
+	// 追加文件信息
+	uint32_t pos1 = xrtArrayAppend(&xpk->ldb, 1);
+	void* info = xrtArrayGet(&xpk->ldb, pos1);
+	if (!info) {
+		xpkSetError(3, "Failed to allocate file info");
+		return NULL;
+	}
+	
+	// 获取当前时间
+	uint32_t nowTime = (uint32_t)xrtToUnixTime(xrtNow());
+	
+	if (packType == XPK_TYPE_LINUX) {
+		xpkFileInfoLinux* linuxInfo = (xpkFileInfoLinux*)info;
+		linuxInfo->dataOffset = dataOffset;
+		linuxInfo->dataSize = compSize;
+		linuxInfo->fileSize = size;
+		linuxInfo->fileHash = fileHash;
+		linuxInfo->flag.value = 0;
+		linuxInfo->flag.compLevel = level;
+		linuxInfo->flag.fileType = XPK_FTYPE_UNKNOWN;
+		memset(linuxInfo->filePath, 0, XPK_PATH_MAX);
+		strncpy(linuxInfo->filePath, filePath, XPK_PATH_MAX - 1);
+		linuxInfo->pathHash = xpkPathHashLinux(filePath);
+		linuxInfo->fileAttr = 0;
+		linuxInfo->modifyTime = nowTime;
+	} else {
+		xpkFileInfoWin32* win32Info = (xpkFileInfoWin32*)info;
+		win32Info->dataOffset = dataOffset;
+		win32Info->dataSize = compSize;
+		win32Info->fileSize = size;
+		win32Info->fileHash = fileHash;
+		win32Info->flag.value = 0;
+		win32Info->flag.compLevel = level;
+		win32Info->flag.fileType = XPK_FTYPE_UNKNOWN;
+		memset(win32Info->filePath, 0, XPK_PATH_MAX);
+		strncpy(win32Info->filePath, filePath, XPK_PATH_MAX - 1);
+		win32Info->pathHash = xpkPathHashWin32(filePath);
+		win32Info->fileAttr = 0;
+		win32Info->createTime = nowTime;
+		win32Info->modifyTime = nowTime;
+	}
+	
+	xpk->modified = 1;
+	return info;
 }
 
 // ============================================================================
