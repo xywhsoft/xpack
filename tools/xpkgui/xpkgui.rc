@@ -1,0 +1,59 @@
+#include "resource.h"
+#include <windows.h>
+
+IDR_MAINMENU MENU
+BEGIN
+	POPUP "文件(&F)"
+	BEGIN
+		MENUITEM "新建(&N)...\tCtrl+N",		ID_FILE_NEW
+		MENUITEM "打开(&O)...\tCtrl+O",		ID_FILE_OPEN
+		MENUITEM SEPARATOR
+		MENUITEM "关闭(&C)",				ID_FILE_CLOSE
+		MENUITEM "保存(&S)\tCtrl+S",		ID_FILE_SAVE
+		MENUITEM SEPARATOR
+		MENUITEM "添加文件(&A)...",			ID_FILE_ADD
+		MENUITEM "解压(&E)...",				ID_FILE_EXTRACT
+		MENUITEM "删除(&D)",				ID_FILE_DELETE
+		MENUITEM "重命名(&R)...",			ID_FILE_RENAME
+		MENUITEM SEPARATOR
+		MENUITEM "重建(&B)",				ID_FILE_REBUILD
+		MENUITEM "属性(&P)...",				ID_FILE_PROPERTIES
+		MENUITEM SEPARATOR
+		MENUITEM "退出(&X)",				ID_FILE_EXIT
+	END
+
+	POPUP "查看(&V)"
+	BEGIN
+		MENUITEM "刷新(&R)\tF5",			ID_VIEW_REFRESH
+		MENUITEM SEPARATOR
+		MENUITEM "详细信息",				ID_VIEW_DETAILS
+	END
+
+	POPUP "工具(&T)"
+	BEGIN
+		MENUITEM "验证(&V)",					ID_TOOLS_VERIFY
+		MENUITEM "全部解压(&A)...",			ID_TOOLS_EXTRACTALL
+	END
+
+	POPUP "帮助(&H)"
+	BEGIN
+		MENUITEM "关于(&A)...",				ID_HELP_ABOUT
+	END
+END
+
+STRINGTABLE
+BEGIN
+	ID_FILE_NEW		"创建新的 xPack 压缩包"
+	ID_FILE_OPEN		"打开现有的 xPack 压缩包"
+	ID_FILE_CLOSE		"关闭当前压缩包"
+	ID_FILE_SAVE		"保存当前压缩包"
+	ID_FILE_ADD		"添加文件到压缩包"
+	ID_FILE_EXTRACT	"解压选中的文件"
+	ID_FILE_DELETE		"删除选中的文件"
+	ID_FILE_RENAME		"重命名选中的文件"
+	ID_FILE_REBUILD	"重建压缩包以优化存储"
+	ID_FILE_PROPERTIES	"查看压缩包属性"
+	ID_VIEW_REFRESH	"刷新文件列表"
+	ID_TOOLS_VERIFY	"验证压缩包完整性"
+	ID_TOOLS_EXTRACTALL	"解压所有文件"
+END

@@ -1,0 +1,21 @@
+LIBRARY comdlg32.dll
+EXPORTS
+ChooseColorA
+ChooseColorW
+ChooseFontA
+ChooseFontW
+FindTextA
+FindTextW
+GetOpenFileNameA
+GetOpenFileNameW
+GetSaveFileNameA
+GetSaveFileNameW
+PageSetupDlgA
+PageSetupDlgW
+PrintDlgA
+PrintDlgExA
+PrintDlgExW
+PrintDlgW
+ReplaceTextA
+ReplaceTextW
+CommDlgExtendedError
