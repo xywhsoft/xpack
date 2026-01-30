@@ -47,7 +47,7 @@ XPKAPI xpkFileInfoIndex* xpkIndexAppendFile(xpkObject xpk, int32_t index,
     
     // 读取文件内容
     size_t fileSize = 0;
-    void* fileData = xrtFileGetAll(path, &fileSize);
+    void* fileData = xrtFileGetAll((str)path, &fileSize);
     if (!fileData) {
         xpkSetError(2, "Failed to read source file");
         return NULL;

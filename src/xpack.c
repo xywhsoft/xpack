@@ -62,7 +62,7 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
     xpk->modified = 0;
     
     // 打开文件
-    xpk->file = xrtOpen(path, readonly, XRT_CP_BINARY);
+    xpk->file = xrtOpen((str)path, readonly, XRT_CP_BINARY);
     
     if (xpk->file) {
         // 文件存在，尝试读取包头
@@ -73,16 +73,10 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
         if (headData && readSize == sizeof(xpkHead)) {
             memcpy(&xpk->head, headData, sizeof(xpkHead));
             free(headData);
-            
-            // 验证签名和版本
-            if (xpk->head.signature != XPK_SIGNATURE) {
-                xpkSetError(4, "Invalid signature");
-                xrtClose(xpk->file);
-                free(xpk);
-                return NULL;
-            }
-            if (xpk->head.version != XPK_VERSION) {
-                xpkSetError(5, "Version not supported");
+
+            // 验证版本（文件头包含 "xpk" + 版本号，与 ver6 兼容）
+            if (xpk->head.fileHead != XPK_VERSION) {
+                xpkSetError(4, "Invalid version or signature");
                 xrtClose(xpk->file);
                 free(xpk);
                 return NULL;
@@ -127,7 +121,7 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
         }
         
         // 创建新文件
-        xpk->file = xrtOpen(path, 0, XRT_CP_BINARY);
+        xpk->file = xrtOpen((str)path, 0, XRT_CP_BINARY);
         if (!xpk->file) {
             xpkSetError(1, "Failed to create file");
             free(xpk);
@@ -137,16 +131,16 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
 init_new_pack:
         // 初始化新包头
         memset(&xpk->head, 0, sizeof(xpkHead));
-        xpk->head.signature = XPK_SIGNATURE;
-        xpk->head.version = XPK_VERSION;
+        xpk->head.fileHead = XPK_VERSION;
         xpk->head.flag.packType = XPK_TYPE_CORE;
         xpk->head.flag.ldbComp = XPK_LDB_COMP;
+        xpk->head.ldbOffset = sizeof(xpkHead);
         xpk->head.createTime = (uint32_t)xrtToUnixTime(xrtNow());
         xpk->head.modifyTime = xpk->head.createTime;
-        
+
         // 初始化 LDB 数组（默认 Core 模式）
         xrtArrayInit(&xpk->ldb, xpkInfoSizes[XPK_TYPE_CORE]);
-        
+
         xpk->modified = 1;
     }
     

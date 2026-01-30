@@ -113,7 +113,7 @@ XPKAPI void* xpkPathAppendFile(xpkObject xpk, const char* filePath,
     
     // 读取文件内容
     size_t fileSize = 0;
-    void* fileData = xrtFileGetAll(srcPath, &fileSize);
+    void* fileData = xrtFileGetAll((str)srcPath, &fileSize);
     if (!fileData) {
         xpkSetError(2, "Failed to read source file");
         return NULL;

@@ -200,7 +200,7 @@ static int extractCallback(void* xpk, uint32_t pos, void* info, void* userData) 
         if (!lastSlash) lastSlash = strrchr(dirPath, '\\');
         if (lastSlash) {
             *lastSlash = '\0';
-            xrtDirCreateAll(dirPath);
+            xrtDirCreateAll((str)dirPath);
         }
         
         // 提取文件
@@ -228,7 +228,7 @@ XPKAPI int xpkExtractAll(xpkObject xpk, const char* dir) {
     if (!xpk || !dir) return -1;
     
     // 创建目标目录
-    xrtDirCreateAll(dir);
+    xrtDirCreateAll((str)dir);
     
     ExtractContext ctx = { dir, 0, 0 };
     xpkEach(xpk, extractCallback, &ctx);

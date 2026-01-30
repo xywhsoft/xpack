@@ -147,26 +147,28 @@ static const xpkCompMap xpkCompTable[16] = {
 
 ```c
 typedef struct {
-    // 基础标识 (8 bytes)
-    uint32_t    signature;      // 文件签名 "xpk\0" (0x006B7078)
-    uint8_t     version;        // 版本号 (7)
+    // 基础标识 (4 bytes)
+    uint32_t    fileHead;       // 文件头标识 "xpk" + 版本号 (0x116B7078)
+
+    // 文件信息扩展 (4 bytes)
     uint8_t     reserved0;      // 保留
     uint16_t    infoExtSize;    // 文件信息扩展大小
-    
+    uint8_t     reserved1;      // 保留
+
     // 包标记 (4 bytes)
     xpkFlag     flag;           // 包标记位域
-    
+
     // 文件信息 (12 bytes)
     uint32_t    fileCount;      // 文件数量
     uint32_t    headExtSize;    // 包头扩展数据大小
     uint32_t    discCode;       // 识别代码(用户自定义)
-    
+
     // LDB 信息 (16 bytes)
     uint32_t    ldbOffset;      // LDB 偏移位置
     uint32_t    ldbSize;        // LDB 压缩后大小
     uint32_t    ldbRawSize;     // LDB 原始大小
     uint32_t    ldbHash;        // LDB 哈希值
-    
+
     // 时间戳 (8 bytes)
     uint32_t    createTime;     // 创建时间
     uint32_t    modifyTime;     // 修改时间

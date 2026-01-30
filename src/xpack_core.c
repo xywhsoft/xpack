@@ -24,7 +24,7 @@ XPKAPI uint32_t xpkAppendFile(xpkObject xpk, const char* path, int level) {
     
     // 读取文件内容
     size_t fileSize = 0;
-    void* fileData = xrtFileGetAll(path, &fileSize);
+    void* fileData = xrtFileGetAll((str)path, &fileSize);
     if (!fileData) {
         xpkSetError(2, "Failed to read source file");
         return UINT32_MAX;
@@ -188,7 +188,7 @@ XPKAPI int xpkUpdateFile(xpkObject xpk, uint32_t pos, const char* path, int leve
     
     // 读取文件内容
     size_t fileSize = 0;
-    void* fileData = xrtFileGetAll(path, &fileSize);
+    void* fileData = xrtFileGetAll((str)path, &fileSize);
     if (!fileData) {
         xpkSetError(2, "Failed to read source file");
         return -1;
