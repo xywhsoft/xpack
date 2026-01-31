@@ -1,7 +1,5 @@
 /*
- * xPack Ver7 - 测试框架
- *
- * 统一测试宏定义和工具函数
+ * xPack Ver7 - 统一测试框架
  */
 
 #ifndef TEST_FRAMEWORK_H
@@ -11,31 +9,87 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 #include "../lib/xrt/xrt.h"
 #include "../src/xpack.h"
 
-// 测试统计
-extern int g_tests_passed;
-extern int g_tests_failed;
+#define MAX_TESTS 300
+#define MAX_CATEGORIES 30
 
-// 测试宏定义
+typedef enum {
+    CAT_UNKNOWN = 0,
+    CAT_CORE = 1,
+    CAT_INDEX = 2,
+    CAT_PATH = 3,
+    CAT_COMPRESSION = 4,
+    CAT_SOLID = 5,
+    CAT_ERROR = 6,
+    CAT_UTILS = 7,
+    CAT_BATCH = 8,
+    CAT_TRAVERSE = 9,
+    CAT_STATS = 10,
+    CAT_VERIFY = 11,
+    CAT_REBUILD = 12,
+    CAT_PROPERTIES = 13,
+    CAT_FILETYPE = 14,
+    CAT_CYCLE = 15,
+    CAT_MULTI = 16,
+    CAT_EDGE = 17,
+    CAT_CONCURRENT = 18,
+    CAT_RECOVERY = 19,
+    CAT_PLATFORM = 20,
+    CAT_MEMORY = 21,
+    CAT_INTEGRATION = 22,
+    CAT_PERFORMANCE = 23,
+    CAT_RATIO = 24,
+    CAT_REGRESSION = 25,
+    CAT_VOLUME = 26
+} TestCategory;
+
+typedef struct {
+    const char* name;
+    const char* description;
+    TestCategory category;
+    void (*func)(void);
+} Test;
+
+typedef struct {
+    int total;
+    int passed;
+    int failed;
+    int cat_counts[MAX_CATEGORIES];
+    int cat_passed[MAX_CATEGORIES];
+    int cat_failed[MAX_CATEGORIES];
+} TestStats;
+
+typedef struct {
+    const char* name;
+    Test tests[MAX_TESTS];
+    int count;
+    TestStats stats;
+    time_t start_time;
+} TestSuite;
+
+extern TestSuite g_test_suite;
+extern TestCategory g_current_category;
+
 #define TEST(name) void test_##name(void)
 
-#define RUN_TEST(name) do { \
-	printf("  Testing %s... ", #name); \
-	test_##name(); \
-	printf("PASSED\n"); \
-	g_tests_passed++; \
-} while(0)
+#define TEST_REGISTER(name, category, description) \
+    do { \
+        test_suite_register(#name, test_##name, category, description); \
+    } while(0)
 
 #define ASSERT(cond) do { \
-	if (!(cond)) { \
-		printf("FAILED\n"); \
-		printf("    Assertion failed: %s\n", #cond); \
-		printf("    At line %d\n", __LINE__); \
-		g_tests_failed++; \
-		return; \
-	} \
+    if (!(cond)) { \
+        printf("      FAILED\n"); \
+        printf("      Assertion failed: %s\n", #cond); \
+        printf("      File: %s, Line: %d\n", __FILE__, __LINE__); \
+        fflush(stdout); \
+        g_test_suite.stats.failed++; \
+        g_test_suite.stats.cat_failed[g_current_category]++; \
+        return; \
+    } \
 } while(0)
 
 #define ASSERT_EQ(a, b) ASSERT((a) == (b))
@@ -48,60 +102,12 @@ extern int g_tests_failed;
 #define ASSERT_NOT_NULL(a) ASSERT((a) != NULL)
 #define ASSERT_STR_EQ(a, b) ASSERT(strcmp(a, b) == 0)
 #define ASSERT_STR_NE(a, b) ASSERT(strcmp(a, b) != 0)
-#define ASSERT_STR_CONTAINS(str, substr) ASSERT(strstr(str, substr) != NULL)
 
-// 测试分类枚举
-typedef enum {
-	TEST_CATEGORY_CORE = 1,
-	TEST_CATEGORY_INDEX = 2,
-	TEST_CATEGORY_PATH = 3,
-	TEST_CATEGORY_COMPRESSION = 4,
-	TEST_CATEGORY_SOLID = 5,
-	TEST_CATEGORY_ERROR = 6,
-	TEST_CATEGORY_UTILS = 7,
-	TEST_CATEGORY_BATCH = 8,
-	TEST_CATEGORY_TRAVERSE = 9,
-	TEST_CATEGORY_STATS = 10,
-	TEST_CATEGORY_VERIFY = 11,
-	TEST_CATEGORY_REBUILD = 12,
-	TEST_CATEGORY_PROPERTIES = 13,
-	TEST_CATEGORY_FILETYPE = 14,
-	TEST_CATEGORY_CYCLE = 15,
-	TEST_CATEGORY_MULTI = 16,
-	TEST_CATEGORY_EDGE = 17,
-	TEST_CATEGORY_CONCURRENT = 18,
-	TEST_CATEGORY_RECOVERY = 19,
-	TEST_CATEGORY_PLATFORM = 20,
-	TEST_CATEGORY_MEMORY = 21,
-	TEST_CATEGORY_INTEGRATION = 22,
-	TEST_CATEGORY_PERFORMANCE = 23,
-	TEST_CATEGORY_RATIO = 24,
-	TEST_CATEGORY_REGRESSION = 25
-} TestCategory;
-
-// 测试信息结构
-typedef struct {
-	const char* name;
-	void (*func)(void);
-	TestCategory category;
-	const char* description;
-} TestInfo;
-
-// 测试运行器接口
-typedef struct {
-	const char* name;
-	const char* version;
-	int test_count;
-	int passed;
-	int failed;
-	double duration;
-} TestRunner;
-
-// 测试函数原型
-void test_print_header(const char* title);
-void test_print_footer(int passed, int failed);
-void test_print_separator(void);
-void test_print_category(const char* name);
+void test_suite_init(const char* name);
+int test_suite_register(const char* name, void (*func)(void), TestCategory category, const char* description);
+void test_suite_run_all(void);
+void test_suite_print_report(void);
+void test_suite_save_report(const char* filename);
 const char* test_category_name(TestCategory category);
 
 #endif /* TEST_FRAMEWORK_H */
