@@ -128,7 +128,7 @@ XPKAPI int xpkExtractFile(xpkObject xpk, uint32_t pos, const char* path) {
     void* data = xpkExtractData(xpk, pos, &outSize);
     if (!data) return -1;
     
-    int result = xrtFilePutAll(path, data, outSize);
+    int result = xrtFilePutAll((str)path, data, outSize);
     free(data);
     
     return (result == (int)outSize) ? 0 : -1;

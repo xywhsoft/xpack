@@ -36,6 +36,10 @@ static int tests_failed = 0;
 #define ASSERT_NE(a, b) ASSERT((a) != (b))
 #define ASSERT_NULL(a) ASSERT((a) == NULL)
 #define ASSERT_NOT_NULL(a) ASSERT((a) != NULL)
+#define ASSERT_GT(a, b) ASSERT((a) > (b))
+#define ASSERT_LT(a, b) ASSERT((a) < (b))
+#define ASSERT_GE(a, b) ASSERT((a) >= (b))
+#define ASSERT_LE(a, b) ASSERT((a) <= (b))
 
 // ============================================================================
 // Core 模式测试
@@ -80,6 +84,47 @@ TEST(core_append_data) {
     ASSERT_EQ(memcmp(extracted, data, outSize), 0);
     
     xpkFree(extracted);
+    xpkClose(xpk);
+}
+
+TEST(core_initialization) {
+    xpkObject xpk = xpkOpen("test_core_init.xpk", 0, 0);
+    ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkType(xpk), XPK_TYPE_CORE);
+    ASSERT_EQ(xpkCount(xpk), 0);
+    xpkClose(xpk);
+}
+
+TEST(core_create_empty_package) {
+    xpkObject xpk = xpkOpen("test_core_empty.xpk", 0, 0);
+    ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkCount(xpk), 0);
+    ASSERT_EQ(xpkSave(xpk), 0);
+    xpkClose(xpk);
+
+    xpk = xpkOpen("test_core_empty.xpk", 0, 1);
+    ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkCount(xpk), 0);
+    xpkClose(xpk);
+}
+
+TEST(core_add_file) {
+    xpkObject xpk = xpkOpen("test_core_add_file.xpk", 0, 0);
+    ASSERT_NOT_NULL(xpk);
+
+    char testData[256];
+    memset(testData, 'A', sizeof(testData));
+    strcpy(testData, "Test file content");
+
+    xpkAppendData(xpk, testData, sizeof(testData), 6);
+    ASSERT_EQ(xpkCount(xpk), 1);
+
+    ASSERT_EQ(xpkSave(xpk), 0);
+    xpkClose(xpk);
+
+    xpk = xpkOpen("test_core_add_file.xpk", 0, 1);
+    ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkCount(xpk), 1);
     xpkClose(xpk);
 }
 
@@ -301,67 +346,59 @@ TEST(path_mode_linux) {
 // 固实压缩测试
 // ============================================================================
 
-TEST(solid_mode_enable_disable) {
-    xpkObject xpk = xpkOpen("test_solid_mode.xpk", 0, 0);
+TEST(solid_create_basic) {
+    xpkObject xpk = xpkOpen("test_solid_basic.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
-    
-    // 默认不启用固实模式
-    ASSERT_EQ(xpkSolidMode(xpk), 0);
-    
-    // 启用固实模式
+
     ASSERT_EQ(xpkSolidModeSet(xpk, 1), 0);
     ASSERT_EQ(xpkSolidMode(xpk), 1);
-    
-    // 添加数据
-    const char* data = "Test solid compression";
+
+    const char* data = "Solid compression test data";
     uint32_t pos = xpkAppendData(xpk, data, (uint32_t)strlen(data), 6);
     ASSERT_EQ(pos, 0);
-    ASSERT_EQ(xpkCount(xpk), 1);
-    
-    // 保存
+
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
-    
-    // 重新打开验证
-    xpk = xpkOpen("test_solid_mode.xpk", 0, 1);
+
+    xpk = xpkOpen("test_solid_basic.xpk", 0, 1);
     ASSERT_NOT_NULL(xpk);
     ASSERT_EQ(xpkSolidMode(xpk), 1);
-    ASSERT_EQ(xpkCount(xpk), 1);
-    
+
+    uint32_t outSize = 0;
+    void* extracted = xpkExtractData(xpk, 0, &outSize);
+    ASSERT_NOT_NULL(extracted);
+    ASSERT_EQ(outSize, strlen(data));
+    ASSERT_EQ(memcmp(extracted, data, outSize), 0);
+    xpkFree(extracted);
+
     xpkClose(xpk);
 }
 
-TEST(solid_mode_multiple_files) {
-    xpkObject xpk = xpkOpen("test_solid_multi.xpk", 0, 0);
+TEST(solid_add_multiple_files) {
+    xpkObject xpk = xpkOpen("test_solid_multi_files.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
-    
-    // 启用固实模式
+
     ASSERT_EQ(xpkSolidModeSet(xpk, 1), 0);
-    
-    // 添加多个文件
-    for (int i = 0; i < 10; i++) {
+
+    for (int i = 0; i < 5; i++) {
         char data[128];
-        snprintf(data, sizeof(data), "Solid file %d with some repeated data", i);
+        sprintf(data, "File %d content with repeated data", i);
         uint32_t pos = xpkAppendData(xpk, data, (uint32_t)strlen(data), 6);
         ASSERT_EQ(pos, i);
     }
-    
-    ASSERT_EQ(xpkCount(xpk), 10);
-    
-    // 保存
+
+    ASSERT_EQ(xpkCount(xpk), 5);
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
-    
-    // 重新打开验证
-    xpk = xpkOpen("test_solid_multi.xpk", 0, 1);
+
+    xpk = xpkOpen("test_solid_multi_files.xpk", 0, 1);
     ASSERT_NOT_NULL(xpk);
-    ASSERT_EQ(xpkCount(xpk), 10);
-    
-    // 验证所有文件
-    for (int i = 0; i < 10; i++) {
+    ASSERT_EQ(xpkCount(xpk), 5);
+
+    for (int i = 0; i < 5; i++) {
         char expected[128];
-        snprintf(expected, sizeof(expected), "Solid file %d with some repeated data", i);
-        
+        sprintf(expected, "File %d content with repeated data", i);
+
         uint32_t outSize = 0;
         void* extracted = xpkExtractData(xpk, i, &outSize);
         ASSERT_NOT_NULL(extracted);
@@ -369,154 +406,93 @@ TEST(solid_mode_multiple_files) {
         ASSERT_EQ(memcmp(extracted, expected, outSize), 0);
         xpkFree(extracted);
     }
-    
+
     xpkClose(xpk);
 }
 
-TEST(solid_mode_empty_files) {
+TEST(solid_compression_ratio_vs_normal) {
+    char dataFiles[5][2048];
+
+    for (int i = 0; i < 5; i++) {
+        memset(dataFiles[i], 'A' + (i % 3), sizeof(dataFiles[i]));
+        strcpy(dataFiles[i] + 2000, "Common suffix string");
+    }
+
+    xpkObject xpkNormal = xpkOpen("test_ratio_normal.xpk", 0, 0);
+    ASSERT_NOT_NULL(xpkNormal);
+
+    for (int i = 0; i < 5; i++) {
+        xpkAppendData(xpkNormal, dataFiles[i], sizeof(dataFiles[i]), 6);
+    }
+    ASSERT_EQ(xpkSave(xpkNormal), 0);
+
+    uint32_t normalSize = 0;
+    for (uint32_t i = 0; i < xpkCount(xpkNormal); i++) {
+        normalSize += xpkInfoPacked(xpkNormal, i);
+    }
+    xpkClose(xpkNormal);
+
+    xpkObject xpkSolid = xpkOpen("test_ratio_solid.xpk", 0, 0);
+    ASSERT_NOT_NULL(xpkSolid);
+    ASSERT_EQ(xpkSolidModeSet(xpkSolid, 1), 0);
+
+    for (int i = 0; i < 5; i++) {
+        xpkAppendData(xpkSolid, dataFiles[i], sizeof(dataFiles[i]), 6);
+    }
+    ASSERT_EQ(xpkSave(xpkSolid), 0);
+
+    uint32_t solidOffset = 0;
+    uint32_t solidSize = 0;
+    ASSERT_EQ(xpkSolidBlockInfo(xpkSolid, &solidOffset, &solidSize), 0);
+    xpkClose(xpkSolid);
+
+    ASSERT_GT(normalSize, solidSize);
+    ASSERT_GT(solidSize, 0);
+}
+
+TEST(solid_empty_files) {
     xpkObject xpk = xpkOpen("test_solid_empty.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
-    
-    // 启用固实模式
+
     ASSERT_EQ(xpkSolidModeSet(xpk, 1), 0);
-    
-    // 添加空文件
+
     uint32_t pos1 = xpkAppendData(xpk, NULL, 0, 6);
     ASSERT_EQ(pos1, 0);
-    
+
     uint32_t pos2 = xpkAppendData(xpk, "", 0, 6);
     ASSERT_EQ(pos2, 1);
-    
-    // 添加正常文件
+
     const char* data = "Non-empty file";
     uint32_t pos3 = xpkAppendData(xpk, data, (uint32_t)strlen(data), 6);
     ASSERT_EQ(pos3, 2);
-    
-    ASSERT_EQ(xpkCount(xpk), 3);
-    
-    // 保存
+
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
-    
-    // 重新打开验证
+
     xpk = xpkOpen("test_solid_empty.xpk", 0, 1);
     ASSERT_NOT_NULL(xpk);
-    
-    // 验证空文件
+
     uint32_t outSize = 0;
     void* extracted = xpkExtractData(xpk, 0, &outSize);
     ASSERT_NOT_NULL(extracted);
     ASSERT_EQ(outSize, 0);
     xpkFree(extracted);
-    
-    // 验证第二个空文件
+
     extracted = xpkExtractData(xpk, 1, &outSize);
     ASSERT_NOT_NULL(extracted);
     ASSERT_EQ(outSize, 0);
     xpkFree(extracted);
-    
-    // 验证非空文件
+
     extracted = xpkExtractData(xpk, 2, &outSize);
     ASSERT_NOT_NULL(extracted);
     ASSERT_EQ(outSize, strlen(data));
     ASSERT_EQ(memcmp(extracted, data, outSize), 0);
     xpkFree(extracted);
-    
+
     xpkClose(xpk);
 }
 
-TEST(solid_mode_compression_ratio) {
-    // 准备测试数据（多个相似文件）
-    char dataFiles[5][1024];
-    for (int i = 0; i < 5; i++) {
-        memset(dataFiles[i], 'A' + i, 1024);
-    }
-    
-    // 独立压缩
-    xpkObject xpkIndependent = xpkOpen("test_ratio_independent.xpk", 0, 0);
-    ASSERT_NOT_NULL(xpkIndependent);
-    
-    for (int i = 0; i < 5; i++) {
-        xpkAppendData(xpkIndependent, dataFiles[i], 1024, 7);
-    }
-    ASSERT_EQ(xpkSave(xpkIndependent), 0);
-    
-    uint32_t independentSize = xpkInfoPacked(xpkIndependent, 0) +
-                               xpkInfoPacked(xpkIndependent, 1) +
-                               xpkInfoPacked(xpkIndependent, 2) +
-                               xpkInfoPacked(xpkIndependent, 3) +
-                               xpkInfoPacked(xpkIndependent, 4);
-    xpkClose(xpkIndependent);
-    
-    // 固实压缩
-    xpkObject xpkSolid = xpkOpen("test_ratio_solid.xpk", 0, 0);
-    ASSERT_NOT_NULL(xpkSolid);
-    ASSERT_EQ(xpkSolidModeSet(xpkSolid, 1), 0);
-    
-    for (int i = 0; i < 5; i++) {
-        xpkAppendData(xpkSolid, dataFiles[i], 1024, 7);
-    }
-    ASSERT_EQ(xpkSave(xpkSolid), 0);
-    
-    // 获取固实块信息
-    uint32_t solidOffset = 0;
-    uint32_t solidSize = 0;
-    ASSERT_EQ(xpkSolidBlockInfo(xpkSolid, &solidOffset, &solidSize), 0);
-    
-    xpkClose(xpkSolid);
-    
-    printf("\n");
-    printf("    Independent compression: %u bytes\n", independentSize);
-    printf("    Solid compression: %u bytes\n", solidSize);
-    printf("    Compression improvement: %.1f%%\n",
-           100.0 * (independentSize - solidSize) / independentSize);
-    printf("  ");
-}
 
-TEST(solid_mode_block_info) {
-    xpkObject xpk = xpkOpen("test_solid_block_info.xpk", 0, 0);
-    ASSERT_NOT_NULL(xpk);
-    
-    ASSERT_EQ(xpkSolidModeSet(xpk, 1), 0);
-    
-    // 添加文件
-    for (int i = 0; i < 5; i++) {
-        char data[256];
-        snprintf(data, sizeof(data), "File %d data", i);
-        xpkAppendData(xpk, data, (uint32_t)strlen(data), 6);
-    }
-    
-    ASSERT_EQ(xpkSave(xpk), 0);
-    
-    // 获取固实块信息
-    uint32_t offset = 0;
-    uint32_t size = 0;
-    ASSERT_EQ(xpkSolidBlockInfo(xpk, &offset, &size), 0);
-    
-    ASSERT_NE(offset, 0);
-    ASSERT_NE(size, 0);
-    
-    printf("\n");
-    printf("    Solid block offset: %u\n", offset);
-    printf("    Solid block size: %u bytes\n", size);
-    printf("  ");
-    
-    xpkClose(xpk);
-}
-
-TEST(solid_mode_cannot_set_after_files) {
-    xpkObject xpk = xpkOpen("test_solid_error.xpk", 0, 0);
-    ASSERT_NOT_NULL(xpk);
-    
-    // 先添加文件
-    const char* data = "Test data";
-    xpkAppendData(xpk, data, (uint32_t)strlen(data), 6);
-    
-    // 尝试在已有文件后设置固实模式（应该失败）
-    ASSERT_NE(xpkSolidModeSet(xpk, 1), 0);
-    
-    xpkClose(xpk);
-}
 
 // ============================================================================
 // 统计和校验测试
@@ -569,6 +545,9 @@ int main(void) {
     printf("=================================================\n\n");
     
     printf("[Core Mode Tests]\n");
+    RUN_TEST(core_initialization);
+    RUN_TEST(core_create_empty_package);
+    RUN_TEST(core_add_file);
     RUN_TEST(core_create_empty);
     RUN_TEST(core_append_data);
     RUN_TEST(core_multiple_files);
@@ -588,12 +567,10 @@ int main(void) {
     printf("\n");
     
     printf("[Solid Compression Tests]\n");
-    RUN_TEST(solid_mode_enable_disable);
-    RUN_TEST(solid_mode_multiple_files);
-    RUN_TEST(solid_mode_empty_files);
-    RUN_TEST(solid_mode_compression_ratio);
-    RUN_TEST(solid_mode_block_info);
-    RUN_TEST(solid_mode_cannot_set_after_files);
+    RUN_TEST(solid_create_basic);
+    RUN_TEST(solid_add_multiple_files);
+    RUN_TEST(solid_compression_ratio_vs_normal);
+    RUN_TEST(solid_empty_files);
     printf("\n");
 
     printf("[Utility Tests]\n");

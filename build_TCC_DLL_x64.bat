@@ -12,7 +12,6 @@ tcc -m64 -shared ^
 	lib/zstd/zstd.c ^
 	lib/lzma/Alloc.c ^
 	lib/lzma/CpuArch.c ^
-	lib/lzma/tcc_stub.c ^
 	lib/lzma/LzFind.c ^
 	lib/lzma/LzmaDec.c ^
 	lib/lzma/LzmaEnc.c ^

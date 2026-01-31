@@ -7,6 +7,10 @@ Igor Pavlov : Public domain */
 
 #include "CpuArch.h"
 
+#ifdef __TINYC__
+#include "tcc_stub.h"
+#endif
+
 #ifdef MY_CPU_X86_OR_AMD64
 
 #undef NEED_CHECK_FOR_CPUID
@@ -238,7 +242,7 @@ void __declspec(naked) Z7_FASTCALL z7_x86_cpuid_subFunc(UInt32 p[4], UInt32 func
       #include <intrin.h>
       #define MY_cpuidex  __cpuidex
 
-static
+
 void Z7_FASTCALL z7_x86_cpuid_subFunc(UInt32 p[4], UInt32 func, UInt32 subFunc)
 {
   __cpuidex((int *)p, func, subFunc);
@@ -267,6 +271,7 @@ Z7_NO_INLINE void Z7_FASTCALL MY_cpuidex_HACK(Int32 subFunction, Int32 func, Int
 }
       #define MY_cpuidex(info, func, func2)  MY_cpuidex_HACK(func2, func, info)
       #pragma message("======== MY_cpuidex_HACK WAS USED ========")
+
 static
 void Z7_FASTCALL z7_x86_cpuid_subFunc(UInt32 p[4], UInt32 func, UInt32 subFunc)
 {

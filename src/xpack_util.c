@@ -300,7 +300,7 @@ XPKAPI int xpkAppendDir(xpkObject xpk, const char* dir, const char* pattern,
     ctx.success = 0;
     ctx.failed = 0;
     
-    xrtDirScan(dir, recursive, (ptr)appendDirCallback, &ctx);
+    xrtDirScan((str)dir, recursive, (ptr)appendDirCallback, &ctx);
     
     return ctx.failed > 0 ? -1 : ctx.success;
 }
