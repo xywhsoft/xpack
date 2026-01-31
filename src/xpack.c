@@ -36,7 +36,10 @@ static const char* g_errorMessages[] = {
     "Decompression failed",         // 8
     "Hash verification failed",     // 9
     "Readonly mode write denied",   // 10
-    "Pack type mismatch"            // 11
+    "Pack type mismatch",          // 11
+    "Maximum volume count exceeded", // 12
+    "Volume file not available",   // 13
+    "Volume data incomplete"       // 14
 };
 
 // ============================================================================
@@ -61,6 +64,16 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
     xpk->readonly = readonly ? 1 : 0;
     xpk->modified = 0;
     
+    // 初始化分卷管理器
+    xpkVolumeInit(xpk);
+    if (path) {
+        size_t pathLen = strlen(path);
+        if (pathLen > 0) {
+            strncpy(xpk->volume.basePath, path, 255);
+            xpk->volume.basePath[255] = '\0';
+        }
+    }
+    
     // 打开文件
     xpk->file = xrtOpen((str)path, readonly, XRT_CP_BINARY);
     
@@ -70,55 +83,74 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
         size_t readSize = 0;
         void* headData = xrtGet(xpk->file, sizeof(xpkHead), &readSize);
         
-        if (headData && readSize == sizeof(xpkHead)) {
-            memcpy(&xpk->head, headData, sizeof(xpkHead));
-            free(headData);
+        if (!headData || readSize != sizeof(xpkHead)) {
+            // 文件为空或读取失败，初始化新包
+            if (headData) xrtFree(headData);
+            goto init_new_pack;
+        }
+        
+        memcpy(&xpk->head, headData, sizeof(xpkHead));
+        xrtFree(headData);
 
-            // 验证版本（文件头包含 "xpk" + 版本号，与 ver6 兼容）
-            if (xpk->head.fileHead != XPK_VERSION) {
-                xpkSetError(4, "Invalid version or signature");
+        // 验证版本（文件头包含 "xpk" + 版本号，与 ver6 兼容）
+        if (xpk->head.fileHead != XPK_VERSION) {
+            xpkSetError(4, "Invalid version or signature");
+            xrtClose(xpk->file);
+            free(xpk);
+            return NULL;
+        }
+
+        // 读取包头扩展数据
+        if (xpk->head.headExtSize > 0) {
+            xpk->headExt = xrtGet(xpk->file, xpk->head.headExtSize, &readSize);
+            if (!xpk->headExt || readSize != xpk->head.headExtSize) {
+                xpkSetError(2, "Failed to read head extension");
                 xrtClose(xpk->file);
                 free(xpk);
                 return NULL;
             }
+        }
+        
+        // 初始化 LDB 数组
+        int packType = xpk->head.flag.packType & 0x03;
+        xrtArrayInit(&xpk->ldb, xpkInfoSizes[packType]);
+        
+        // 初始化固实相关字段
+        xpk->solidMode = xpk->head.flag.solidMode ? 1 : 0;
+        xpk->solidCompLevel = XPK_COMP_DEFAULT;
+        xpk->solidBufferSize = 0;
+        xpk->solidCached = 0;
+        xpk->solidDecompressed = NULL;
+        xpk->solidBuffer = NULL;
+        
+        // 初始化分卷相关字段
+        // 仅当volumeMode标志为1且headExtSize符合预期时才启用volume模式
+        xpk->volume.enabled = (xpk->head.flag.volumeMode && xpk->head.headExtSize >= sizeof(xpkVolumeInfo)) ? 1 : 0;
+        xpk->volume.splitMode = xpk->head.flag.splitMode;
+        xpk->volume.currentVolume = 0;
+        xpk->volume.currentOffset = XPK_VOL_HEADER_SIZE;
+        
+        // 读取分卷信息
+        if (xpk->volume.enabled && xpk->head.headExtSize >= sizeof(xpkVolumeInfo)) {
+            xpkVolumeInfo* volInfo = (xpkVolumeInfo*)xpk->headExt;
+            xpk->volume.totalSize = XPK_VOL_HEADER_SIZE;
             
-            // 读取包头扩展数据
-            if (xpk->head.headExtSize > 0) {
-                xpk->headExt = xrtGet(xpk->file, xpk->head.headExtSize, &readSize);
-                if (!xpk->headExt || readSize != xpk->head.headExtSize) {
-                    xpkSetError(2, "Failed to read head extension");
-                    xrtClose(xpk->file);
-                    free(xpk);
-                    return NULL;
-                }
+            // 如果不是主卷，需要打开主卷获取完整信息
+            if (volInfo->volumeIndex != 0) {
+                // 简化处理：仅支持打开主卷
+                xpk->volume.currentVolume = volInfo->volumeIndex;
             }
-            
-            // 初始化 LDB 数组
-            int packType = xpk->head.flag.packType & 0x03;
-            xrtArrayInit(&xpk->ldb, xpkInfoSizes[packType]);
-            
-            // 初始化固实相关字段
-            xpk->solidMode = xpk->head.flag.solidMode ? 1 : 0;
-            xpk->solidCompLevel = XPK_COMP_DEFAULT;
-            xpk->solidBufferSize = 0;
-            xpk->solidCached = 0;
-            xpk->solidDecompressed = NULL;
-            xpk->solidBuffer = NULL;
-            
-            // 加载 LDB
-            if (xpk->head.fileCount > 0) {
-                if (xpkLdbLoad(xpk) != 0) {
-                    xrtArrayUnit(&xpk->ldb);
-                    if (xpk->headExt) free(xpk->headExt);
-                    xrtClose(xpk->file);
-                    free(xpk);
-                    return NULL;
-                }
+        }
+        
+        // 加载 LDB
+        if (xpk->head.fileCount > 0) {
+            if (xpkLdbLoad(xpk) != 0) {
+                xrtArrayUnit(&xpk->ldb);
+                if (xpk->headExt) free(xpk->headExt);
+                xrtClose(xpk->file);
+                free(xpk);
+                return NULL;
             }
-        } else {
-            // 文件为空或读取失败，初始化新包
-            if (headData) free(headData);
-            goto init_new_pack;
         }
     } else {
         // 文件不存在
@@ -176,18 +208,29 @@ XPKAPI int xpkSave(xpkObject xpk) {
 	xpk->head.modifyTime = xrtNow();
 	xpk->head.fileCount = xpk->ldb.Count;
 	
-	// 移动到文件开始位置
-	xrtSeek(xpk->file, xpk->baseOffset, XRT_SEEK_SET);
-	
-	// 计算数据区偏移
-	uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
-	
-	// 写入包头（暂时）
-	xrtPut(xpk->file, &xpk->head, sizeof(xpkHead));
-	
-	// 写入包头扩展数据
-	if (xpk->head.headExtSize > 0 && xpk->headExt) {
-		xrtPut(xpk->file, xpk->headExt, xpk->head.headExtSize);
+	// 分卷模式：更新所有卷的包头
+	if (xpk->volume.enabled) {
+		for (int i = 0; i <= xpk->volume.currentVolume; i++) {
+			xfile volFile = xpk->volume.volumes[i];
+			if (!volFile) continue;
+			
+			xrtSeek(volFile, 0, XRT_SEEK_SET);
+			xpkHead headCopy = xpk->head;
+			headCopy.flag.volumeMode = 1;
+			headCopy.flag.splitMode = xpk->volume.splitMode;
+			headCopy.headExtSize = sizeof(xpkVolumeInfo);
+			
+			xrtPut(volFile, &headCopy, sizeof(xpkHead));
+			
+			xpkVolumeInfo volInfo;
+			volInfo.volumeCount = xpk->volume.currentVolume + 1;
+			volInfo.volumeIndex = i;
+			xrtPut(volFile, &volInfo, sizeof(xpkVolumeInfo));
+		}
+	} else {
+		// 单卷模式：更新包头
+		xrtSeek(xpk->file, xpk->baseOffset, XRT_SEEK_SET);
+		xrtPut(xpk->file, &xpk->head, sizeof(xpkHead));
 	}
 	
 	// 固实模式：保存固实块
@@ -202,9 +245,11 @@ XPKAPI int xpkSave(xpkObject xpk) {
 		}
 	}
 	
-	// 重新写入包头（更新 LDB 信息）
-	xrtSeek(xpk->file, xpk->baseOffset, XRT_SEEK_SET);
-	xrtPut(xpk->file, &xpk->head, sizeof(xpkHead));
+	// 单卷模式：重新写入包头（更新 LDB 信息）
+	if (!xpk->volume.enabled) {
+		xrtSeek(xpk->file, xpk->baseOffset, XRT_SEEK_SET);
+		xrtPut(xpk->file, &xpk->head, sizeof(xpkHead));
+	}
 	
 	xpk->modified = 0;
 	return 0;
@@ -212,6 +257,11 @@ XPKAPI int xpkSave(xpkObject xpk) {
 
 XPKAPI void xpkClose(xpkObject xpk) {
 	if (!xpk) return;
+	
+	xfile mainFile = xpk->file;
+	
+	// 关闭所有分卷文件
+	xpkVolumeCloseAll(xpk);
 	
 	// 释放 LDB
 	xrtArrayUnit(&xpk->ldb);
@@ -232,10 +282,9 @@ XPKAPI void xpkClose(xpkObject xpk) {
 		xpk->solidDecompressed = NULL;
 	}
 	
-	// 关闭文件
-	if (xpk->file) {
-		xrtClose(xpk->file);
-		xpk->file = NULL;
+	// 关闭文件（如果还没被 xpkVolumeCloseAll 关闭）
+	if (mainFile) {
+		xrtClose(mainFile);
 	}
 	
 	free(xpk);
@@ -511,7 +560,7 @@ int xpkSolidDecompressBlock(xpkObject xpk) {
 	void* compData = xrtGet(xpk->file, solidSize, &readSize);
 	
 	if (!compData || readSize != solidSize) {
-		if (compData) free(compData);
+		xrtFree(compData);
 		xpkSetError(2, "Failed to read solid block");
 		return -1;
 	}
@@ -526,7 +575,7 @@ int xpkSolidDecompressBlock(xpkObject xpk) {
 	// 分配解压缓冲区
 	void* rawData = malloc(totalRawSize);
 	if (!rawData) {
-		free(compData);
+		xrtFree(compData);
 		xpkSetError(3, "Failed to allocate solid buffer");
 		return -1;
 	}
@@ -535,12 +584,12 @@ int xpkSolidDecompressBlock(xpkObject xpk) {
 	int solidLevel = xpk->head.flag.ldbComp;
 	if (xpkDecompressRouter(solidLevel, compData, solidSize,
 	                     rawData, totalRawSize) != 0) {
-		free(compData);
+		xrtFree(compData);
 		free(rawData);
 		xpkSetError(8, "Solid decompression failed");
 		return -1;
 	}
-	free(compData);
+	xrtFree(compData);
 	
 	// 保存到缓存
 	xpk->solidDecompressed = rawData;
@@ -582,4 +631,125 @@ XPKAPI int xpkLastError(void) {
 
 XPKAPI const char* xpkLastErrorMsg(void) {
     return g_lastErrorMsg;
+}
+
+// ============================================================================
+// 分卷控制接口
+// ============================================================================
+
+XPKAPI int xpkVolumeMode(xpkObject xpk) {
+    if (!xpk) return -1;
+    return xpk->volume.enabled ? 1 : 0;
+}
+
+XPKAPI int xpkVolumeModeSet(xpkObject xpk, int enabled) {
+    if (!xpk) return -1;
+    if (xpk->readonly) {
+        xpkSetError(10, "Cannot change volume mode in readonly");
+        return -1;
+    }
+    
+    xpk->volume.enabled = enabled ? 1 : 0;
+    xpk->head.flag.volumeMode = xpk->volume.enabled;
+    xpk->head.headExtSize = xpk->volume.enabled ? sizeof(xpkVolumeInfo) : 0;
+    
+    if (xpk->volume.enabled) {
+        xpk->head.flag.splitMode = xpk->volume.splitMode;
+    }
+    
+    xpk->modified = 1;
+    return 0;
+}
+
+XPKAPI int xpkVolumeSize(xpkObject xpk) {
+    if (!xpk) return -1;
+    return (int)xpk->volume.volumeSize;
+}
+
+XPKAPI int xpkVolumeSizeSet(xpkObject xpk, uint32_t size) {
+    if (!xpk) return -1;
+    if (xpk->readonly) {
+        xpkSetError(10, "Cannot change volume size in readonly");
+        return -1;
+    }
+    
+    xpk->volume.volumeSize = size;
+    return 0;
+}
+
+XPKAPI int xpkVolumeCount(xpkObject xpk) {
+    if (!xpk) return -1;
+    if (!xpk->volume.enabled) return 1;
+    return xpk->volume.currentVolume + 1;
+}
+
+XPKAPI int xpkVolumeCurrent(xpkObject xpk) {
+    if (!xpk) return -1;
+    return (int)xpk->volume.currentVolume;
+}
+
+XPKAPI int xpkVolumeSplitMode(xpkObject xpk) {
+    if (!xpk) return -1;
+    return (int)xpk->volume.splitMode;
+}
+
+XPKAPI int xpkVolumeSplitModeSet(xpkObject xpk, int mode) {
+    if (!xpk) return -1;
+    if (xpk->readonly) {
+        xpkSetError(10, "Cannot change split mode in readonly");
+        return -1;
+    }
+    
+    if (mode < 0 || mode > 1) {
+        xpkSetError(6, "Invalid split mode");
+        return -1;
+    }
+    
+    xpk->volume.splitMode = (uint8_t)mode;
+    if (xpk->volume.enabled) {
+        xpk->head.flag.splitMode = xpk->volume.splitMode;
+    }
+    
+    return 0;
+}
+
+XPKAPI const char* xpkVolumePath(xpkObject xpk, int index) {
+    return xpkVolumeGetPath(xpk, index);
+}
+
+XPKAPI int xpkVolumeStatGet(xpkObject xpk, xpkVolumeStat* stat) {
+    if (!xpk || !stat) return -1;
+    
+    memset(stat, 0, sizeof(xpkVolumeStat));
+    stat->volumeCount = xpkVolumeCount(xpk);
+    stat->totalSize = xpk->volume.totalSize;
+    
+    if (xpk->volume.enabled) {
+        stat->volumeSizes = (uint32_t*)malloc(stat->volumeCount * sizeof(uint32_t));
+        if (!stat->volumeSizes) {
+            xpkSetError(3, "Failed to allocate volume sizes");
+            return -1;
+        }
+        
+        uint64_t totalData = 0;
+        for (int i = 0; i < stat->volumeCount; i++) {
+            if (i < xpk->volume.currentVolume) {
+                stat->volumeSizes[i] = xpk->volume.volumeOffsets[i + 1] - xpk->volume.volumeOffsets[i];
+            } else if (i == xpk->volume.currentVolume) {
+                stat->volumeSizes[i] = xpk->volume.totalSize - xpk->volume.volumeOffsets[i];
+            } else {
+                stat->volumeSizes[i] = 0;
+            }
+            totalData += stat->volumeSizes[i];
+        }
+        
+        stat->totalDataSize = totalData;
+        stat->avgSize = (double)xpk->volume.totalSize / stat->volumeCount;
+    } else {
+        stat->volumeSizes = NULL;
+        stat->totalDataSize = xpk->volume.totalSize;
+        stat->avgSize = (double)xpk->volume.totalSize;
+    }
+    
+    return 0;
 }

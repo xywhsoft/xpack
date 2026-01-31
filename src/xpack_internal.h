@@ -14,12 +14,39 @@
 extern "C" {
 #endif
 
+#define XPK_MAX_VOLUMES 256
+#define XPK_VOL_HEADER_SIZE (sizeof(xpkHead) + sizeof(xpkVolumeInfo))
+
+// ============================================================================
+// 运行时分卷配置
+// ============================================================================
+typedef struct {
+	// 配置
+	uint8_t         enabled;           // 是否启用分卷
+	uint32_t        volumeSize;        // 单卷最大字节数 (0=不限制)
+	uint8_t         splitMode;         // 0=按字节, 1=按文件
+	
+	// 状态
+	uint32_t        currentVolume;     // 当前写入的卷索引
+	uint32_t        currentOffset;     // 当前卷的写入偏移
+	
+	// 文件管理
+	char            basePath[256];     // 基础路径（不含卷后缀）
+	xfile          volumes[XPK_MAX_VOLUMES];   // 卷文件句柄数组
+	uint8_t        volumeOpen[XPK_MAX_VOLUMES]; // 卷是否已打开
+	
+	// 元数据
+	uint32_t        totalSize;         // 所有卷的总大小
+	uint32_t        volumeOffsets[XPK_MAX_VOLUMES]; // 各卷的基础偏移
+	
+} xpkVolume;
+
 // ============================================================================
 // xPack 对象内部结构
 // ============================================================================
 typedef struct xpkStruct {
 	// 文件信息
-	xfile               file;           // xrt 文件句柄
+	xfile               file;           // xrt 文件句柄 (主卷)
 	uint32_t            baseOffset;     // 包在文件中的基础偏移
 	
 	// 状态标记
@@ -50,6 +77,9 @@ typedef struct xpkStruct {
 	void*               solidDecompressed;  // 解压后的固实块数据
 	uint32_t            solidDecompSize;    // 解压后的固实块大小
 	uint8_t             solidCached;        // 固实块是否已缓存
+	
+	// 分卷相关
+	xpkVolume           volume;         // 分卷管理器
 	
 } xpkStruct;
 
@@ -94,6 +124,18 @@ int xpkSolidSave(xpkObject xpk);
 void* xpkSolidExtractData(xpkObject xpk, uint32_t pos, xpkFileInfo* info, uint32_t* outSize);
 int xpkSolidDecompressBlock(xpkObject xpk);
 uint32_t xpkGetSolidOffset(xpkObject xpk, uint32_t pos);
+
+// 分卷内部函数
+int xpkVolumeInit(xpkObject xpk);
+int xpkVolumeOpen(xpkObject xpk, int index);
+int xpkVolumeCloseAll(xpkObject xpk);
+int xpkVolumeCreateNext(xpkObject xpk);
+int xpkVolumeCheckCapacity(xpkObject xpk, uint32_t dataSize);
+int xpkVolumeWriteData(xpkObject xpk, const void* data, uint32_t size);
+void* xpkVolumeReadData(xpkObject xpk, uint32_t globalOffset, uint32_t size, uint32_t* outSize);
+int xpkVolumeFromOffset(xpkObject xpk, uint32_t globalOffset);
+void xpkVolumeGetName(xpkObject xpk, int index, char* outName, size_t nameSize);
+const char* xpkVolumeGetPath(xpkObject xpk, int index);
 
 #ifdef __cplusplus
 }

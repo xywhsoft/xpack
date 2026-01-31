@@ -336,7 +336,7 @@ XPKAPI int xpkRebuild(xpkObject xpk) {
         size_t readSize = 0;
         void* data = xrtGet(xpk->file, info->dataSize, &readSize);
         if (!data || readSize != info->dataSize) {
-            if (data) free(data);
+            xrtFree(data);
             xpkSetError(2, "Failed to read data during rebuild");
             return -1;
         }
@@ -344,11 +344,11 @@ XPKAPI int xpkRebuild(xpkObject xpk) {
         // 写入新位置
         xrtSeek(xpk->file, xpk->baseOffset + newOffset, XRT_SEEK_SET);
         if (xrtPut(xpk->file, data, info->dataSize) != (int)info->dataSize) {
-            free(data);
+            xrtFree(data);
             xpkSetError(2, "Failed to write data during rebuild");
             return -1;
         }
-        free(data);
+        xrtFree(data);
         
         // 更新偏移
         info->dataOffset = newOffset;

@@ -35,9 +35,8 @@ int xpkLdbLoad(xpkObject xpk) {
     uint32_t ldbRawSize = xpk->head.fileCount * totalInfoSize;
     
     // 读取压缩的 LDB 数据
-    xrtSeek(xpk->file, xpk->baseOffset + xpk->head.ldbOffset, XRT_SEEK_SET);
-    size_t readSize = 0;
-    void* compData = xrtGet(xpk->file, xpk->head.ldbSize, &readSize);
+    uint32_t readSize = 0;
+    void* compData = xpkVolumeReadData(xpk, xpk->head.ldbOffset, xpk->head.ldbSize, &readSize);
     
     if (!compData || readSize != xpk->head.ldbSize) {
         if (compData) free(compData);
@@ -139,7 +138,7 @@ int xpkLdbSave(xpkObject xpk) {
 	uint32_t ldbOffset = xpk->head.ldbOffset;
 	if (!xpk->head.flag.solidMode) {
 		// 独立模式：计算在最后一个文件数据之后
-		ldbOffset = sizeof(xpkHead) + xpk->head.headExtSize;
+		ldbOffset = xpk->baseOffset + sizeof(xpkHead) + xpk->head.headExtSize;
 		if (xpk->ldb.Count > 0) {
 			xpkFileInfo* lastInfo = (xpkFileInfo*)XPK_LDB_GET(xpk, xpk->ldb.Count - 1);
 			if (lastInfo) {
@@ -171,16 +170,20 @@ int xpkLdbSave(xpkObject xpk) {
 	uint32_t ldbHash = xrtHash32(compData, compSize);
 	
 	// 写入 LDB 数据
-	xrtSeek(xpk->file, xpk->baseOffset + ldbOffset, XRT_SEEK_SET);
-	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+	xrtSeek(xpk->file, ldbOffset, XRT_SEEK_SET);
+	if (xpkVolumeWriteData(xpk, compData, compSize) != 0) {
 		free(compData);
-		xpkSetError(2, "Failed to write LDB data");
 		return -1;
 	}
 	free(compData);
 	
 	// 设置文件结束位置
-	xrtSetEOF(xpk->file);
+	if (xpk->volume.enabled && xpk->volume.currentVolume >= 0) {
+		xfile lastVol = xpk->volume.volumes[xpk->volume.currentVolume];
+		if (lastVol) xrtSetEOF(lastVol);
+	} else {
+		xrtSetEOF(xpk->file);
+	}
 	
 	// 更新包头中的 LDB 信息（固实模式下不更新 ldbOffset）
 	xpk->head.ldbSize = compSize;

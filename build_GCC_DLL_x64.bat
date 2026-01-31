@@ -6,6 +6,7 @@ gcc -m64 -shared ^
 	src/xpack_ldb.c ^
 	src/xpack_path.c ^
 	src/xpack_util.c ^
+	src/xpack_volume.c ^
 	lib/xrt/xrt.c ^
 	lib/lz4/lz4.c ^
 	lib/lz4/lz4hc.c ^
@@ -27,4 +28,3 @@ gcc -m64 -shared ^
 @echo;
 @echo off
 
-pause

@@ -77,7 +77,7 @@ XPKAPI uint32_t xpkAppendData(xpkObject xpk, const void* data, uint32_t size, in
 	uint32_t fileHash = xrtHash32((ptr)data, size);
 	
 	// 计算数据偏移
-	uint32_t dataOffset = sizeof(xpkHead) + xpk->head.headExtSize;
+	uint32_t dataOffset = xpk->baseOffset + sizeof(xpkHead) + xpk->head.headExtSize;
 	
 	// 如果有现有文件，计算下一个数据偏移
 	if (xpk->ldb.Count > 0) {
@@ -88,10 +88,9 @@ XPKAPI uint32_t xpkAppendData(xpkObject xpk, const void* data, uint32_t size, in
 	}
 	
 	// 写入压缩数据到文件
-	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+	xrtSeek(xpk->file, dataOffset, XRT_SEEK_SET);
+	if (xpkVolumeWriteData(xpk, compData, compSize) != 0) {
 		free(compData);
-		xpkSetError(2, "Failed to write data");
 		return UINT32_MAX;
 	}
 	free(compData);
@@ -153,9 +152,8 @@ XPKAPI void* xpkExtractData(xpkObject xpk, uint32_t pos, uint32_t* outSize) {
 	
 	// 独立模式：标准解压
 	// 读取压缩数据
-	xrtSeek(xpk->file, xpk->baseOffset + info->dataOffset, XRT_SEEK_SET);
-	size_t readSize = 0;
-	void* compData = xrtGet(xpk->file, info->dataSize, &readSize);
+	uint32_t readSize = 0;
+	void* compData = xpkVolumeReadData(xpk, info->dataOffset, info->dataSize, &readSize);
 	if (!compData || readSize != info->dataSize) {
 		if (compData) free(compData);
 		xpkSetError(2, "Failed to read compressed data");

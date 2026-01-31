@@ -108,7 +108,9 @@ typedef union {
         uint32_t packType   : 4;        // [0-3]   包类型 (0-3)
         uint32_t ldbComp    : 4;        // [4-7]   LDB 压缩级别 (0-15)
         uint32_t solidMode  : 1;        // [8]     固实压缩模式 (0=独立,1=固实)
-        uint32_t reserved   : 23;       // [9-31]  保留
+        uint32_t volumeMode : 1;        // [9]     分卷模式 (0=单卷,1=多卷)
+        uint32_t splitMode  : 2;        // [10-11] 分割模式 (0=字节,1=文件)
+        uint32_t reserved   : 20;       // [12-31] 保留
     };
 } xpkFlag;
 
@@ -244,6 +246,16 @@ typedef struct {
 #pragma pack(pop)
 
 // ============================================================================
+// 分卷信息头 (8 bytes) - 存储在 xpkHead.headExt
+// ============================================================================
+#pragma pack(push, 1)
+typedef struct {
+    uint32_t        volumeCount;        // [0-3]   分卷总数 (1=不分卷)
+    uint32_t        volumeIndex;       // [4-7]   当前卷索引 (0-based)
+} xpkVolumeInfo;
+#pragma pack(pop)
+
+// ============================================================================
 // 压缩级别映射结构
 // ============================================================================
 typedef struct {
@@ -294,6 +306,17 @@ typedef struct {
 } xpkStat;
 
 // ============================================================================
+// 分卷统计信息结构
+// ============================================================================
+typedef struct {
+    int             volumeCount;         // 分卷总数
+    uint32_t*       volumeSizes;        // 各卷大小数组 (需调用者释放)
+    uint64_t        totalSize;          // 总大小（所有卷）
+    uint64_t        totalDataSize;      // 数据总大小
+    double          avgSize;           // 平均卷大小
+} xpkVolumeStat;
+
+// ============================================================================
 // xPack 对象（不透明类型）
 // ============================================================================
 typedef struct xpkStruct* xpkObject;
@@ -327,6 +350,20 @@ XPKAPI xpkHead*     xpkGetHead(xpkObject xpk);
 XPKAPI int          xpkSolidMode(xpkObject xpk);
 XPKAPI int          xpkSolidModeSet(xpkObject xpk, int enabled);
 XPKAPI int          xpkSolidBlockInfo(xpkObject xpk, uint32_t* offset, uint32_t* size);
+
+// ============================================================================
+// 分卷控制接口
+// ============================================================================
+XPKAPI int          xpkVolumeMode(xpkObject xpk);
+XPKAPI int          xpkVolumeModeSet(xpkObject xpk, int enabled);
+XPKAPI int          xpkVolumeSize(xpkObject xpk);
+XPKAPI int          xpkVolumeSizeSet(xpkObject xpk, uint32_t size);
+XPKAPI int          xpkVolumeCount(xpkObject xpk);
+XPKAPI int          xpkVolumeCurrent(xpkObject xpk);
+XPKAPI int          xpkVolumeSplitMode(xpkObject xpk);
+XPKAPI int          xpkVolumeSplitModeSet(xpkObject xpk, int mode);
+XPKAPI const char*  xpkVolumePath(xpkObject xpk, int index);
+XPKAPI int          xpkVolumeStatGet(xpkObject xpk, xpkVolumeStat* stat);
 
 // ============================================================================
 // 文件操作 - Core 模式（按位置）
