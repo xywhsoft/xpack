@@ -26,6 +26,8 @@ gcc ^
 	-DZSTD_NO_INTRINSICS ^
 	-DZ7_ST ^
 	-DXPK_WITH_SQLITE ^
+	-DUNICODE ^
+	-D_UNICODE ^
 	-m64 ^
 	-O2 ^
 	-Wall ^
@@ -59,8 +61,8 @@ gcc ^
 	-luser32 ^
 	-lgdi32 ^
 	-ladvapi32 ^
-	-lole32 ^
-	-mwindows
+	-lole32
+rem	-mwindows
 
 if %ERRORLEVEL% EQU 0 (
 	echo.

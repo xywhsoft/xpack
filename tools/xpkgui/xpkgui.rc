@@ -2,6 +2,8 @@
 #include "resource.h"
 #include <windows.h>
 
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
 IDR_MAINMENU MENU
 BEGIN
 	POPUP "文件(&F)"
@@ -24,7 +26,6 @@ BEGIN
 		MENUITEM SEPARATOR
 		MENUITEM "退出(&X)",				ID_FILE_EXIT
 	END
-
 	POPUP "查看(&V)"
 	BEGIN
 		MENUITEM "刷新(&R)\tF5",			ID_VIEW_REFRESH
@@ -32,7 +33,6 @@ BEGIN
 		MENUITEM "显示网格线",				ID_VIEW_GRIDLINES
 		MENUITEM "显示状态栏",				ID_VIEW_STATUSBAR
 	END
-
 	POPUP "工具(&T)"
 	BEGIN
 		MENUITEM "验证(&V)",					ID_TOOLS_VERIFY
@@ -46,7 +46,6 @@ BEGIN
 		MENUITEM "设置分卷大小(&Z)...",		ID_TOOLS_VOLUME_SIZE
 		MENUITEM "设置识别代码(&C)...",		ID_TOOLS_DISCCODE
 	END
-
 	POPUP "帮助(&H)"
 	BEGIN
 		MENUITEM "关于(&A)...",				ID_HELP_ABOUT
@@ -59,7 +58,7 @@ BEGIN
 	ID_FILE_OPEN	"打开已有的 xPack 压缩包"
 	ID_FILE_CLOSE	"关闭当前的压缩包"
 	ID_FILE_SAVE	"保存当前的压缩包"
-	ID_FILE_ADD		"添加文件到压缩包"
+	ID_FILE_ADD	"添加文件到压缩包"
 	ID_FILE_ADDDIR	"添加目录到压缩包"
 	ID_FILE_EXTRACT	"解压选中的文件"
 	ID_FILE_DELETE	"删除选中的文件"

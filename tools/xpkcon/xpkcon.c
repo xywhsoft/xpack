@@ -34,7 +34,7 @@ typedef struct {
 	uint32_t fileCount;
 	time_t startTime;
 } ProgressInfo;
-static const char* VERSION = "1.1.0";
+static const char* VERSION = "1.2.0";
 static ProgressInfo g_progress = {0};
 
 void print_usage(void);
@@ -401,7 +401,17 @@ int cmd_add(xpkObject xpk, CommandLineArgs* args)
 				process_directory(path, "*", subFiles, &subCount, MAX_FILES, 1);
 				
 				for (int j = 0; j < subCount; j++) {
-					uint32_t pos = xpkAppendFile(xpk, subFiles[j], args->compLevel);
+					uint32_t pos;
+					if (args->packType == XPK_TYPE_WIN32 || args->packType == XPK_TYPE_LINUX) {
+						pos = (uint32_t)(uintptr_t)xpkPathAppendFile(xpk, subFiles[j], subFiles[j], args->compLevel);
+					} else {
+						pos = xpkAppendFile(xpk, subFiles[j], args->compLevel);
+					}
+					if (pos == UINT32_MAX) {
+						fprintf(stderr, "Error: Failed to add '%s'\n", subFiles[j]);
+						free(subFiles[j]);
+						return 1;
+					}
 					if (args->verbose) {
 						printf("  Added: %s\n", subFiles[j]);
 					}
@@ -411,7 +421,12 @@ int cmd_add(xpkObject xpk, CommandLineArgs* args)
 				fprintf(stderr, "Warning: Skipping directory '%s' (use -r for recursive)\n", path);
 			}
 		} else if (is_file_exists(path)) {
-			uint32_t pos = xpkAppendFile(xpk, path, args->compLevel);
+			uint32_t pos;
+			if (args->packType == XPK_TYPE_WIN32 || args->packType == XPK_TYPE_LINUX) {
+				pos = (uint32_t)(uintptr_t)xpkPathAppendFile(xpk, path, path, args->compLevel);
+			} else {
+				pos = xpkAppendFile(xpk, path, args->compLevel);
+			}
 			if (pos == UINT32_MAX) {
 				fprintf(stderr, "Error: Failed to add '%s'\n", path);
 				return 1;
@@ -456,31 +471,53 @@ int cmd_extract(xpkObject xpk, CommandLineArgs* args)
 		strncpy(baseDir, ".", MAX_PATH_LEN - 1);
 	}
 
+	int packType = xpkType(xpk);
 	int extracted = 0;
 	for (uint32_t i = 0; i < count; i++) {
-		void* info = xpkInfo(xpk, i);
-		if (info == NULL) continue;
-
 		int shouldExtract = 1;
 		if (args->fileCount > 0) {
 			shouldExtract = 0;
 			for (int j = 0; j < args->fileCount; j++) {
-				if (wildcard_match(args->files[j], info)) {
-					shouldExtract = 1;
-					break;
+				if (packType == XPK_TYPE_WIN32 || packType == XPK_TYPE_LINUX) {
+					const char* filePath = xpkPathGet(xpk, i);
+					if (filePath && wildcard_match(args->files[j], filePath)) {
+						shouldExtract = 1;
+						break;
+					}
+				} else {
+					char posStr[32];
+					snprintf(posStr, sizeof(posStr), "%u", i);
+					if (wildcard_match(args->files[j], posStr)) {
+						shouldExtract = 1;
+						break;
+					}
 				}
 			}
 		}
 
 		if (shouldExtract) {
 			char outPath[MAX_PATH_LEN];
-			snprintf(outPath, MAX_PATH_LEN, "%s/%s", baseDir, info);
+			if (packType == XPK_TYPE_WIN32 || packType == XPK_TYPE_LINUX) {
+				const char* filePath = xpkPathGet(xpk, i);
+				if (!filePath) {
+					fprintf(stderr, "Error: Failed to get file path for position %u\n", i);
+					continue;
+				}
+				snprintf(outPath, MAX_PATH_LEN, "%s/%s", baseDir, filePath);
+			} else {
+				snprintf(outPath, MAX_PATH_LEN, "%s/file_%u", baseDir, i);
+			}
 			
-			if (xpkExtractFile(xpk, i, outPath) == 0) {
+			int result = xpkExtractFile(xpk, i, outPath);
+			if (result == 0) {
 				if (args->verbose) {
 					printf("  Extracted: %s\n", outPath);
 				}
 				extracted++;
+			} else {
+				if (args->verbose) {
+					fprintf(stderr, "  Failed to extract: %s (error code: %d)\n", outPath, result);
+				}
 			}
 		}
 	}
@@ -504,25 +541,47 @@ int cmd_extract_simple(xpkObject xpk, CommandLineArgs* args)
 		strncpy(baseDir, ".", MAX_PATH_LEN - 1);
 	}
 
+	int packType = xpkType(xpk);
 	int extracted = 0;
 	for (uint32_t i = 0; i < count; i++) {
-		void* info = xpkInfo(xpk, i);
-		if (info == NULL) continue;
-
 		int shouldExtract = 1;
 		if (args->fileCount > 0) {
 			shouldExtract = 0;
 			for (int j = 0; j < args->fileCount; j++) {
-				if (wildcard_match(args->files[j], info)) {
-					shouldExtract = 1;
-					break;
+				if (packType == XPK_TYPE_WIN32 || packType == XPK_TYPE_LINUX) {
+					const char* filePath = xpkPathGet(xpk, i);
+					if (filePath && wildcard_match(args->files[j], filePath)) {
+						shouldExtract = 1;
+						break;
+					}
+				} else {
+					char posStr[32];
+					snprintf(posStr, sizeof(posStr), "%u", i);
+					if (wildcard_match(args->files[j], posStr)) {
+						shouldExtract = 1;
+						break;
+					}
 				}
 			}
 		}
 
 		if (shouldExtract) {
 			char outPath[MAX_PATH_LEN];
-			snprintf(outPath, MAX_PATH_LEN, "%s/%s", baseDir, info);
+			if (packType == XPK_TYPE_WIN32 || packType == XPK_TYPE_LINUX) {
+				const char* filePath = xpkPathGet(xpk, i);
+				if (!filePath) {
+					fprintf(stderr, "Error: Failed to get file path for position %u\n", i);
+					continue;
+				}
+				char* lastSlash = strrchr(filePath, '/');
+				char* lastBackslash = strrchr(filePath, '\\');
+				char* fileName = filePath;
+				if (lastSlash) fileName = lastSlash + 1;
+				if (lastBackslash && lastBackslash > fileName) fileName = lastBackslash + 1;
+				snprintf(outPath, MAX_PATH_LEN, "%s/%s", baseDir, fileName);
+			} else {
+				snprintf(outPath, MAX_PATH_LEN, "%s/file_%u", baseDir, i);
+			}
 			
 			if (xpkExtractFile(xpk, i, outPath) == 0) {
 				if (args->verbose) {
@@ -545,16 +604,20 @@ int cmd_list(xpkObject xpk, CommandLineArgs* args)
 		return 0;
 	}
 
-	printf("  %-40s %12s %12s %8s %6s\n", "Filename", "Size", "Packed", "Ratio", "Level");
-	printf("  %-40s %12s %12s %8s %6s\n", "--------", "----", "------", "-----", "-----");
+	int packType = xpkType(xpk);
+	
+	if (packType == XPK_TYPE_WIN32 || packType == XPK_TYPE_LINUX) {
+		printf("  %-40s %12s %12s %8s %6s\n", "Filename", "Size", "Packed", "Ratio", "Level");
+		printf("  %-40s %12s %12s %8s %6s\n", "--------", "----", "------", "-----", "-----");
+	} else {
+		printf("  %-10s %12s %12s %8s %6s\n", "Position", "Size", "Packed", "Ratio", "Level");
+		printf("  %-10s %12s %12s %8s %6s\n", "--------", "----", "------", "-----", "-----");
+	}
 
 	uint64_t totalSize = 0;
 	uint64_t totalPacked = 0;
 
 	for (uint32_t i = 0; i < count; i++) {
-		void* info = xpkInfo(xpk, i);
-		if (info == NULL) continue;
-
 		uint32_t size = xpkInfoSize(xpk, i);
 		uint32_t packed = xpkInfoPacked(xpk, i);
 		int level = xpkInfoLevel(xpk, i);
@@ -567,7 +630,20 @@ int cmd_list(xpkObject xpk, CommandLineArgs* args)
 		format_size(packed, packedBuf, sizeof(packedBuf));
 
 		float ratio = size > 0 ? (100.0f * packed / size) : 0.0f;
-		printf("  %-40s %12s %12s %7.1f%% %6d\n", info, sizeBuf, packedBuf, ratio, level);
+		
+		if (packType == XPK_TYPE_WIN32 || packType == XPK_TYPE_LINUX) {
+			const char* filePath = xpkPathGet(xpk, i);
+			if (filePath) {
+				char fileName[41];
+				strncpy(fileName, filePath, 40);
+				fileName[40] = '\0';
+				printf("  %-40s %12s %12s %7.1f%% %6d\n", fileName, sizeBuf, packedBuf, ratio, level);
+			} else {
+				printf("  %-40s %12s %12s %7.1f%% %6d\n", "<unknown>", sizeBuf, packedBuf, ratio, level);
+			}
+		} else {
+			printf("  %-10u %12s %12s %7.1f%% %6d\n", i, sizeBuf, packedBuf, ratio, level);
+		}
 	}
 
 	char totalSizeBuf[32], totalPackedBuf[32];
@@ -759,7 +835,34 @@ void format_time(time_t t, char* buf, int bufSize)
 
 int wildcard_match(const char* pattern, const char* text)
 {
-	return 1;
+	if (!pattern || !text) return 0;
+	
+	while (*pattern && *text) {
+		if (*pattern == '*') {
+			pattern++;
+			if (*pattern == '\0') return 1;
+			
+			while (*text) {
+				if (wildcard_match(pattern, text)) {
+					return 1;
+				}
+				text++;
+			}
+			return 0;
+		} else if (*pattern == '?') {
+			pattern++;
+			text++;
+		} else if (*pattern == *text) {
+			pattern++;
+			text++;
+		} else {
+			return 0;
+		}
+	}
+	
+	while (*pattern == '*') pattern++;
+	
+	return *pattern == '\0' && *text == '\0';
 }
 
 int process_directory(const char* dir, const char* pattern, char** files, int* count, int maxCount, int recursive)
