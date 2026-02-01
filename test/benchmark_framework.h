@@ -10,6 +10,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
+
+#ifndef UINT64_MAX
+#define UINT64_MAX ((uint64_t)-1)
+#endif
 
 #define BENCHMARK_MAX_NAME_LEN 128
 #define BENCHMARK_MAX_RUNS 100
@@ -80,13 +85,13 @@ static void benchmark_stats_compute(BenchmarkStats* stats) {
         return;
     }
 
+    // 重置统计值（因为 benchmark_stats_add 已经计算过，这里重新计算以确保正确性）
+    stats->total_time_ms = 0;
+    stats->min_time_ms = UINT64_MAX;
+    stats->max_time_ms = 0;
+
     for (int i = 0; i < stats->run_count; i++) {
         stats->total_time_ms += stats->runs[i].time_ms;
-    }
-
-    stats->avg_time_ms = stats->total_time_ms / stats->run_count;
-
-    for (int i = 0; i < stats->run_count; i++) {
         if (stats->runs[i].time_ms < stats->min_time_ms) {
             stats->min_time_ms = stats->runs[i].time_ms;
         }
@@ -94,6 +99,8 @@ static void benchmark_stats_compute(BenchmarkStats* stats) {
             stats->max_time_ms = stats->runs[i].time_ms;
         }
     }
+
+    stats->avg_time_ms = stats->total_time_ms / stats->run_count;
 
     if (stats->run_count > 1) {
         uint64_t sorted[BENCHMARK_MAX_RUNS];
@@ -125,7 +132,7 @@ static void benchmark_result_print(const BenchmarkResult* result) {
     printf("Time: %6llu ms  ", (unsigned long long)result->time_ms);
 
     if (result->speed_mb_per_sec > 0) {
-        printf("Speed: %8.2f MB/s  ", result->speed_mb_per_sec / (1024.0 * 1024.0));
+        printf("Speed: %8.2f MB/s  ", (double)result->speed_mb_per_sec);
     }
 
     if (result->peak_memory_kb > 0) {
@@ -164,7 +171,7 @@ static void benchmark_stats_print_csv(const BenchmarkStats* stats, const char* f
                 r->name,
                 r->data_size / (1024.0 * 1024.0),
                 (unsigned long long)r->time_ms,
-                r->speed_mb_per_sec / (1024.0 * 1024.0),
+                (double)r->speed_mb_per_sec / (1024.0 * 1024.0),
                 (unsigned long long)r->peak_memory_kb,
                 r->notes);
     }
@@ -193,7 +200,7 @@ static void benchmark_stats_print_json(const BenchmarkStats* stats, const char* 
         fprintf(fp, "      \"name\": \"%s\",\n", r->name);
         fprintf(fp, "      \"data_size\": %llu,\n", (unsigned long long)r->data_size);
         fprintf(fp, "      \"time_ms\": %llu,\n", (unsigned long long)r->time_ms);
-        fprintf(fp, "      \"speed_mb_per_sec\": %.2f,\n", r->speed_mb_per_sec / (1024.0 * 1024.0));
+        fprintf(fp, "      \"speed_mb_per_sec\": %.2f,\n", (double)r->speed_mb_per_sec / (1024.0 * 1024.0));
         fprintf(fp, "      \"peak_memory_kb\": %llu,\n", (unsigned long long)r->peak_memory_kb);
         fprintf(fp, "      \"notes\": \"%s\"\n", r->notes);
         fprintf(fp, "    }%s\n", i < stats->run_count - 1 ? "," : "");

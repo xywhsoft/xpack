@@ -52,6 +52,9 @@ XPKAPI xpkObject xpkOpen(const char* path, uint32_t offset, int readonly) {
         return NULL;
     }
     
+    // 初始化 xrt 运行环境
+    xrtInit();
+    
     // 分配对象
     xpkStruct* xpk = (xpkStruct*)malloc(sizeof(xpkStruct));
     if (!xpk) {
@@ -288,6 +291,9 @@ XPKAPI void xpkClose(xpkObject xpk) {
 	}
 	
 	free(xpk);
+	
+	// 释放 xrt 运行环境
+	xrtUnit();
 }
 
 // ============================================================================
