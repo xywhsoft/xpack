@@ -11,26 +11,29 @@
 - [xpkshext.h](file://tools/xpkgui/xpkshext.h)
 - [xpkshext.def](file://tools/xpkgui/xpkshext.def)
 - [xpkshext.reg](file://tools/xpkgui/xpkshext.reg)
+- [install.bat](file://tools/xpkgui/install.bat)
+- [uninstall.bat](file://tools/xpkgui/uninstall.bat)
+- [xpkgui.reg](file://tools/xpkgui/xpkgui.reg)
 - [build_x64.bat](file://tools/xpkgui/build_x64.bat)
 - [build_x86.bat](file://tools/xpkgui/build_x86.bat)
 - [build_shext_x64.bat](file://tools/xpkgui/build_shext_x64.bat)
 - [build_shext_x86.bat](file://tools/xpkgui/build_shext_x86.bat)
+- [build_shext_gcc_x64.bat](file://tools/xpkgui/build_shext_gcc_x64.bat)
+- [build_shext_gcc_x86.bat](file://tools/xpkgui/build_shext_gcc_x86.bat)
+- [build_shext_tcc_x64.bat](file://tools/xpkgui/build_shext_tcc_x64.bat)
+- [build_shext_tcc_x86.bat](file://tools/xpkgui/build_shext_tcc_x86.bat)
+- [build_linux.sh](file://tools/xpkgui/build_linux.sh)
 - [xpack.h](file://src/xpack.h)
 - [xrt.h](file://lib/xrt/xrt.h)
 </cite>
 
 ## 更新摘要
 **变更内容**
-- 新增命令行集成支持，支持多种模式的命令行操作
-- 实现拖放支持，提升用户体验
-- 增强设置管理系统，支持配置持久化
-- 添加历史记录功能，记录最近使用的压缩包
-- 扩展包类型选择功能，支持多种压缩包模式
-- 新增压缩级别选择对话框
-- 实现模式匹配操作，支持通配符批量处理
-- 增强错误处理机制，提供详细错误信息
-- 添加分卷压缩功能，支持大文件处理
-- 集成Shell扩展，提供右键菜单支持
+- 新增完整的安装卸载脚本系统，支持自动化部署和清理
+- 增强 Windows Shell 扩展功能，完善右键菜单集成
+- 补充注册表管理工具，提供文件关联和扩展注册
+- 添加多平台编译支持，包括 GCC 和 TCC 编译器
+- 优化平台特定配置，增强系统兼容性
 
 ## 目录
 1. [简介](#简介)
@@ -40,12 +43,15 @@
 5. [详细组件分析](#详细组件分析)
 6. [命令行功能](#命令行功能)
 7. [Shell扩展集成](#shell扩展集成)
-8. [设置管理](#设置管理)
-9. [历史记录](#历史记录)
-10. [依赖关系分析](#依赖关系分析)
-11. [性能考虑](#性能考虑)
-12. [故障排除指南](#故障排除指南)
-13. [结论](#结论)
+8. [安装卸载系统](#安装卸载系统)
+9. [注册表管理](#注册表管理)
+10. [平台特定优化](#平台特定优化)
+11. [设置管理](#设置管理)
+12. [历史记录](#历史记录)
+13. [依赖关系分析](#依赖关系分析)
+14. [性能考虑](#性能考虑)
+15. [故障排除指南](#故障排除指南)
+16. [结论](#结论)
 
 ## 简介
 
@@ -63,6 +69,8 @@ xpkgui 是一个基于 Win32 SDK 开发的 xPack 压缩包管理工具，提供�
 - **历史记录**：最近使用文件的自动记录
 - **拖放支持**：直观的拖拽文件操作
 - **分卷压缩**：支持大文件的分卷存储
+- **安装卸载系统**：自动化部署和清理工具
+- **多平台支持**：Windows 和 Linux 平台编译支持
 
 ## 项目结构
 
@@ -78,32 +86,53 @@ D[build_x64.bat - 64位编译脚本]
 E[build_x86.bat - 32位编译脚本]
 F[README.md - 项目文档]
 G[xpkgui_full_spec.md - 完整规格说明]
+H[install.bat - 安装脚本]
+I[uninstall.bat - 卸载脚本]
+J[xpkgui.reg - 文件关联注册表]
 end
 subgraph "Shell扩展"
-H[xpkshext.c - Shell扩展源码]
-I[xpkshext.h - Shell扩展头文件]
-J[xpkshext.def - DLL导出定义]
-K[xpkshext.reg - Shell扩展注册表]
+K[xpkshext.c - Shell扩展源码]
+L[xpkshext.h - Shell扩展头文件]
+M[xpkshext.def - DLL导出定义]
+N[xpkshext.reg - Shell扩展注册表]
+O[build_shext_x64.bat - Shell扩展64位编译]
+P[build_shext_x86.bat - Shell扩展32位编译]
+end
+subgraph "平台特定编译"
+Q[build_shext_gcc_x64.bat - GCC 64位编译]
+R[build_shext_gcc_x86.bat - GCC 32位编译]
+S[build_shext_tcc_x64.bat - TCC 64位编译]
+T[build_shext_tcc_x86.bat - TCC 32位编译]
+U[build_linux.sh - Linux编译脚本]
 end
 subgraph "依赖库"
-L[xPack 核心库]
-M[xrt 运行时库]
-N[LZ4 压缩库]
-O[LZMA 压缩库]
-P[ZSTD 压缩库]
+V[xPack 核心库]
+W[xrt 运行时库]
+X[LZ4 压缩库]
+Y[LZMA 压缩库]
+Z[ZSTD 压缩库]
 end
-A --> L
-A --> M
-A --> N
-A --> O
-A --> P
-H --> L
-H --> M
+A --> V
+A --> W
+A --> X
+A --> Y
+A --> Z
+K --> V
+K --> W
+K --> X
+K --> Y
+K --> Z
+H --> A
+H --> K
+I --> A
+I --> K
 ```
 
 **图表来源**
 - [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L100)
 - [xpkshext.c](file://tools/xpkgui/xpkshext.c#L1-L100)
+- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
+- [uninstall.bat](file://tools/xpkgui/uninstall.bat#L1-L85)
 
 **章节来源**
 - [README.md](file://tools/xpkgui/README.md#L281-L299)
@@ -163,20 +192,25 @@ G[压缩包管理器]
 H[设置管理器]
 I[历史记录管理器]
 J[命令行处理器]
+K[Shell扩展处理器]
+L[安装卸载处理器]
 end
 subgraph "数据访问层"
-K[xPack API]
-L[xrt 库]
-M[压缩算法库]
-N[配置文件系统]
-O[历史文件系统]
+M[xPack API]
+N[xrt 库]
+O[压缩算法库]
+P[配置文件系统]
+Q[历史文件系统]
+R[注册表系统]
+S[文件系统]
 end
 subgraph "系统接口"
-P[Win32 API]
-Q[文件系统]
-R[内存管理]
-S[Shell扩展]
-T[注册表]
+T[Win32 API]
+U[COM API]
+V[Shell API]
+W[注册表API]
+X[文件系统API]
+Y[进程管理]
 end
 A --> F
 B --> F
@@ -184,22 +218,30 @@ C --> F
 D --> F
 E --> F
 F --> G
-G --> K
-K --> L
-K --> M
-H --> N
-I --> O
-J --> P
-S --> T
-L --> P
-M --> P
-N --> P
-O --> P
+G --> M
+M --> N
+M --> O
+H --> P
+I --> Q
+J --> T
+K --> U
+K --> V
+L --> R
+L --> W
+M --> S
+N --> S
+O --> S
+P --> S
+Q --> S
+R --> W
+S --> X
+Y --> T
 ```
 
 **图表来源**
 - [xpkgui.c](file://tools/xpkgui/xpkgui.c#L166-L247)
 - [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1018-L1040)
+- [xpkshext.c](file://tools/xpkgui/xpkshext.c#L1-L388)
 
 ## 详细组件分析
 
@@ -480,6 +522,190 @@ Windows Registry Editor Version 5.00
 - [README.md](file://tools/xpkgui/README.md#L266-L280)
 - [xpkgui_full_spec.md](file://tools/xpkgui/xpkgui_full_spec.md#L55-L242)
 
+## 安装卸载系统
+
+### 自动化安装脚本
+
+xpkgui 提供了完整的安装卸载系统，支持自动化部署：
+
+**安装脚本功能：**
+- 自动检测系统架构（x86/x64）
+- 复制核心文件到安装目录
+- 注册文件关联
+- 注册 Shell 扩展
+- 刷新图标缓存
+
+**卸载脚本功能：**
+- 注销 Shell 扩展
+- 删除右键菜单注册表项
+- 删除文件关联
+- 清理程序文件
+- 删除配置目录
+- 刷新图标缓存
+
+### 安装流程详解
+
+```mermaid
+flowchart TD
+Start([运行安装脚本]) --> DetectArch{检测系统架构}
+DetectArch --> |x64| SetDir64[设置64位源目录]
+DetectArch --> |x86| SetDir32[设置32位源目录]
+SetDir64 --> CopyFiles[复制核心文件]
+SetDir32 --> CopyFiles
+CopyFiles --> CheckCLI{检查xpkcon.exe}
+CheckCLI --> |存在| CopyCLI[复制命令行工具]
+CheckCLI --> |不存在| SkipCLI[跳过命令行工具]
+CopyCLI --> RegisterAssoc[注册文件关联]
+SkipCLI --> RegisterAssoc
+RegisterAssoc --> RegisterShell[注册Shell扩展]
+RegisterShell --> RefreshCache[刷新图标缓存]
+RefreshCache --> Complete([安装完成])
+```
+
+**图表来源**
+- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
+
+### 卸载流程详解
+
+```mermaid
+flowchart TD
+Start([运行卸载脚本]) --> UnregisterShell[注销Shell扩展]
+UnregisterShell --> DeleteMenus[删除右键菜单注册表]
+DeleteMenus --> DeleteAssoc[删除文件关联]
+DeleteAssoc --> DeleteFiles[删除程序文件]
+DeleteFiles --> DeleteConfig[删除配置目录]
+DeleteConfig --> RefreshCache[刷新图标缓存]
+RefreshCache --> Complete([卸载完成])
+```
+
+**图表来源**
+- [uninstall.bat](file://tools/xpkgui/uninstall.bat#L1-L85)
+
+**章节来源**
+- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
+- [uninstall.bat](file://tools/xpkgui/uninstall.bat#L1-L85)
+
+## 注册表管理
+
+### 文件关联注册
+
+xpkgui 通过注册表管理文件关联，实现双击打开功能：
+
+```reg
+Windows Registry Editor Version 5.00
+
+; .xpk 文件类型定义
+[HKEY_CLASSES_ROOT\.xpk]
+@="xPack.File"
+"PerceivedType"="compressed"
+"Content Type"="application/x-xpack"
+
+; xPack 文件类型描述
+[HKEY_CLASSES_ROOT\xPack.File]
+@="xPack 压缩包"
+"Friendl yTypeName"="xPack 压缩包"
+
+; 默认图标
+[HKEY_CLASSES_ROOT\xPack.File\DefaultIcon]
+@="\"C:\\Program Files\\xPack\\xpkgui.exe\",0"
+
+; 打开命令（GUI）
+[HKEY_CLASSES_ROOT\xPack.File\shell\open\command]
+@="\"C:\\Program Files\\xPack\\xpkgui.exe\" \"%1\""
+
+; 管理菜单项
+[HKEY_CLASSES_ROOT\xPack.File\shell\manage]
+@="使用 xpkgui 管理文件"
+"Icon"="\"C:\\Program Files\\xPack\\xpkgui.exe\",0"
+
+[HKEY_CLASSES_ROOT\xPack.File\shell\manage\command]
+@="\"C:\\Program Files\\xPack\\xpkgui.exe\" \"%1\""
+```
+
+**图表来源**
+- [xpkgui.reg](file://tools/xpkgui/xpkgui.reg#L1-L29)
+
+### Shell扩展注册表
+
+Shell 扩展通过注册表实现右键菜单集成：
+
+```reg
+Windows Registry Editor Version 5.00
+
+; 注册 Shell 扩展 CLSID
+[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}]
+@="xPack Shell Extension"
+
+[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}\InprocServer32]
+@="C:\\Program Files\\xPack\\xpkshext.dll"
+"ThreadingModel"="Apartment"
+
+; 右键菜单注册
+[HKEY_CLASSES_ROOT\.xpk\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+
+[HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+
+[HKEY_CLASSES_ROOT\Directory\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+
+[HKEY_CLASSES_ROOT\Folder\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+```
+
+**图表来源**
+- [xpkshext.reg](file://tools/xpkgui/xpkshext.reg#L1-L26)
+
+**章节来源**
+- [xpkgui.reg](file://tools/xpkgui/xpkgui.reg#L1-L29)
+- [xpkshext.reg](file://tools/xpkgui/xpkshext.reg#L1-L26)
+
+## 平台特定优化
+
+### 多编译器支持
+
+xpkgui 支持多种编译器，提供灵活的构建选项：
+
+**GCC 编译器支持：**
+- 64位编译：`build_shext_gcc_x64.bat`
+- 32位编译：`build_shext_gcc_x86.bat`
+- 优化标志：`-O2 -Wall`
+- 链接库：`-lshell32 -lshlwapi -lole32`
+
+**TCC 编译器支持：**
+- 64位编译：`build_shext_tcc_x64.bat`
+- 32位编译：`build_shext_tcc_x86.bat`
+- 特殊宏定义：`-DZSTD_NO_INTRINSICS -DZ7_ST`
+- 链接参数：`-DLL shared`
+
+**Linux 平台支持：**
+- 静态链接：`build_linux.sh`
+- GTK+3.0 支持：`$(pkg-config --cflags gtk+-3.0)`
+- 压缩库集成：LZ4、LZMA、ZSTD
+- 线程支持：`-lpthread -lm`
+
+### 平台特定配置
+
+**Windows 平台配置：**
+- Win32 API 集成
+- COM 接口支持
+- Shell API 集成
+- 注册表操作
+
+**Linux 平台配置：**
+- GTK+ 图形界面
+- POSIX 系统调用
+- 静态库链接
+- 无外部依赖
+
+**章节来源**
+- [build_shext_gcc_x64.bat](file://tools/xpkgui/build_shext_gcc_x64.bat#L1-L47)
+- [build_shext_gcc_x86.bat](file://tools/xpkgui/build_shext_gcc_x86.bat#L1-L47)
+- [build_shext_tcc_x64.bat](file://tools/xpkgui/build_shext_tcc_x64.bat#L1-L45)
+- [build_shext_tcc_x86.bat](file://tools/xpkgui/build_shext_tcc_x86.bat#L1-L45)
+- [build_linux.sh](file://tools/xpkgui/build_linux.sh#L1-L61)
+
 ## 设置管理
 
 ### 配置文件系统
@@ -603,51 +829,65 @@ graph TB
 subgraph "xpkgui 应用程序"
 A[xpkgui.c]
 B[xpkshext.c]
+C[install.bat]
+D[uninstall.bat]
 end
 subgraph "核心库依赖"
-C[xPack 压缩库]
-D[xrt 运行时库]
+E[xPack 压缩库]
+F[xrt 运行时库]
 end
 subgraph "压缩算法库"
-E[LZ4 库]
-F[LZMA 库]
-G[ZSTD 库]
+G[LZ4 库]
+H[LZMA 库]
+I[ZSTD 库]
 end
 subgraph "系统库"
-H[Win32 API]
-I[COMCTL32]
-J[COMDLG32]
-K[SHELL32]
-L[SHLWAPI]
-M[USER32]
-N[ADVAPI32]
-O[Kernel32]
+J[Win32 API]
+K[COMCTL32]
+L[COMDLG32]
+M[SHELL32]
+N[SHLWAPI]
+O[USER32]
+P[ADVAPI32]
+Q[Kernel32]
+R[OLE32]
+S[SHARED]
 end
-A --> C
-A --> D
 A --> E
 A --> F
 A --> G
-B --> C
-B --> D
-B --> H
-B --> K
-B --> L
 A --> H
 A --> I
+B --> E
+B --> F
+B --> G
+B --> H
+B --> I
+B --> J
+B --> M
+B --> N
+B --> R
+B --> S
+C --> J
+C --> R
+D --> J
+D --> R
 A --> J
-A --> M
-A --> N
+A --> K
+A --> L
 A --> O
-C --> D
-E --> H
-F --> H
-G --> H
+A --> P
+A --> Q
+E --> F
+G --> J
+H --> J
+I --> J
 ```
 
 **图表来源**
 - [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L16)
 - [build_x64.bat](file://tools/xpkgui/build_x64.bat#L10-L28)
+- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
 
 ### 内部模块依赖
 
@@ -661,44 +901,55 @@ B[xpkshext.c]
 C[xpkshext.h]
 D[xpkshext.def]
 E[xpkshext.reg]
+F[install.bat]
+G[uninstall.bat]
+H[xpkgui.reg]
 end
 subgraph "API 层"
-F[xPack API]
-G[xrt API]
-H[压缩算法API]
+I[xPack API]
+J[xrt API]
+K[压缩算法API]
 end
 subgraph "系统层"
-I[Win32 API]
-J[文件系统]
-K[注册表]
-L[Shell API]
-M[COM API]
+L[Win32 API]
+M[文件系统]
+N[注册表]
+O[Shell API]
+P[COM API]
+Q[进程管理]
+R[图标缓存]
 end
-A --> F
-A --> G
-A --> H
-B --> F
-B --> G
-B --> H
+A --> I
+A --> J
+A --> K
 B --> I
+B --> J
+B --> K
 B --> L
-B --> M
-C --> I
+B --> O
+B --> P
 C --> L
-C --> M
-D --> I
-E --> K
-F --> J
-G --> J
-H --> J
-I --> J
-L --> J
-M --> J
+C --> O
+C --> P
+D --> L
+E --> N
+F --> N
+G --> N
+H --> N
+I --> M
+J --> M
+K --> M
+L --> M
+O --> M
+P --> M
+Q --> L
+R --> L
 ```
 
 **图表来源**
 - [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L11)
 - [xpkshext.c](file://tools/xpkgui/xpkshext.c#L1-L50)
+- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
 
 **章节来源**
 - [build_x64.bat](file://tools/xpkgui/build_x64.bat#L7-L42)
@@ -742,19 +993,35 @@ Shell 扩展通过以下方式保证性能：
 - **缓存机制**：缓存常用的文件信息
 - **异步处理**：避免阻塞资源管理器
 
+### 平台优化
+
+**Windows 平台优化：**
+- COM 接口优化
+- Shell API 高效调用
+- 注册表操作批处理
+- 进程间通信优化
+
+**Linux 平台优化：**
+- 静态链接减少依赖
+- GTK+ 绘制优化
+- POSIX 系统调用优化
+- 内存管理优化
+
 ## 故障排除指南
 
 ### 常见问题及解决方案
 
 | 问题类型 | 症状 | 可能原因 | 解决方案 |
 |---------|------|---------|---------|
-| 编译失败 | 编译器报错 | 缺少依赖库 | 确保 TCC 编译器已安装 |
+| 编译失败 | 编译器报错 | 缺少依赖库 | 确保 TCC/GCC 编译器已安装 |
 | 运行时错误 | 程序崩溃 | 库文件缺失 | 检查所有依赖库是否正确链接 |
 | 文件操作失败 | 添加/删除文件失败 | 权限不足 | 以管理员身份运行程序 |
 | 压缩包损坏 | 打开压缩包失败 | 文件损坏 | 使用验证功能检查完整性 |
-| Shell扩展失效 | 右键菜单不可用 | 注册表问题 | 重新安装或修复注册表 |
+| Shell扩展失效 | 右键菜单不可用 | 注册表问题 | 运行安装脚本重新注册 |
 | 设置丢失 | 配置文件损坏 | 文件权限问题 | 检查 %APPDATA%\xPack 目录权限 |
 | 历史记录异常 | 历史文件损坏 | 文件格式错误 | 删除历史文件重新生成 |
+| 安装失败 | 文件复制失败 | 目录权限不足 | 以管理员身份运行安装脚本 |
+| 卸载不彻底 | 注册表残留 | 注销失败 | 运行卸载脚本或手动清理 |
 
 ### 错误处理机制
 
@@ -787,6 +1054,7 @@ UpdateStatus --> End
 - **内存检查**：检测内存泄漏和访问违规
 - **Shell扩展调试**：使用调试器附加 DLL 进程
 - **注册表检查**：验证 Shell 扩展注册状态
+- **安装脚本调试**：检查权限和路径问题
 
 **章节来源**
 - [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2266-L2283)
@@ -803,8 +1071,10 @@ xpkgui 是一个功能完整、架构清晰的 xPack 压缩包管理工具。经
 4. **Shell扩展**：提供右键菜单集成，提升用户体验
 5. **配置管理**：完善的设置管理系统，支持用户偏好定制
 6. **历史记录**：自动记录最近使用的文件
-7. **性能优秀**：优化的算法选择和内存管理
-8. **易于使用**：简化的编译和部署过程
+7. **安装卸载系统**：自动化部署和清理工具
+8. **多平台支持**：Windows 和 Linux 平台编译支持
+9. **性能优秀**：优化的算法选择和内存管理
+10. **易于使用**：简化的编译和部署过程
 
 ### 技术特点
 
@@ -813,6 +1083,8 @@ xpkgui 是一个功能完整、架构清晰的 xPack 压缩包管理工具。经
 - 完善的错误处理和用户反馈机制
 - 支持多种压缩算法和包模式
 - 集成 Shell 扩展，提供丰富的系统集成功能
+- 自动化安装卸载系统，简化部署流程
+- 多编译器支持，提供灵活的构建选项
 
 ### 发展建议
 
@@ -824,5 +1096,7 @@ xpkgui 是一个功能完整、架构清晰的 xPack 压缩包管理工具。经
 4. **云集成**：支持云端存储服务
 5. **高级搜索**：支持基于内容的文件搜索
 6. **压缩包比较**：支持不同版本压缩包的差异比较
+7. **性能监控**：添加实时性能指标显示
+8. **自定义主题**：支持用户界面主题定制
 
-xpkgui 为 xPack 格式的管理和使用提供了优秀的工具，是开发者和最终用户的理想选择。其丰富的功能和良好的用户体验使其成为 xPack 生态系统中的重要组成部分。
+xpkgui 为 xPack 格式的管理和使用提供了优秀的工具，是开发者和最终用户的理想选择。其丰富的功能和良好的用户体验使其成为 xPack 生态系统中的重要组成部分。通过持续的改进和优化，xpkgui 将继续为用户提供更好的压缩包管理体验。

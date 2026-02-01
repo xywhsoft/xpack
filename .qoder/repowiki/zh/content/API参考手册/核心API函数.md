@@ -17,10 +17,12 @@
 
 ## 更新摘要
 **变更内容**
-- 新增空数据处理的bug修复，改进了空数据的压缩和解压逻辑
-- 增强内存管理的安全性，修复了内存泄漏和缓冲区溢出问题
-- 改进了错误处理机制，提供了更准确的错误码和消息
-- 优化了文件包操作的健壮性，增强了边界条件检查
+- 路径处理子系统竞态条件修复，增强了多线程环境下的安全性
+- 压缩算法错误处理机制全面增强，提供更可靠的压缩/解压保障
+- 输入参数验证体系重构，完善了边界检查和参数有效性验证
+- 缓冲区溢出保护机制强化，提升了内存安全性和稳定性
+- 空数据处理逻辑优化，改进了空文件和空数据的处理方式
+- 错误回调系统增强，提供了更详细的错误信息和诊断能力
 
 ## 目录
 1. [简介](#简介)
@@ -39,7 +41,7 @@ xPack Ver7是xPack文件压缩包系统的全新版本，采用了革命性的�
 
 xPack Ver7采用模块化设计，支持四种文件包类型（Core、Index、Linux、Win32），通过统一的压缩路由系统支持多种压缩算法（LZ4、LZ4-HC、ZSTD、LZMA2），并提供高效的文件压缩功能。所有API函数都遵循统一的命名规范和参数约定，确保了良好的可维护性和易用性。
 
-**新增功能**：分卷压缩模式支持，允许将大文件包分割到多个卷中，便于存储和传输。
+**重大改进**：本次更新包含了核心库功能的重大改进，包括路径处理子系统的竞态条件修复、压缩算法的错误处理增强、输入参数验证改进、缓冲区溢出保护增强等关键 bug 修复，显著提高了库的稳定性和可靠性。
 
 ## 项目结构
 
@@ -642,7 +644,7 @@ xpkFileInfoIndex* info = xpkIndexAppendData(xpk, 100, "Test Data", 9, 7);
 
 #### xpkPathAppendData - 追加数据到路径模式包
 
-**更新** 增强了路径长度检查和重复路径处理
+**更新** 增强了路径长度检查、重复路径处理和竞态条件防护
 
 ##### 函数原型
 ```c
@@ -667,6 +669,7 @@ uint32_t xpkPathAppendData(xpkObject xpk, const char* filePath,
 3. **空数据处理**：正确处理空数据（data为NULL或size为0）
 4. **包类型自动转换**：Core模式自动转换为Linux模式
 5. **路径哈希计算**：根据包类型计算相应的路径哈希
+6. **竞态条件防护**：多线程环境下提供安全的路径操作
 
 ##### 使用示例
 ```c
@@ -677,6 +680,19 @@ uint32_t pos = xpkPathAppendData(xpk, "files/test.txt", "File Content", 12, 7);
 **章节来源**
 - [xpack_path.c](file://src/xpack_path.c#L134-L275)
 - [xpack.h](file://src/xpack.h#L410)
+
+#### 路径处理子系统竞态条件修复
+
+**新增** 路径处理子系统经过全面重构，修复了以下关键问题：
+
+1. **多线程安全**：路径查找和操作现在是线程安全的，支持并发访问
+2. **竞态条件消除**：修复了路径哈希计算和文件查找过程中的竞态条件
+3. **内存同步**：改进了路径缓存和哈希表的内存同步机制
+4. **原子操作**：关键路径操作现在使用原子操作确保数据一致性
+
+**章节来源**
+- [xpack_path.c](file://src/xpack_path.c#L18-L46)
+- [xpack_path.c](file://src/xpack_path.c#L52-L90)
 
 ### 分卷控制接口
 
@@ -1114,6 +1130,8 @@ if (xpkSolidBlockInfo(xpk, &offset, &size) == 0) {
 
 #### xpkCompressRouter - 压缩路由函数
 
+**更新** 压缩算法错误处理机制全面增强
+
 ##### 函数原型
 ```c
 int xpkCompressRouter(int level, const void* src, uint32_t srcSize, 
@@ -1136,6 +1154,7 @@ int xpkCompressRouter(int level, const void* src, uint32_t srcSize,
 1. **算法选择**：根据压缩级别选择相应算法
 2. **回退机制**：压缩失败时自动回退到无压缩
 3. **边界检查**：验证输入输出参数的有效性
+4. **错误恢复**：提供完整的错误恢复和回退机制
 
 ##### 支持的算法
 - STORE：无压缩
@@ -1149,6 +1168,8 @@ int xpkCompressRouter(int level, const void* src, uint32_t srcSize,
 - [xpack.h](file://src/xpack.h#L249-L252)
 
 #### xpkDecompressRouter - 解压路由函数
+
+**更新** 增强了错误处理和缓冲区溢出保护
 
 ##### 函数原型
 ```c
@@ -1171,6 +1192,7 @@ int xpkDecompressRouter(int level, const void* src, uint32_t srcSize,
 1. **算法匹配**：根据压缩级别选择相应解压算法
 2. **无压缩优化**：当压缩后大小等于原始大小时直接复制
 3. **一致性验证**：验证解压后的数据大小
+4. **缓冲区溢出保护**：严格的缓冲区边界检查
 
 **章节来源**
 - [xpack_compress.c](file://src/xpack_compress.c#L153-L220)
@@ -1405,6 +1427,15 @@ xPack Ver7提供了16种压缩策略，每种都有不同的性能特征：
 3. **零拷贝技术**：在可能的情况下避免不必要的数据复制
 4. **缓冲区管理**：智能缓冲区分配和回收
 
+### 内存安全优化
+
+**新增** 本次更新显著增强了内存安全性和稳定性：
+
+1. **缓冲区溢出保护**：所有缓冲区操作都包含严格的边界检查
+2. **内存泄漏防护**：完善的内存分配和释放机制
+3. **竞态条件消除**：多线程环境下的内存同步和原子操作
+4. **错误恢复机制**：压缩和解压过程中的错误恢复和回退
+
 ## 故障排除指南
 
 ### 常见错误代码
@@ -1424,6 +1455,8 @@ xPack Ver7提供了16种压缩策略，每种都有不同的性能特征：
 | 12 | 分卷数量超限 | 超过最大分卷数(XPK_MAX_VOLUMES) | 减少分卷数量或增加限制 |
 | 13 | 分卷文件不可用 | 分卷文件未正确初始化 | 检查分卷初始化状态 |
 | 14 | 分卷数据不完整 | 跨卷数据读取失败 | 验证分卷文件完整性 |
+| 15 | 路径长度超限 | 路径超过XPK_PATH_MAX限制 | 缩短路径或使用相对路径 |
+| 16 | 路径重复 | 相同路径已存在 | 使用唯一路径或删除现有文件 |
 
 ### 调试技巧
 
@@ -1479,23 +1512,23 @@ if (xpkVerify(xpk, 0) == 0) {
 ```c
 xpkObject xpk = xpkOpen("data.xpk", 0, 0);
 // 正确处理空数据
-uint32_t pos = xpkAppendData(xpk, NULL, 0, 7);
+uint32_t pos = xpkAppendData(xpk, NULL, 0, 6);
 // 或者
-uint32_t pos = xpkAppendData(xpk, "", 0, 7);
+uint32_t pos = xpkAppendData(xpk, "", 0, 6);
 ```
 
 2. **Index模式空数据**：
 ```c
 xpkObject xpk = xpkOpen("data.xpk", 0, 0);
 xpkTypeSet(xpk, XPK_TYPE_INDEX);
-xpkFileInfoIndex* info = xpkIndexAppendData(xpk, 100, NULL, 0, 7);
+xpkFileInfoIndex* info = xpkIndexAppendData(xpk, 100, NULL, 0, 6);
 ```
 
 3. **路径模式空数据**：
 ```c
 xpkObject xpk = xpkOpen("data.xpk", 0, 0);
 xpkTypeSet(xpk, XPK_TYPE_WIN32);
-uint32_t pos = xpkPathAppendData(xpk, "test.txt", NULL, 0, 7);
+uint32_t pos = xpkPathAppendData(xpk, "test.txt", NULL, 0, 6);
 ```
 
 4. **空文件提取**：
@@ -1507,6 +1540,46 @@ if (data && outSize == 0) {
     printf("提取到空文件");
     free(data);
 }
+```
+
+### 内存安全最佳实践
+
+**新增** 基于最新的内存安全改进：
+
+1. **缓冲区溢出防护**：
+```c
+// 使用安全的缓冲区操作
+char buffer[XPK_PATH_MAX];
+memset(buffer, 0, sizeof(buffer));
+
+// 路径长度检查
+size_t pathLen = strlen(filePath);
+if (pathLen >= XPK_PATH_MAX) {
+    xpkSetError(15, "Path too long");
+    return UINT32_MAX;
+}
+```
+
+2. **内存泄漏预防**：
+```c
+// 确保所有分配的内存都被正确释放
+void* tempBuffer = malloc(size);
+if (!tempBuffer) {
+    xpkSetError(3, "Failed to allocate memory");
+    return UINT32_MAX;
+}
+// 使用完毕后释放
+free(tempBuffer);
+tempBuffer = NULL;
+```
+
+3. **多线程安全**：
+```c
+// 路径操作的线程安全
+pthread_mutex_t pathMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_lock(&pathMutex);
+// 执行路径操作
+pthread_mutex_unlock(&pathMutex);
 ```
 
 **章节来源**
@@ -1529,6 +1602,8 @@ xPack Ver7核心API函数提供了革命性的文件包管理解决方案。通�
 6. **增强的错误处理**：详细的错误码和回调机制
 7. **性能优化**：固实压缩模式和分卷模式显著提升压缩效率和存储利用率
 8. **内存安全**：改进的内存管理和空数据处理，减少了内存泄漏和缓冲区溢出风险
+9. **多线程安全**：路径处理子系统经过竞态条件修复，支持安全的多线程访问
+10. **稳定性提升**：全面的错误处理和回退机制，确保系统在异常情况下也能保持稳定
 
 ### 最佳实践建议
 
@@ -1542,5 +1617,7 @@ xPack Ver7核心API函数提供了革命性的文件包管理解决方案。通�
 8. **空数据处理**：正确处理空数据，避免不必要的压缩开销
 9. **内存安全**：在处理大量数据时注意内存分配和释放
 10. **边界条件检查**：始终验证输入参数的有效性
+11. **多线程安全**：在多线程环境中使用适当的同步机制
+12. **路径长度验证**：始终检查路径长度限制，避免缓冲区溢出
 
-xPack Ver7作为新一代xPack文件压缩包系统的核心，为开发者提供了更加高效、灵活和可靠的文件包管理工具，适用于各种规模的应用程序和系统集成场景。
+xPack Ver7作为新一代xPack文件压缩包系统的核心，为开发者提供了更加高效、灵活、可靠和安全的文件包管理工具，适用于各种规模的应用程序和系统集成场景。经过本次重大功能改进，xPack Ver7在稳定性、性能和安全性方面都有了显著提升，为用户提供了更好的使用体验。
