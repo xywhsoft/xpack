@@ -8,68 +8,63 @@ echo.
 
 set INSTALL_DIR=%ProgramFiles%\xPack
 set EXE_PATH=%INSTALL_DIR%\xpkgui.exe
-set CLI_PATH=%INSTALL_DIR%\xpkcon.exe
 set SHELL_DLL=%INSTALL_DIR%\xpkshext.dll
-set XPK_DLL=%INSTALL_DIR%\xpack.dll
 
-echo 卸载目录: %INSTALL_DIR%
+echo 安装目录: %INSTALL_DIR%
 echo.
 
-echo 取消注册 Shell 扩展...
-
+echo 注销 Shell 扩展...
 if exist "%SHELL_DLL%" (
     regsvr32 /u /s "%SHELL_DLL%"
-    echo [OK] Shell 扩展已注销
+    if errorlevel 1 (
+        echo [警告] 无法注销 Shell 扩展
+    ) else (
+        echo [OK] Shell 扩展已注销
+    )
+
+    reg delete HKCR\.xpk\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
+    reg delete HKCR\*\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
+    reg delete HKCR\Directory\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
+    reg delete HKCR\Folder\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
+) else (
+    echo [提示] xpkshext.dll 未找到，跳过 Shell Extension 卸载
 )
 
 echo.
-echo 删除右键菜单注册表项...
-
-reg delete HKCR\.xpk\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
-reg delete HKCR\*\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
-reg delete HKCR\Directory\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
-reg delete HKCR\Folder\shellex\ContextMenuHandlers\XPKShell /f >nul 2>nul
-
-echo [OK] 右键菜单已删除
-
-echo.
-echo 删除文件关联...
-
+echo 注销文件关联...
 reg delete HKCR\.xpk /f >nul 2>nul
 reg delete HKCR\xPack.File /f >nul 2>nul
 
-echo [OK] 文件关联已删除
-
-echo.
-echo 删除程序文件...
-
-if exist "%EXE_PATH%" (
-    del "%EXE_PATH%"
-    echo [OK] xpkgui.exe 已删除
+if errorlevel 1 (
+    echo [警告] 无法注销文件关联
+) else (
+    echo [OK] 文件关联已注销
 )
 
-if exist "%CLI_PATH%" (
-    del "%CLI_PATH%"
-    echo [OK] xpkcon.exe 已删除
+echo.
+echo 删除文件...
+if exist "%EXE_PATH%" (
+    del "%EXE_PATH%" /F /Q
+    echo [OK] xpkgui.exe
+) else (
+    echo [警告] xpkgui.exe 未找到
 )
 
 if exist "%SHELL_DLL%" (
-    del "%SHELL_DLL%"
-    echo [OK] xpkshext.dll 已删除
-)
-
-if exist "%XPK_DLL%" (
-    del "%XPK_DLL%"
-    echo [OK] xpack.dll 已删除
+    del "%SHELL_DLL%" /F /Q
+    echo [OK] xpkshext.dll
+) else (
+    echo [提示] xpkshext.dll 未找到
 )
 
 echo.
-echo 删除配置目录...
-
-set CONFIG_DIR=%APPDATA%\xPack
-if exist "%CONFIG_DIR%" (
-    rmdir /s /q "%CONFIG_DIR%"
-    echo [OK] 配置目录已删除
+echo 检查是否需要删除安装目录...
+dir "%INSTALL_DIR%" /b >nul 2>nul
+if errorlevel 1 (
+    rd "%INSTALL_DIR%"
+    echo [OK] 安装目录已删除
+) else (
+    echo [提示] 安装目录中还有其他文件，未删除
 )
 
 echo.

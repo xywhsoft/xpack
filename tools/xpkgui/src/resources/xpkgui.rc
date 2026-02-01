@@ -1,0 +1,95 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include "resource.h"
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "新建(&N)...\tCtrl+N", ID_FILE_NEW
+        MENUITEM "打开(&O)...\tCtrl+O", ID_FILE_OPEN
+        MENUITEM "关闭(&C)", ID_FILE_CLOSE
+        MENUITEM SEPARATOR
+        MENUITEM "保存(&S)\tCtrl+S", ID_FILE_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "添加文件(&A)...\tCtrl+A", ID_FILE_ADD
+        MENUITEM "添加目录(&D)...\tCtrl+D", ID_FILE_ADDDIR
+        MENUITEM "解压文件(&E)...\tCtrl+E", ID_FILE_EXTRACT
+        MENUITEM "删除(&D)\tDel", ID_FILE_DELETE
+        MENUITEM "重命名(&R)\tF2", ID_FILE_RENAME
+        MENUITEM SEPARATOR
+        MENUITEM "重建(&B)", ID_FILE_REBUILD
+        MENUITEM "属性(&P)", ID_FILE_PROPERTIES
+        MENUITEM SEPARATOR
+        MENUITEM "退出(&X)\tCtrl+Q", ID_FILE_EXIT
+    END
+    POPUP "查看(&V)"
+    BEGIN
+        MENUITEM "刷新(&R)\tF5", ID_VIEW_REFRESH
+    END
+    POPUP "工具(&T)"
+    BEGIN
+        MENUITEM "验证(&V)", ID_TOOLS_VERIFY
+        MENUITEM "测试(&T)", ID_TOOLS_TEST
+        MENUITEM "全部解压(&A)", ID_TOOLS_EXTRACTALL
+        MENUITEM SEPARATOR
+        MENUITEM "固实模式(&S)", ID_TOOLS_SOLIDMODE
+        MENUITEM "分卷模式(&V)", ID_TOOLS_VOLUME_MODE
+        MENUITEM "分卷大小(&Z)...", ID_TOOLS_VOLUME_SIZE
+        MENUITEM "识别代码(&D)...", ID_TOOLS_DISCCODE
+        MENUITEM SEPARATOR
+        MENUITEM "模式匹配(&P)...", ID_TOOLS_PATTERN
+    END
+    POPUP "帮助(&H)"
+    BEGIN
+        MENUITEM "关于(&A)", ID_HELP_ABOUT
+    END
+END
+
+2001 DIALOGEX 0, 0, 380, 180
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "选择压缩级别"
+FONT 9, "MS Shell Dlg"
+BEGIN
+    LTEXT           "压缩级别:", 1003, 10, 10, 360, 8
+    COMBOBOX        1001, 10, 25, 360, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", 1002, 10, 55, 360, 40
+    DEFPUSHBUTTON   "确定", IDOK, 100, 120, 80, 25
+    PUSHBUTTON      "取消", IDCANCEL, 200, 120, 80, 25
+END
+
+2002 DIALOGEX 0, 0, 300, 140
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "输入"
+FONT 9, "MS Shell Dlg"
+BEGIN
+    LTEXT           "", 1001, 10, 10, 280, 8
+    EDITTEXT        1002, 10, 25, 280, 12, ES_AUTOHSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "确定", IDOK, 50, 70, 80, 25
+    PUSHBUTTON      "取消", IDCANCEL, 170, 70, 80, 25
+END
+
+3001 DIALOGEX 0, 0, 420, 280
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "新建 xPack 压缩包"
+FONT 9, "MS Shell Dlg"
+BEGIN
+    LTEXT           "请输入压缩包文件路径:", 1003, 10, 10, 400, 8
+    EDITTEXT        1001, 10, 25, 300, 12, ES_AUTOHSCROLL | WS_TABSTOP
+    PUSHBUTTON      "浏览...", 1004, 320, 25, 70, 14
+    LTEXT           "包类型:", 1005, 10, 50, 400, 8
+    AUTORADIOBUTTON "Win32 (推荐)  - 路径访问，不区分大小写", 2000, 10, 65, 400, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "Linux        - 路径访问，区分大小写", 2001, 10, 80, 400, 10, WS_TABSTOP
+    AUTORADIOBUTTON "Index        - 整数索引访问", 2002, 10, 95, 400, 10, WS_TABSTOP
+    AUTORADIOBUTTON "Core         - 顺序位置访问", 2003, 10, 110, 400, 10, WS_TABSTOP
+    LTEXT           "压缩模式:", 1006, 10, 130, 400, 8
+    AUTOCHECKBOX   "启用固实压缩 (更好的压缩比，但解压整个块)", 1007, 10, 145, 400, 10, WS_TABSTOP
+    DEFPUSHBUTTON   "确定", IDOK, 110, 250, 80, 25
+    PUSHBUTTON      "取消", IDCANCEL, 230, 250, 80, 25
+END
+
+STRINGTABLE
+BEGIN
+    IDC_FILELIST       "文件列表"
+    IDC_STATUSBAR     "状态栏"
+END

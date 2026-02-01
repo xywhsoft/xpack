@@ -199,6 +199,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	g_hInstance = hInstance;
 
+	// 延迟加载设置和历史记录以避免启动时阻塞
+	// 由于hwnd尚未创建，我们直接调用函数，但可以考虑异步加载
 	LoadSettings();
 	LoadHistory();
 
@@ -268,7 +270,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，输出错误日志，但继续处理消息循环
+			OutputDebugStringW(L"GetMessage failed in main loop\n");
+			continue;  // 继续循环而不是退出
 		} else {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -536,12 +540,10 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
 			if (!InitMainWnd(hwnd)) {
 				return -1;
 			}
-			if (g_commandMode == CMD_ADD && wcslen(g_commandPath) > 0) {
-				AddFiles();
-			} else if (g_commandMode == CMD_ADD_AUTO && wcslen(g_commandPath) > 0) {
-				AddFiles();
-			} else if (wcslen(g_commandPath) > 0) {
-				OpenXpkFile(g_commandPath);
+			// 在WM_CREATE中避免执行耗时操作，改为发送消息在稍后执行
+			if (wcslen(g_commandPath) > 0) {
+				// 使用WM_USER + 100以确保在窗口完全初始化后再处理
+				PostMessage(hwnd, WM_USER + 100, g_commandMode, 0);
 			}
 			break;
 
@@ -726,6 +728,27 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
 					ShowAboutDialog();
 					break;
 			}
+			break;
+		case WM_USER + 1:
+			// 处理在WM_CREATE中延迟的操作
+			if (wParam == CMD_ADD || wParam == CMD_ADD_AUTO) {
+				AddFiles();
+			} else {
+				OpenXpkFile(g_commandPath);
+			}
+			break;
+		case WM_USER + 100:
+			// 延迟处理命令行参数指定的操作
+			if (wParam == CMD_ADD || wParam == CMD_ADD_AUTO) {
+				PostMessage(hwnd, WM_USER + 1, wParam, lParam);  // 转发给原来的处理器
+			} else {
+				PostMessage(hwnd, WM_USER + 1, 0, 0);  // 转发OpenXpkFile操作
+			}
+			break;
+		case WM_USER + 102:
+			// 延迟加载设置和历史记录以避免启动时阻塞
+			LoadSettings();
+			LoadHistory();
 			break;
 
 		case WM_NOTIFY:
@@ -1635,7 +1658,11 @@ int SetVolumeSize(void)
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，仍需恢复主窗口状态
+			DestroyWindow(hDlg);
+			EnableWindow(g_hMainWnd, TRUE);
+			SetForegroundWindow(g_hMainWnd);
+			return IDCANCEL;  // 返回取消，避免主窗口被锁定
 		} else if (!IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -1937,7 +1964,11 @@ int NewPackageDialog(HWND hwnd, wchar_t* path, int* solidMode, int* pkgType)
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，仍需恢复主窗口状态
+			DestroyWindow(hDlg);
+			EnableWindow(hwnd, TRUE);
+			SetForegroundWindow(hwnd);
+			return IDCANCEL;  // 返回取消，避免主窗口被锁定
 		} else if (!IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -2034,7 +2065,11 @@ int CompressLevelDialog(HWND hwnd, int* level)
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，仍需恢复主窗口状态
+			DestroyWindow(hDlg);
+			EnableWindow(hwnd, TRUE);
+			SetForegroundWindow(hwnd);
+			return IDCANCEL;  // 返回取消，避免主窗口被锁定
 		} else if (!IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -2109,7 +2144,11 @@ int DiscCodeInputDialog(HWND hwnd, uint32_t* code)
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，仍需恢复主窗口状态
+			DestroyWindow(hDlg);
+			EnableWindow(hwnd, TRUE);
+			SetForegroundWindow(hwnd);
+			return IDCANCEL;  // 返回取消，避免主窗口被锁定
 		} else if (!IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -2188,7 +2227,11 @@ int PatternSelectDialog(HWND hwnd, wchar_t* pattern, int* operation)
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，仍需恢复主窗口状态
+			DestroyWindow(hDlg);
+			EnableWindow(hwnd, TRUE);
+			SetForegroundWindow(hwnd);
+			return IDCANCEL;  // 返回取消，避免主窗口被锁定
 		} else if (!IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -2348,7 +2391,11 @@ int InputBox(HWND hwnd, const wchar_t* title, const wchar_t* prompt, wchar_t* bu
 
 	while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (bRet == -1) {
-			break;
+			// 如果GetMessage失败，仍需恢复主窗口状态
+			DestroyWindow(hDlg);
+			EnableWindow(hwnd, TRUE);
+			SetForegroundWindow(hwnd);
+			return IDCANCEL;  // 返回取消，避免主窗口被锁定
 		} else if (!IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);

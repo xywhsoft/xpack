@@ -7,7 +7,7 @@
 #ifndef XPACK_INTERNAL_H
 #define XPACK_INTERNAL_H
 
-#include <xrt/xrt.h>
+#include <xrt.h>
 #include "xpack.h"
 
 #ifdef __cplusplus

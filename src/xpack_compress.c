@@ -6,12 +6,12 @@
 
 #include "xpack_internal.h"
 #include <string.h>
-#include <lz4/lz4.h>
-#include <lz4/lz4hc.h>
-#include <zstd/zstd.h>
-#include <lzma/Lzma2Enc.h>
-#include <lzma/Lzma2Dec.h>
-#include <lzma/Alloc.h>
+#include <lz4.h>
+#include <lz4hc.h>
+#include <zstd.h>
+#include <Lzma2Enc.h>
+#include <Lzma2Dec.h>
+#include <Alloc.h>
 
 // ============================================================================
 // 压缩路由

@@ -20,7 +20,7 @@
 #define XPACK_H
 
 #include <stdint.h>
-#include <xrt/xrt.h>
+#include <xrt.h>
 
 #ifdef __cplusplus
 extern "C" {

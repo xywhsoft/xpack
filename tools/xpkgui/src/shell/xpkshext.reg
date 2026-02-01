@@ -1,0 +1,25 @@
+Windows Registry Editor Version 5.00
+
+; 注册 Shell 扩展 CLSID
+[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}]
+@="xPack Shell Extension"
+
+[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}\InprocServer32]
+@="C:\\Program Files\\xPack\\xpkshext.dll"
+"ThreadingModel"="Apartment"
+
+; .xpk 文件右键菜单
+[HKEY_CLASSES_ROOT\.xpk\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+
+; * (所有文件) 右键菜单
+[HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+
+; Directory (文件夹) 右键菜单
+[HKEY_CLASSES_ROOT\Directory\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+
+; Folder (文件夹背景) 右键菜单
+[HKEY_CLASSES_ROOT\Folder\shellex\ContextMenuHandlers\XPKShell]
+@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"

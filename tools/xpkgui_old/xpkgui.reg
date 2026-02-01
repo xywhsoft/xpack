@@ -1,0 +1,28 @@
+Windows Registry Editor Version 5.00
+
+; .xpk 文件类型定义
+[HKEY_CLASSES_ROOT\.xpk]
+@="xPack.File"
+"PerceivedType"="compressed"
+"Content Type"="application/x-xpack"
+
+; xPack 文件类型描述
+[HKEY_CLASSES_ROOT\xPack.File]
+@="xPack 压缩包"
+"FriendlyTypeName"="xPack 压缩包"
+
+; 默认图标 (假设 xpkgui.exe 安装在 %ProgramFiles%\xPack\)
+[HKEY_CLASSES_ROOT\xPack.File\DefaultIcon]
+@="\"C:\\Program Files\\xPack\\xpkgui.exe\",0"
+
+; 打开命令（GUI）
+[HKEY_CLASSES_ROOT\xPack.File\shell\open\command]
+@="\"C:\\Program Files\\xPack\\xpkgui.exe\" \"%1\""
+
+; 管理菜单项
+[HKEY_CLASSES_ROOT\xPack.File\shell\manage]
+@="使用 xpkgui 管理文件"
+"Icon"="\"C:\\Program Files\\xPack\\xpkgui.exe\",0"
+
+[HKEY_CLASSES_ROOT\xPack.File\shell\manage\command]
+@="\"C:\\Program Files\\xPack\\xpkgui.exe\" \"%1\""
