@@ -1,0 +1,5 @@
+LIBRARY "xpkshext"
+EXPORTS
+    DllGetClassObject
+    DllCanUnloadNow
+    DllMain
