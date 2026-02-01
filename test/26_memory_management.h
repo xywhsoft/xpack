@@ -129,8 +129,9 @@ TEST(user_data_memory_handling) {
     char* pData = createTestData_26(1024, 'G');
     const char* sFilename = "test_26_userdata.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
     ASSERT_NE(xpkAppendData(xpk, pData, 1024, 1), UINT32_MAX);
     ASSERT_EQ(xpkIndexUserDataSet(xpk, 10, 256), 0);
     ASSERT_EQ(xpkSave(xpk), 0);
@@ -186,8 +187,9 @@ TEST(repeated_extract_free_cycles) {
 TEST(find_with_null_result) {
     const char* sFilename = "test_26_null_find.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
 
     char* pData = createTestData_26(1024, 'J');
     ASSERT_NE(xpkAppendData(xpk, pData, 1024, 1), UINT32_MAX);
@@ -203,8 +205,9 @@ TEST(find_with_null_result) {
 TEST(each_with_null_callback) {
     const char* sFilename = "test_26_null_each.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
 
     char* pData = createTestData_26(512, 'K');
     for (int i = 0; i < 10; i++) {
@@ -223,16 +226,17 @@ TEST(each_with_null_callback) {
 TEST(match_with_null_callback) {
     const char* sFilename = "test_26_null_match.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_LINUX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_LINUX), 0);
 
     char* pData = createTestData_26(512, 'L');
-    void* pResult1 = xpkPathAppendData(xpk, "test/file1.txt", pData, 512, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "test/file2.txt", pData, 512, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "other/file3.txt", pData, 512, 1);
-    ASSERT_NOT_NULL(pResult3);
+    uint32_t pos1 = xpkPathAppendData(xpk, "test/file1.txt", pData, 512, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "test/file2.txt", pData, 512, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "other/file3.txt", pData, 512, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
     ASSERT_EQ(xpkSave(xpk), 0);
 
     int iCount = 0;

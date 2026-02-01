@@ -28,3 +28,4 @@ gcc -m64 -shared ^
 @echo;
 @echo off
 
+pause

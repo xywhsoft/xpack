@@ -38,7 +38,7 @@ TEST(path_append_directory) {
 	ASSERT_NOT_NULL(xpk);
 
 	ASSERT_EQ(xpkPathAppendData(xpk, "files/", "Content 1", 9, 6), 0);
-	ASSERT_EQ(xpkPathAppendData(xpk, "files/subdir/file2.txt", "Content 2", 9, 6), 0);
+	ASSERT_EQ(xpkPathAppendData(xpk, "files/subdir/file2.txt", "Content 2", 9, 6), 1);
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 
@@ -108,12 +108,16 @@ TEST(path_update_file) {
 	xpkObject xpk = xpkOpen("test_05_update.xpk", 0, 0);
 	ASSERT_NOT_NULL(xpk);
 
-	ASSERT_NOT_NULL(xpkPathAppendData(xpk, "files/file.txt", "Original", 8, 6));
+	ASSERT_NE(xpkPathAppendData(xpk, "files/file.txt", "Original", 8, 6), UINT32_MAX);
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 
-	ASSERT_NULL(xpkPathAppendData(xpk, "files/file.txt", "Updated content", 15, 6));
-	ASSERT_EQ(xpkSave(xpk), 0);
+	// Reopen and try to append same path - should fail because path exists
+	xpk = xpkOpen("test_05_update.xpk", 0, 0);
+	ASSERT_NOT_NULL(xpk);
+	
+	// Should fail because path already exists
+	ASSERT_EQ(xpkPathAppendData(xpk, "files/file.txt", "Updated content", 15, 6), UINT32_MAX);
 	xpkClose(xpk);
 }
 
@@ -126,7 +130,7 @@ TEST(path_multiple_files) {
 		sprintf(data, "File %d content", i);
 		char path[64];
 		sprintf(path, "files/file%d.txt", i);
-		ASSERT_EQ(xpkPathAppendData(xpk, path, data, (uint32_t)strlen(data), 6), 0);
+		ASSERT_EQ(xpkPathAppendData(xpk, path, data, (uint32_t)strlen(data), 6), (uint32_t)i);
 	}
 
 	ASSERT_EQ(xpkSave(xpk), 0);
@@ -148,7 +152,7 @@ TEST(path_traverse_files) {
 		sprintf(data, "File %d", i);
 		char path[64];
 		sprintf(path, "files/dir%d/file.txt", i);
-		ASSERT_EQ(xpkPathAppendData(xpk, path, data, (uint32_t)strlen(data), 6), 0);
+		ASSERT_EQ(xpkPathAppendData(xpk, path, data, (uint32_t)strlen(data), 6), (uint32_t)i);
 	}
 
 	ASSERT_EQ(xpkSave(xpk), 0);

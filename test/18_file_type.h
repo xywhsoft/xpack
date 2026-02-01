@@ -207,7 +207,8 @@ TEST(ftype_after_update) {
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 
-	xpk = xpkOpen("test_18_ftype_update.xpk", 0, 1);
+	// Open in write mode to update
+	xpk = xpkOpen("test_18_ftype_update.xpk", 0, 0);
 	ASSERT_NOT_NULL(xpk);
 	ASSERT_EQ(xpkInfoType(xpk, 0), XPK_FTYPE_TEXT);
 
@@ -327,7 +328,8 @@ TEST(ftype_preserves_after_rebuild) {
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 
-	xpk = xpkOpen("test_18_ftype_rebuild.xpk", 0, 1);
+	// Rebuild requires write mode, not readonly
+	xpk = xpkOpen("test_18_ftype_rebuild.xpk", 0, 0);
 	ASSERT_NOT_NULL(xpk);
 
 	ASSERT_EQ(xpkRebuild(xpk), 0);

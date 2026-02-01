@@ -407,7 +407,7 @@ XPKAPI int                  xpkIndexUserDataSet(xpkObject xpk, int32_t index, in
 XPKAPI uint32_t     xpkPathFind(xpkObject xpk, const char* filePath);
 XPKAPI int          xpkPathExists(xpkObject xpk, const char* filePath);
 XPKAPI void*        xpkPathAppendFile(xpkObject xpk, const char* filePath, const char* srcPath, int level);
-XPKAPI void*        xpkPathAppendData(xpkObject xpk, const char* filePath, const void* data, uint32_t size, int level);
+XPKAPI uint32_t     xpkPathAppendData(xpkObject xpk, const char* filePath, const void* data, uint32_t size, int level);
 XPKAPI int          xpkPathExtractFile(xpkObject xpk, const char* filePath, const char* dstPath);
 XPKAPI void*        xpkPathExtractData(xpkObject xpk, const char* filePath, uint32_t* outSize);
 XPKAPI int          xpkPathUpdateFile(xpkObject xpk, const char* filePath, const char* srcPath, int level);

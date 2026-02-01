@@ -11,7 +11,7 @@ TEST(rebuild_empty_package) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_empty.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_empty.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -33,7 +33,7 @@ TEST(rebuild_single_file) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_single.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_single.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -79,7 +79,7 @@ TEST(rebuild_multiple_files) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_multiple.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_multiple.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -124,7 +124,7 @@ TEST(rebuild_after_remove) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_remove.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_remove.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRemove(xpk, 2), 0);
@@ -157,7 +157,7 @@ TEST(rebuild_after_update) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_update.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_update.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     for (int i = 0; i < 5; i++) {
@@ -193,7 +193,7 @@ TEST(rebuild_multiple_cycles) {
     strcpy(filename, "test_16_rebuild_cycle.xpk");
 
     for (int cycle = 0; cycle < 3; cycle++) {
-        xpkObject xpk = xpkOpen(filename, 0, cycle == 0 ? 0 : 1);
+        xpkObject xpk = xpkOpen(filename, 0, 0);
         ASSERT_NOT_NULL(xpk);
 
         if (cycle == 0) {
@@ -251,7 +251,7 @@ TEST(rebuild_large_files) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_large.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_large.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -295,7 +295,7 @@ TEST(rebuild_path_mode) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_path.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_path.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -331,7 +331,7 @@ TEST(rebuild_index_mode) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_index.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_index.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -362,7 +362,7 @@ TEST(rebuild_empty_files) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_empty_files.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_empty_files.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);
@@ -411,7 +411,7 @@ TEST(rebuild_mixed_levels) {
     ASSERT_EQ(xpkSave(xpk), 0);
     xpkClose(xpk);
 
-    xpk = xpkOpen("test_16_rebuild_levels.xpk", 0, 1);
+    xpk = xpkOpen("test_16_rebuild_levels.xpk", 0, 0);
     ASSERT_NOT_NULL(xpk);
 
     ASSERT_EQ(xpkRebuild(xpk), 0);

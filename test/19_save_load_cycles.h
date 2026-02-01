@@ -121,26 +121,28 @@ TEST(save_load_after_remove) {
 	xpk = xpkOpen(sFilename, 0, 0);
 	ASSERT_NOT_NULL(xpk);
 
-	ASSERT_EQ(xpkRemove(xpk, 2), 0);
+	// Remove middle file (pData2 at position 1)
+	ASSERT_EQ(xpkRemove(xpk, 1), 0);
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 
 	xpk = xpkOpen(sFilename, 0, 0);
 	ASSERT_NOT_NULL(xpk);
 
+	// After removing position 1, pData3 shifts from position 2 to position 1
 	uint32_t outSize1 = 0;
-	uint32_t outSize3 = 0;
+	uint32_t outSize2 = 0;
 	void* pExtracted1 = xpkExtractData(xpk, 0, &outSize1);
-	void* pExtracted3 = xpkExtractData(xpk, 1, &outSize3);
+	void* pExtracted2 = xpkExtractData(xpk, 1, &outSize2);
 	ASSERT_NOT_NULL(pExtracted1);
-	ASSERT_NOT_NULL(pExtracted3);
+	ASSERT_NOT_NULL(pExtracted2);
 	ASSERT_EQ(outSize1, 512);
-	ASSERT_EQ(outSize3, 2048);
+	ASSERT_EQ(outSize2, 2048);  // pData3 is now at position 1
 	ASSERT_EQ(memcmp(pData1, pExtracted1, 512), 0);
-	ASSERT_EQ(memcmp(pData3, pExtracted3, 2048), 0);
+	ASSERT_EQ(memcmp(pData3, pExtracted2, 2048), 0);
 
 	xpkFree(pExtracted1);
-	xpkFree(pExtracted3);
+	xpkFree(pExtracted2);
 	free(pData1);
 	free(pData2);
 	free(pData3);
@@ -183,9 +185,12 @@ TEST(save_load_after_update) {
 
 TEST(save_load_different_compression_levels) {
 	char* pData = createTestData(8192, 'J');
-	const char* sFilename = "test_19_compression_levels.xpk";
 
 	for (int iLevel = 0; iLevel <= 9; iLevel++) {
+		// Use unique filename for each compression level to avoid file accumulation
+		char sFilename[64];
+		sprintf(sFilename, "test_19_compression_level_%d.xpk", iLevel);
+
 		xpkObject xpk = xpkOpen(sFilename, 0, 0);
 		ASSERT_NOT_NULL(xpk);
 
@@ -217,8 +222,9 @@ TEST(save_load_index_mode) {
 	ASSERT_NOT_NULL(xpk);
 
 	ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
-	ASSERT_EQ(xpkIndexAppendData(xpk, 100, pData1, 1024, 5), 0);
-	ASSERT_EQ(xpkIndexAppendData(xpk, 200, pData2, 2048, 5), 0);
+	// xpkIndexAppendData returns pointer, not 0 for success
+	ASSERT_NOT_NULL(xpkIndexAppendData(xpk, 100, pData1, 1024, 5));
+	ASSERT_NOT_NULL(xpkIndexAppendData(xpk, 200, pData2, 2048, 5));
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 
@@ -252,8 +258,9 @@ TEST(save_load_path_mode) {
 	ASSERT_NOT_NULL(xpk);
 
 	ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_WIN32), 0);
-	ASSERT_EQ(xpkPathAppendData(xpk, "file1.txt", pData1, 1024, 5), 0);
-	ASSERT_EQ(xpkPathAppendData(xpk, "file2.txt", pData2, 2048, 5), 0);
+	// xpkPathAppendData returns position, not 0 for success
+	ASSERT_NE(xpkPathAppendData(xpk, "file1.txt", pData1, 1024, 5), UINT32_MAX);
+	ASSERT_NE(xpkPathAppendData(xpk, "file2.txt", pData2, 2048, 5), UINT32_MAX);
 	ASSERT_EQ(xpkSave(xpk), 0);
 	xpkClose(xpk);
 

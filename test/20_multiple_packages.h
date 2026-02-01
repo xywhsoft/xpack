@@ -154,9 +154,16 @@ TEST(different_package_types) {
     ASSERT_NOT_NULL(xpkIndex);
     ASSERT_NOT_NULL(xpkPath);
 
+    // Core type: use xpkAppendData directly
     ASSERT_NE(xpkAppendData(xpkCore, pData, 2048, 1), UINT32_MAX);
-    ASSERT_NE(xpkAppendData(xpkIndex, pData, 2048, 6), UINT32_MAX);
-    ASSERT_NE(xpkAppendData(xpkPath, pData, 2048, 1), UINT32_MAX);
+    
+    // Index type: must set type and use xpkIndexAppendData
+    ASSERT_EQ(xpkTypeSet(xpkIndex, XPK_TYPE_INDEX), 0);
+    ASSERT_NOT_NULL(xpkIndexAppendData(xpkIndex, 100, pData, 2048, 6));
+    
+    // Path type: must set type and use xpkPathAppendData
+    ASSERT_EQ(xpkTypeSet(xpkPath, XPK_TYPE_WIN32), 0);
+    ASSERT_NE(xpkPathAppendData(xpkPath, "test.txt", pData, 2048, 1), UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpkCore), 0);
     ASSERT_EQ(xpkSave(xpkIndex), 0);
@@ -253,11 +260,12 @@ TEST(merge_packages) {
     ASSERT_EQ(xpkSave(xpk1), 0);
     ASSERT_EQ(xpkSave(xpk2), 0);
 
-    for (int iPos = 1; iPos <= 2; iPos++) {
+    // xpk1 has files at position 0 and 1, extract from position 0 and 1
+    for (int iPos = 0; iPos < 2; iPos++) {
         uint32_t outSize = 0;
         void* pExtracted = xpkExtractData(xpk1, iPos, &outSize);
         ASSERT_NOT_NULL(pExtracted);
-        ASSERT_NE(xpkAppendData(xpkMerged, pExtracted, outSize, iPos), UINT32_MAX);
+        ASSERT_NE(xpkAppendData(xpkMerged, pExtracted, outSize, iPos + 1), UINT32_MAX);
         xpkFree(pExtracted);
     }
 

@@ -125,49 +125,53 @@ XPKAPI void* xpkPathAppendFile(xpkObject xpk, const char* filePath,
 		return NULL;
 	}
 	
-	void* info = xpkPathAppendData(xpk, filePath, fileData, (uint32_t)fileSize, level);
+	uint32_t pos = xpkPathAppendData(xpk, filePath, fileData, (uint32_t)fileSize, level);
 	free(fileData);
 	
-	return info;
+	if (pos == UINT32_MAX) {
+		return NULL;
+	}
+	
+	return xpkInfo(xpk, pos);
 }
 
-XPKAPI void* xpkPathAppendData(xpkObject xpk, const char* filePath,
-                                const void* data, uint32_t size, int level) {
-	if (!xpk || !filePath) return NULL;
+XPKAPI uint32_t xpkPathAppendData(xpkObject xpk, const char* filePath,
+                                    const void* data, uint32_t size, int level) {
+	if (!xpk || !filePath) return UINT32_MAX;
 	if (xpk->readonly) {
 		xpkSetError(10, "Cannot append in readonly mode");
-		return NULL;
+		return UINT32_MAX;
 	}
 	
 	int packType = xpkType(xpk);
 	if (packType == XPK_TYPE_CORE) {
 		if (xpkTypeSet(xpk, XPK_TYPE_LINUX) != 0) {
 			xpkSetError(11, "Failed to set pack type");
-			return NULL;
+			return UINT32_MAX;
 		}
 		packType = XPK_TYPE_LINUX;
 	} else if (packType != XPK_TYPE_LINUX && packType != XPK_TYPE_WIN32) {
 		xpkSetError(11, "Pack type is not Linux or Win32");
-		return NULL;
+		return UINT32_MAX;
 	}
 	
 	// 固实包禁止追加
 	if (xpk->head.flag.solidMode) {
 		xpkSetError(11, "Cannot append to solid archive pack");
-		return NULL;
+		return UINT32_MAX;
 	}
 	
 	// 检查路径是否已存在
 	if (xpkPathFind(xpk, filePath) != UINT32_MAX) {
 		xpkSetError(11, "Path already exists");
-		return NULL;
+		return UINT32_MAX;
 	}
 	
 	// 检查路径长度
 	size_t pathLen = strlen(filePath);
 	if (pathLen >= XPK_PATH_MAX) {
 		xpkSetError(11, "Path too long");
-		return NULL;
+		return UINT32_MAX;
 	}
 	
 	// 处理空数据
@@ -186,26 +190,21 @@ XPKAPI void* xpkPathAppendData(xpkObject xpk, const char* filePath,
 	if (size == 0) {
 		// 空数据不进行压缩
 		compSize = 0;
-		compData = malloc(1);
-		if (!compData) {
-			xpkSetError(3, "Failed to allocate compression buffer");
-			return NULL;
-		}
-		compData = 0;
+		compData = NULL;
 	} else {
 		// 计算压缩缓冲区大小
 		uint32_t compBound = xpkCompressBound(level, size);
 		compData = malloc(compBound);
 		if (!compData) {
 			xpkSetError(3, "Failed to allocate compression buffer");
-			return NULL;
+			return UINT32_MAX;
 		}
 		
 		// 压缩数据
 		if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
 			free(compData);
 			xpkSetError(7, "Compression failed");
-			return NULL;
+			return UINT32_MAX;
 		}
 	}
 	
@@ -223,20 +222,22 @@ XPKAPI void* xpkPathAppendData(xpkObject xpk, const char* filePath,
 	}
 	
 	// 写入压缩数据
-	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+	if (compSize > 0 && compData) {
+		xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
+		if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+			free(compData);
+			xpkSetError(2, "Failed to write data");
+			return UINT32_MAX;
+		}
 		free(compData);
-		xpkSetError(2, "Failed to write data");
-		return NULL;
 	}
-	free(compData);
 	
 	// 追加文件信息
 	uint32_t pos1 = xrtArrayAppend(&xpk->ldb, 1);
 	void* info = xrtArrayGet(&xpk->ldb, pos1);
 	if (!info) {
 		xpkSetError(3, "Failed to allocate file info");
-		return NULL;
+		return UINT32_MAX;
 	}
 	
 	// 获取当前时间
@@ -274,7 +275,7 @@ XPKAPI void* xpkPathAppendData(xpkObject xpk, const char* filePath,
 	}
 	
 	xpk->modified = 1;
-	return info;
+	return pos1 - 1;
 }
 
 // ============================================================================

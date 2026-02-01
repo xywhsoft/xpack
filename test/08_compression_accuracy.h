@@ -81,10 +81,11 @@ TEST(accuracy_hash_consistency) {
 }
 
 TEST(accuracy_multiple_files_independent) {
-	char filename[64];
-	strcpy(filename, "test_08_multi_accuracy.xpk");
-
 	for (int testRun = 0; testRun < 3; testRun++) {
+		// Use unique filename for each test run to avoid file accumulation
+		char filename[64];
+		sprintf(filename, "test_08_multi_accuracy_%d.xpk", testRun);
+
 		xpkObject xpk = xpkOpen(filename, 0, 0);
 		ASSERT_NOT_NULL(xpk);
 
@@ -204,9 +205,9 @@ TEST(accuracy_file_operations) {
 
 		uint32_t originalHash = xrtHash32((ptr)data, size);
 
-		free(data);
+		// Don't free data yet - need it for comparison
 
-		xpkObject xpk = xpkOpen(filename, 0, i == 0 ? 0 : 1);
+		xpkObject xpk = xpkOpen(filename, 0, i == 0 ? 0 : 0);  // Always open in write mode to append
 		ASSERT_NOT_NULL(xpk);
 
 		if (i == 0) {
@@ -217,7 +218,8 @@ TEST(accuracy_file_operations) {
 		sprintf(packPath, "files/file%d.bin", i);
 		xpkPathAppendFile(xpk, packPath, srcPath, 6);
 
-		ASSERT_EQ(xpkInfoHash(xpk, i), originalHash);
+		uint32_t pos = xpkCount(xpk) - 1;
+		ASSERT_EQ(xpkInfoHash(xpk, pos), originalHash);
 
 		ASSERT_EQ(xpkSave(xpk), 0);
 		xpkClose(xpk);
@@ -243,6 +245,7 @@ TEST(accuracy_file_operations) {
 		uint32_t extractedHash = xrtHash32((ptr)extracted, readSize);
 		ASSERT_EQ(extractedHash, originalHash);
 
+		free(data);  // Now free the data
 		free(extracted);
 		xpkClose(xpk);
 

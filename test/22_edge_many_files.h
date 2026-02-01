@@ -29,8 +29,9 @@ TEST(single_file) {
 TEST(exactly_256_files) {
     const char* sFilename = "test_22_256_files.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
 
     for (int i = 0; i < 256; i++) {
         char* pData = createTestData_22(512, 'A' + (i % 26));
@@ -51,8 +52,9 @@ TEST(exactly_256_files) {
 TEST(exactly_65536_files) {
     const char* sFilename = "test_22_65536_files.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
 
     for (int i = 0; i < 65536; i++) {
         char* pData = createTestData_22(256, 'A' + (i % 26));
@@ -73,8 +75,9 @@ TEST(exactly_65536_files) {
 TEST(one_thousand_files) {
     const char* sFilename = "test_22_1000_files.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
 
     for (int i = 0; i < 1000; i++) {
         char* pData = createTestData_22(512, 'A' + (i % 26));
@@ -90,8 +93,9 @@ TEST(one_thousand_files) {
 TEST(ten_thousand_files) {
     const char* sFilename = "test_22_10000_files.xpk";
 
-    xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_INDEX, 0);
+    xpkObject xpk = xpkOpen(sFilename, 0, 0);
     ASSERT_NOT_NULL(xpk);
+    ASSERT_EQ(xpkTypeSet(xpk, XPK_TYPE_INDEX), 0);
 
     for (int i = 0; i < 10000; i++) {
         char* pData = createTestData_22(256, 'A' + (i % 26));
@@ -197,7 +201,6 @@ TEST(files_with_duplicate_data) {
     ASSERT_EQ(xpkSave(xpk), 0);
     ASSERT_EQ(xpkCount(xpk), 50);
 
-    free(pData);
     xpkClose(xpk);
 
     xpk = xpkOpen(sFilename, 0, 0);
@@ -212,6 +215,7 @@ TEST(files_with_duplicate_data) {
         xpkFree(pExtracted);
     }
 
+    free(pData);
     xpkClose(xpk);
 }
 
@@ -256,7 +260,7 @@ TEST(update_many_files) {
 
     for (int i = 0; i < 30; i++) {
         char* pNewData = createTestData_22(1024, 'X' + (i % 26));
-        ASSERT_EQ(xpkUpdateData(xpk, i + 1, pNewData, 1024, 6), 0);
+        ASSERT_EQ(xpkUpdateData(xpk, i, pNewData, 1024, 6), 0);
         free(pNewData);
     }
 

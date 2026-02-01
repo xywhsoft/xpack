@@ -52,4 +52,3 @@ echo.
 echo To run all tests:
 echo   release\x64\xpack_full_test.exe
 echo.
-pause

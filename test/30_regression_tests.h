@@ -82,8 +82,8 @@ TEST(regression_path_mode) {
 
     xpkObject xpk = xpkOpen(sFilename, XPK_TYPE_LINUX, 0);
     ASSERT_NOT_NULL(xpk);
-    void* pResult = xpkPathAppendData(xpk, "folder/file.txt", pData, 1024, 1);
-    ASSERT_NOT_NULL(pResult);
+    uint32_t pos = xpkPathAppendData(xpk, "folder/file.txt", pData, 1024, 1);
+    ASSERT_NE(pos, UINT32_MAX);
     ASSERT_EQ(xpkSave(xpk), 0);
 
     ASSERT_NE(xpkPathFind(xpk, "folder/file.txt"), UINT32_MAX);

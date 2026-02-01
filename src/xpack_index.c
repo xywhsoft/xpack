@@ -108,12 +108,7 @@ XPKAPI xpkFileInfoIndex* xpkIndexAppendData(xpkObject xpk, int32_t index,
 	if (size == 0) {
 		// 空数据不进行压缩
 		compSize = 0;
-		compData = malloc(1);
-		if (!compData) {
-			xpkSetError(3, "Failed to allocate compression buffer");
-			return NULL;
-		}
-		compData = 0;
+		compData = NULL;
 	} else {
 		// 计算压缩缓冲区大小
 		uint32_t compBound = xpkCompressBound(level, size);
@@ -145,13 +140,15 @@ XPKAPI xpkFileInfoIndex* xpkIndexAppendData(xpkObject xpk, int32_t index,
 	}
 	
 	// 写入压缩数据
-	xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
-	if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+	if (compSize > 0 && compData) {
+		xrtSeek(xpk->file, xpk->baseOffset + dataOffset, XRT_SEEK_SET);
+		if (xrtPut(xpk->file, compData, compSize) != (int)compSize) {
+			free(compData);
+			xpkSetError(2, "Failed to write data");
+			return NULL;
+		}
 		free(compData);
-		xpkSetError(2, "Failed to write data");
-		return NULL;
 	}
-	free(compData);
 	
 	// 追加文件信息
 	uint32_t pos = xrtArrayAppend(&xpk->ldb, 1);

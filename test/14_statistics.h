@@ -254,7 +254,8 @@ TEST(stats_after_update) {
 	xpkStat stat;
 	ASSERT_EQ(xpkStatGet(xpk, &stat), 0);
 	ASSERT_EQ(stat.fileCount, 5);
-	ASSERT_GT(stat.totalSize, 5 * 512);
+	// Updated data is about 35 bytes * 5 = 175 bytes, not 5*512
+	ASSERT_GT(stat.totalSize, 100);  // Reasonable lower bound for 5 files
 	ASSERT_GT(stat.packedSize, 0);
 	ASSERT_GT(stat.ratio, 0.0);
 
@@ -331,7 +332,8 @@ TEST(stats_path_mode) {
 		sprintf(path, "files/file%d.txt", i);
 		char data[1024];
 		memset(data, 'A' + i, 1024);
-		ASSERT_EQ(xpkPathAppendData(xpk, path, data, 1024, 6), 0);
+		// xpkPathAppendData returns position (0, 1, 2...), not 0 for success
+		ASSERT_NE(xpkPathAppendData(xpk, path, data, 1024, 6), UINT32_MAX);
 	}
 
 	ASSERT_EQ(xpkSave(xpk), 0);
@@ -360,7 +362,8 @@ TEST(stats_index_mode) {
 	for (int i = 0; i < 5; i++) {
 		char data[1024];
 		memset(data, 'A' + i, 1024);
-		ASSERT_EQ(xpkIndexAppendData(xpk, 100 + i, data, 1024, 6), 0);
+		// xpkIndexAppendData returns pointer, not 0 for success
+		ASSERT_NOT_NULL(xpkIndexAppendData(xpk, 100 + i, data, 1024, 6));
 	}
 
 	ASSERT_EQ(xpkSave(xpk), 0);

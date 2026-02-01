@@ -22,12 +22,12 @@ TEST(config_file_backup_scenario) {
     char* pConfig2 = createTestData_27(2048, 'B');
     char* pConfig3 = createTestData_27(512, 'C');
 
-    void* pResult1 = xpkPathAppendData(xpk, "config/app.conf", pConfig1, 1024, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "config/user.conf", pConfig2, 2048, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "backup/app.conf.bak", pConfig3, 512, 1);
-    ASSERT_NOT_NULL(pResult3);
+    uint32_t pos1 = xpkPathAppendData(xpk, "config/app.conf", pConfig1, 1024, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "config/user.conf", pConfig2, 2048, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "backup/app.conf.bak", pConfig3, 512, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
     ASSERT_EQ(xpkExtractAll(xpk, "."), 0);
@@ -76,14 +76,14 @@ TEST(game_asset_package_scenario) {
     char* pSound = createTestData_27(256 * 1024, 'S');
     char* pScript = createTestData_27(64 * 1024, 'J');
 
-    void* pResult1 = xpkPathAppendData(xpk, "textures/hero.png", pTexture, 1024 * 1024, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "models/hero.obj", pModel, 512 * 1024, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "sounds/hero_jump.wav", pSound, 256 * 1024, 1);
-    ASSERT_NOT_NULL(pResult3);
-    void* pResult4 = xpkPathAppendData(xpk, "scripts/hero.lua", pScript, 64 * 1024, 1);
-    ASSERT_NOT_NULL(pResult4);
+    uint32_t pos1 = xpkPathAppendData(xpk, "textures/hero.png", pTexture, 1024 * 1024, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "models/hero.obj", pModel, 512 * 1024, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "sounds/hero_jump.wav", pSound, 256 * 1024, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
+    uint32_t pos4 = xpkPathAppendData(xpk, "scripts/hero.lua", pScript, 64 * 1024, 1);
+    ASSERT_NE(pos4, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
     ASSERT_EQ(xpkExtractAll(xpk, "."), 0);
@@ -105,12 +105,12 @@ TEST(document_archive_scenario) {
     char* pDoc2 = createTestData_27(4096, 'E');
     char* pDoc3 = createTestData_27(8192, 'F');
 
-    void* pResult1 = xpkPathAppendData(xpk, "docs/report1.txt", pDoc1, 2048, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "docs/report2.txt", pDoc2, 4096, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "archive/old_report.txt", pDoc3, 8192, 1);
-    ASSERT_NOT_NULL(pResult3);
+    uint32_t pos1 = xpkPathAppendData(xpk, "docs/report1.txt", pDoc1, 2048, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "docs/report2.txt", pDoc2, 4096, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "archive/old_report.txt", pDoc3, 8192, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
 
@@ -135,12 +135,12 @@ TEST(source_code_package_scenario) {
     char* pSource = createTestData_27(4096, 'S');
     char* pMakefile = createTestData_27(512, 'M');
 
-    void* pResult1 = xpkPathAppendData(xpk, "include/xpack.h", pHeader, 1024, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "src/xpack.c", pSource, 4096, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "Makefile", pMakefile, 512, 1);
-    ASSERT_NOT_NULL(pResult3);
+    uint32_t pos1 = xpkPathAppendData(xpk, "include/xpack.h", pHeader, 1024, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "src/xpack.c", pSource, 4096, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "Makefile", pMakefile, 512, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
 
@@ -165,12 +165,12 @@ TEST(multimedia_collection_scenario) {
     char* pAudio = createTestData_27(2048 * 1024, 'A');
     char* pVideo = createTestData_27(10240 * 1024, 'V');
 
-    void* pResult1 = xpkPathAppendData(xpk, "images/photo.jpg", pImage, 512 * 1024, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "music/song.mp3", pAudio, 2048 * 1024, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "videos/movie.mp4", pVideo, 10240 * 1024, 1);
-    ASSERT_NOT_NULL(pResult3);
+    uint32_t pos1 = xpkPathAppendData(xpk, "images/photo.jpg", pImage, 512 * 1024, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "music/song.mp3", pAudio, 2048 * 1024, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "videos/movie.mp4", pVideo, 10240 * 1024, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
     ASSERT_EQ(xpkVerifyAll(xpk), 0);
@@ -218,12 +218,12 @@ TEST(software_update_package_scenario) {
     char* pDll = createTestData_27(512 * 1024, 'D');
     char* pConfig = createTestData_27(4096, 'C');
 
-    void* pResult1 = xpkPathAppendData(xpk, "bin/app.exe", pExe, 1024 * 1024, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "bin/library.dll", pDll, 512 * 1024, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "config/settings.ini", pConfig, 4096, 1);
-    ASSERT_NOT_NULL(pResult3);
+    uint32_t pos1 = xpkPathAppendData(xpk, "bin/app.exe", pExe, 1024 * 1024, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "bin/library.dll", pDll, 512 * 1024, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "config/settings.ini", pConfig, 4096, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
     ASSERT_EQ(xpkExtractAll(xpk, "."), 0);
@@ -270,14 +270,14 @@ TEST(mixed_content_archive_scenario) {
     char* pImage = createTestData_27(1024 * 1024, 'I');
     char* pAudio = createTestData_27(512 * 1024, 'A');
 
-    void* pResult1 = xpkPathAppendData(xpk, "text/readme.txt", pText, 2048, 1);
-    ASSERT_NOT_NULL(pResult1);
-    void* pResult2 = xpkPathAppendData(xpk, "binary/data.dat", pBinary, 4096, 1);
-    ASSERT_NOT_NULL(pResult2);
-    void* pResult3 = xpkPathAppendData(xpk, "images/logo.png", pImage, 1024 * 1024, 1);
-    ASSERT_NOT_NULL(pResult3);
-    void* pResult4 = xpkPathAppendData(xpk, "sounds/bell.wav", pAudio, 512 * 1024, 1);
-    ASSERT_NOT_NULL(pResult4);
+    uint32_t pos1 = xpkPathAppendData(xpk, "text/readme.txt", pText, 2048, 1);
+    ASSERT_NE(pos1, UINT32_MAX);
+    uint32_t pos2 = xpkPathAppendData(xpk, "binary/data.dat", pBinary, 4096, 1);
+    ASSERT_NE(pos2, UINT32_MAX);
+    uint32_t pos3 = xpkPathAppendData(xpk, "images/logo.png", pImage, 1024 * 1024, 1);
+    ASSERT_NE(pos3, UINT32_MAX);
+    uint32_t pos4 = xpkPathAppendData(xpk, "sounds/bell.wav", pAudio, 512 * 1024, 1);
+    ASSERT_NE(pos4, UINT32_MAX);
 
     ASSERT_EQ(xpkSave(xpk), 0);
     ASSERT_EQ(xpkVerifyAll(xpk), 0);
