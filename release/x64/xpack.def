@@ -60,3 +60,13 @@ xpkUpdateData
 xpkUpdateFile
 xpkVerify
 xpkVerifyAll
+xpkVolumeCount
+xpkVolumeCurrent
+xpkVolumeMode
+xpkVolumeModeSet
+xpkVolumePath
+xpkVolumeSize
+xpkVolumeSizeSet
+xpkVolumeSplitMode
+xpkVolumeSplitModeSet
+xpkVolumeStatGet

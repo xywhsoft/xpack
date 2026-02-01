@@ -15,15 +15,23 @@
 #define ID_FILE_REBUILD         109
 #define ID_FILE_SAVE            110
 #define ID_FILE_PROPERTIES      111
+#define ID_FILE_ADDDIR          112
 
 #define ID_VIEW_REFRESH         200
 #define ID_VIEW_LARGEICON       201
 #define ID_VIEW_DETAILS         202
+#define ID_VIEW_GRIDLINES       203
+#define ID_VIEW_STATUSBAR       204
 
 #define ID_TOOLS_VERIFY         300
 #define ID_TOOLS_EXTRACTALL     301
 #define ID_TOOLS_COMPRESS       302
 #define ID_TOOLS_SOLIDMODE      303
+#define ID_TOOLS_VOLUME_MODE    304
+#define ID_TOOLS_VOLUME_SIZE    305
+#define ID_TOOLS_TEST           306
+#define ID_TOOLS_DISCCODE       307
+#define ID_TOOLS_PATTERN        308
 
 #define ID_HELP_ABOUT           400
 

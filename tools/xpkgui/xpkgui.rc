@@ -1,62 +1,80 @@
+#pragma code_page(65001)
 #include "resource.h"
 #include <windows.h>
 
 IDR_MAINMENU MENU
 BEGIN
-	POPUP "�ļ�(&F)"
+	POPUP "文件(&F)"
 	BEGIN
-		MENUITEM "�½�(&N)...\tCtrl+N",		ID_FILE_NEW
-		MENUITEM "��(&O)...\tCtrl+O",		ID_FILE_OPEN
+		MENUITEM "新建(&N)...\tCtrl+N",		ID_FILE_NEW
+		MENUITEM "打开(&O)...\tCtrl+O",		ID_FILE_OPEN
 		MENUITEM SEPARATOR
-		MENUITEM "�ر�(&C)",				ID_FILE_CLOSE
-		MENUITEM "����(&S)\tCtrl+S",		ID_FILE_SAVE
+		MENUITEM "关闭(&C)",				ID_FILE_CLOSE
+		MENUITEM "保存(&S)\tCtrl+S",		ID_FILE_SAVE
 		MENUITEM SEPARATOR
-		MENUITEM "�����ļ�(&A)...",			ID_FILE_ADD
-		MENUITEM "��ѹ(&E)...",				ID_FILE_EXTRACT
-		MENUITEM "ɾ��(&D)",				ID_FILE_DELETE
-		MENUITEM "������(&R)...",			ID_FILE_RENAME
+		MENUITEM "添加文件(&A)...",			ID_FILE_ADD
+		MENUITEM "添加目录(&D)...",			ID_FILE_ADDDIR
 		MENUITEM SEPARATOR
-		MENUITEM "�ؽ�(&B)",				ID_FILE_REBUILD
-		MENUITEM "����(&P)...",				ID_FILE_PROPERTIES
+		MENUITEM "解压(&E)...",				ID_FILE_EXTRACT
+		MENUITEM "删除(&D)",				ID_FILE_DELETE
+		MENUITEM "重命名(&R)...",			ID_FILE_RENAME
 		MENUITEM SEPARATOR
-		MENUITEM "�˳�(&X)",				ID_FILE_EXIT
+		MENUITEM "重建(&B)",				ID_FILE_REBUILD
+		MENUITEM "属性(&P)...",				ID_FILE_PROPERTIES
+		MENUITEM SEPARATOR
+		MENUITEM "退出(&X)",				ID_FILE_EXIT
 	END
 
-	POPUP "�鿴(&V)"
+	POPUP "查看(&V)"
 	BEGIN
-		MENUITEM "ˢ��(&R)\tF5",			ID_VIEW_REFRESH
+		MENUITEM "刷新(&R)\tF5",			ID_VIEW_REFRESH
 		MENUITEM SEPARATOR
-		MENUITEM "��ϸ��Ϣ",				ID_VIEW_DETAILS
+		MENUITEM "显示网格线",				ID_VIEW_GRIDLINES
+		MENUITEM "显示状态栏",				ID_VIEW_STATUSBAR
 	END
 
-	POPUP "����(&T)"
+	POPUP "工具(&T)"
 	BEGIN
-		MENUITEM "��֤(&V)",					ID_TOOLS_VERIFY
-		MENUITEM "ȫ����ѹ(&A)...",			ID_TOOLS_EXTRACTALL
+		MENUITEM "验证(&V)",					ID_TOOLS_VERIFY
+		MENUITEM "测试(&T)",					ID_TOOLS_TEST
 		MENUITEM SEPARATOR
-		MENUITEM "�ʵ����ģʽ(&S)",		ID_TOOLS_SOLIDMODE
+		MENUITEM "全部解压(&A)...",			ID_TOOLS_EXTRACTALL
+		MENUITEM "模式匹配(&P)...",			ID_TOOLS_PATTERN
+		MENUITEM SEPARATOR
+		MENUITEM "固实压缩模式(&S)",		ID_TOOLS_SOLIDMODE
+		MENUITEM "分卷模式(&V)...",			ID_TOOLS_VOLUME_MODE
+		MENUITEM "设置分卷大小(&Z)...",		ID_TOOLS_VOLUME_SIZE
+		MENUITEM "设置识别代码(&C)...",		ID_TOOLS_DISCCODE
 	END
 
-	POPUP "����(&H)"
+	POPUP "帮助(&H)"
 	BEGIN
-		MENUITEM "����(&A)...",				ID_HELP_ABOUT
+		MENUITEM "关于(&A)...",				ID_HELP_ABOUT
 	END
 END
 
 STRINGTABLE
 BEGIN
-	ID_FILE_NEW		"�����µ� xPack ѹ����"
-	ID_FILE_OPEN		"�����е� xPack ѹ����"
-	ID_FILE_CLOSE		"�رյ�ǰѹ����"
-	ID_FILE_SAVE		"���浱ǰѹ����"
-	ID_FILE_ADD		"�����ļ���ѹ����"
-	ID_FILE_EXTRACT	"��ѹѡ�е��ļ�"
-	ID_FILE_DELETE		"ɾ��ѡ�е��ļ�"
-	ID_FILE_RENAME		"������ѡ�е��ļ�"
-	ID_FILE_REBUILD	"�ؽ�ѹ�������Ż��洢"
-	ID_FILE_PROPERTIES	"�鿴ѹ��������"
-	ID_VIEW_REFRESH	"ˢ���ļ��б�"
-	ID_TOOLS_VERIFY	"��֤ѹ����������"
-	ID_TOOLS_EXTRACTALL	"��ѹ�����ļ�"
-	ID_TOOLS_SOLIDMODE	"л�ʵ����ģʽ"
+	ID_FILE_NEW		"创建新的 xPack 压缩包"
+	ID_FILE_OPEN	"打开已有的 xPack 压缩包"
+	ID_FILE_CLOSE	"关闭当前的压缩包"
+	ID_FILE_SAVE	"保存当前的压缩包"
+	ID_FILE_ADD		"添加文件到压缩包"
+	ID_FILE_ADDDIR	"添加目录到压缩包"
+	ID_FILE_EXTRACT	"解压选中的文件"
+	ID_FILE_DELETE	"删除选中的文件"
+	ID_FILE_RENAME	"重命名选中的文件"
+	ID_FILE_REBUILD	"重建压缩包以优化存储"
+	ID_FILE_PROPERTIES	"查看压缩包属性"
+	ID_VIEW_REFRESH	"刷新文件列表"
+	ID_VIEW_GRIDLINES	"显示/隐藏网格线"
+	ID_VIEW_STATUSBAR	"显示/隐藏状态栏"
+	ID_TOOLS_VERIFY	"验证压缩包完整性"
+	ID_TOOLS_TEST	"测试压缩包完整性"
+	ID_TOOLS_EXTRACTALL	"解压所有文件"
+	ID_TOOLS_PATTERN	"按模式匹配操作文件"
+	ID_TOOLS_SOLIDMODE	"切换固实压缩模式"
+	ID_TOOLS_VOLUME_MODE	"启用/禁用分卷模式"
+	ID_TOOLS_VOLUME_SIZE	"设置分卷大小限制"
+	ID_TOOLS_DISCCODE	"设置识别代码"
 END

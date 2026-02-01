@@ -74,8 +74,10 @@ XPKAPI xpkFileInfoIndex* xpkIndexAppendData(xpkObject xpk, int32_t index,
 		return NULL;
 	}
 	if (xpkType(xpk) != XPK_TYPE_INDEX) {
-		xpkSetError(11, "Pack type is not Index");
-		return NULL;
+		if (xpkTypeSet(xpk, XPK_TYPE_INDEX) != 0) {
+			xpkSetError(11, "Failed to set pack type");
+			return NULL;
+		}
 	}
 	
 	// 固实包禁止追加
@@ -99,20 +101,34 @@ XPKAPI xpkFileInfoIndex* xpkIndexAppendData(xpkObject xpk, int32_t index,
 	// 限制压缩级别
 	level = level & 0x0F;
 	
-	// 计算压缩缓冲区大小
-	uint32_t compBound = xpkCompressBound(level, size);
-	void* compData = malloc(compBound);
-	if (!compData) {
-		xpkSetError(3, "Failed to allocate compression buffer");
-		return NULL;
-	}
-	
 	// 压缩数据
 	uint32_t compSize = 0;
-	if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
-		free(compData);
-		xpkSetError(7, "Compression failed");
-		return NULL;
+	void* compData = NULL;
+	
+	if (size == 0) {
+		// 空数据不进行压缩
+		compSize = 0;
+		compData = malloc(1);
+		if (!compData) {
+			xpkSetError(3, "Failed to allocate compression buffer");
+			return NULL;
+		}
+		compData = 0;
+	} else {
+		// 计算压缩缓冲区大小
+		uint32_t compBound = xpkCompressBound(level, size);
+		compData = malloc(compBound);
+		if (!compData) {
+			xpkSetError(3, "Failed to allocate compression buffer");
+			return NULL;
+		}
+		
+		// 压缩数据
+		if (xpkCompressRouter(level, data, size, compData, compBound, &compSize) != 0) {
+			free(compData);
+			xpkSetError(7, "Compression failed");
+			return NULL;
+		}
 	}
 	
 	// 计算文件哈希
