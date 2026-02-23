@@ -1,3 +1,18 @@
+
+
+
+set XRT_DIR=lib/xrt
+set LZ4_DIR=lib/lz4
+set LZMA_DIR=lib/lzma
+set ZSTD_DIR=lib/zstd
+
+
+
+set CFLAGS=-I%XRT_DIR% -I%LZ4_DIR% -I%LZMA_DIR% -I%ZSTD_DIR% -DZ7_ST -DXPK_BUILD_DLL -O2 -s -fPIC -ffunction-sections -fdata-sections -Wl,--gc-sections
+set LDFLAGS=-lws2_32 -liphlpapi
+
+
+
 gcc -m64 -shared ^
 	src/xpack.c ^
 	src/xpack_compress.c ^
@@ -18,11 +33,8 @@ gcc -m64 -shared ^
 	lib/lzma/LzmaEnc.c ^
 	lib/lzma/Lzma2Dec.c ^
 	lib/lzma/Lzma2Enc.c ^
-	-DZ7_ST ^
-	-DXPK_BUILD_DLL ^
-	-Ilib -Ilib/zstd -Ilib/lzma -Isrc ^
-	-O2 -s -fPIC -ffunction-sections -fdata-sections -Wl,--gc-sections ^
-	-lws2_32 -lIPHLPAPI ^
+	%CFLAGS%  ^
+	%LDFLAGS% ^
 	-o release/x64/xpack.dll
 
 @echo;

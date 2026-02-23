@@ -11,9 +11,20 @@
 - [test/README.md](file://tools/xpkcon/test/README.md)
 - [test_xpk_api.c](file://tools/xpkcon/test/test_xpk_api.c)
 - [test_xpkcon.c](file://tools/xpkcon/test/test_xpkcon.c)
+- [test_framework.c](file://tools/xpkcon/test/test_framework.c)
+- [test_cases.c](file://tools/xpkcon/test/test_cases.c)
 - [design.md](file://docs/design.md)
 - [spec.md](file://docs/spec.md)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 更新了版本信息从1.1.0到1.2.0
+- 增强了文件路径处理功能，改进了Windows/Linux风格路径区分
+- 改进了位置索引处理和通配符模式匹配机制
+- 增加了平台特定的路径解析逻辑
+- 改进了错误报告机制和更好的错误处理
+- 新增了分卷模式的split-mode选项支持
 
 ## 目录
 1. [简介](#简介)
@@ -37,9 +48,16 @@ xpkcon 是 xPack 文件压缩库的命令行工具，功能对标 7z，支持创
 - **多包类型**：Core、Index、Linux、Win32 四种包类型
 - **十六级压缩**：支持 0-15 级压缩级别，满足不同性能需求
 - **固实压缩**：支持固实压缩模式以获得更高的压缩比
-- **通配符匹配**：支持文件名通配符过滤
-- **递归处理**：支持目录递归处理
-- **分卷压缩**：支持按大小或文件数量进行分卷压缩
+- **通配符匹配**：支持文件名通配符过滤，增强文件选择灵活性
+- **递归处理**：支持目录递归处理，提高批量操作效率
+- **分卷压缩**：支持按大小或文件数量进行分卷压缩，新增split-mode选项
+- **平台适配**：改进的Windows/Linux风格路径处理和位置索引管理
+
+**更新** 版本1.2.0增强了文件路径处理功能，改进了跨平台兼容性和错误处理机制
+
+**章节来源**
+- [xpkcon.c](file://tools/xpkcon/xpkcon.c#L37-L37)
+- [README.md](file://tools/xpkcon/README.md#L1-L13)
 
 ## 项目结构
 
@@ -58,24 +76,26 @@ subgraph "测试目录 (test/)"
 G[test_xpk_api.c - API测试]
 H[test_xpkcon.c - 命令行测试]
 I[README.md - 测试文档]
+J[test_framework.c - 测试框架]
+K[test_cases.c - 测试用例]
 end
 end
 subgraph "库依赖"
-J[xpack.h - xPack库头文件]
-K[xrt/xrt.h - xRT库]
-L[lz4/lz4.h - LZ4库]
-M[zstd/zstd.h - ZSTD库]
-N[lzma/Lzma.h - LZMA库]
+L[xpack.h - xPack库头文件]
+M[xrt/xrt.h - xRT库]
+N[lz4/lz4.h - LZ4库]
+O[zstd/zstd.h - ZSTD库]
+P[lzma/Lzma.h - LZMA库]
 end
-A --> J
-A --> K
 A --> L
 A --> M
 A --> N
+A --> O
+A --> P
 ```
 
 **图表来源**
-- [xpkcon.c](file://tools/xpkcon/xpkcon.c#L1-L10)
+- [xpkcon.c](file://tools/xpkcon/xpkcon.c#L1-L128)
 - [README.md](file://tools/xpkcon/README.md#L1-L50)
 
 **章节来源**
@@ -86,7 +106,7 @@ A --> N
 
 ### 命令行参数解析器
 
-命令行参数解析器负责处理用户输入的各种选项和参数：
+命令行参数解析器负责处理用户输入的各种选项和参数，现已增强对分卷模式的支持：
 
 ```mermaid
 flowchart TD
@@ -99,12 +119,15 @@ F --> G{解析包类型}
 G --> H{解析压缩级别}
 H --> I{解析固实模式}
 I --> J{解析分卷大小}
-J --> K{解析输出目录}
-K --> L{解析其他选项}
-L --> M[提取命令和文件列表]
-M --> N[验证必需参数]
-N --> O[返回解析结果]
+J --> K{解析分卷模式}
+K --> L{解析输出目录}
+L --> M{解析其他选项}
+M --> N[提取命令和文件列表]
+N --> O[验证必需参数]
+O --> P[返回解析结果]
 ```
+
+**更新** 新增了`--split-mode`选项支持，允许用户选择按字节或按文件数量进行分卷分割
 
 **图表来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L207-L337)
@@ -124,6 +147,8 @@ N --> O[返回解析结果]
 | `u` | 更新压缩包中的文件 | `cmd_update()` |
 | `i` | 显示压缩包详细信息 | `cmd_info()` |
 
+**更新** 命令处理函数现在更好地支持通配符匹配和位置索引处理
+
 **章节来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L99-L118)
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L339-L726)
@@ -138,27 +163,38 @@ subgraph "应用层 (Application Layer)"
 A[xpkcon 主程序]
 B[命令处理器]
 C[参数解析器]
+D[通配符匹配器]
+E[路径处理器]
 end
 subgraph "业务逻辑层 (Business Logic Layer)"
-D[xPack API封装]
-E[文件系统操作]
-F[压缩算法选择]
+F[xPack API封装]
+G[文件系统操作]
+H[压缩算法选择]
+I[分卷模式管理]
 end
 subgraph "数据访问层 (Data Access Layer)"
-G[xPack库]
-H[压缩算法库]
-I[文件系统]
+J[xPack库]
+K[压缩算法库]
+L[文件系统]
+M[平台适配层]
 end
 A --> B
 B --> C
 B --> D
-C --> D
-D --> E
+B --> E
+C --> F
 D --> F
-E --> I
-F --> H
+E --> F
 F --> G
+F --> H
+F --> I
+G --> L
+G --> M
+H --> K
+I --> J
 ```
+
+**更新** 新增了通配符匹配器和路径处理器组件，增强了文件操作的灵活性
 
 **图表来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L61-L128)
@@ -175,6 +211,7 @@ sequenceDiagram
 participant U as 用户
 participant M as 主程序
 participant P as 参数解析器
+participant W as 通配符匹配器
 participant X as xPack库
 participant C as 命令处理器
 U->>M : 启动xpkcon
@@ -184,12 +221,16 @@ P-->>M : 返回解析结果
 M->>X : 打开压缩包
 X-->>M : 返回xpk对象
 M->>C : 执行对应命令
+C->>W : 处理通配符匹配
+W-->>C : 返回匹配结果
 C->>X : 调用xPack API
 X-->>C : 返回操作结果
 C-->>M : 返回命令执行结果
 M->>X : 保存并关闭压缩包
 M-->>U : 输出结果
 ```
+
+**更新** 新增了通配符匹配处理流程，提高了文件选择的灵活性
 
 **图表来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L61-L128)
@@ -223,7 +264,7 @@ end
 
 ### 分卷压缩机制
 
-分卷压缩功能允许将大压缩包分割成多个小文件：
+分卷压缩功能允许将大压缩包分割成多个小文件，新增了split-mode选项：
 
 ```mermaid
 flowchart TD
@@ -239,6 +280,8 @@ H --> F
 F --> I[完成所有文件]
 I --> J[输出卷信息]
 ```
+
+**更新** 新增了按文件数量分割的split-mode选项，提供了更灵活的分卷控制
 
 **图表来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L428-L442)
@@ -257,32 +300,38 @@ xpkcon 依赖于多个外部库来提供完整的功能：
 graph TB
 subgraph "xpkcon 主程序"
 A[xpkcon.c]
+B[wildcard_match 函数]
+C[process_directory 函数]
 end
 subgraph "xPack 库"
-B[xpack.h]
-C[xpack.c]
-D[xpack_compress.c]
+D[xpack.h]
+E[xpack.c]
+F[xpack_compress.c]
 end
 subgraph "压缩算法库"
-E[lz4.h]
-F[zstd.h]
-G[LzmaDec.h]
+G[lz4.h]
+H[zstd.h]
+I[LzmaDec.h]
 end
 subgraph "系统库"
-H[kernel32.lib]
-I[user32.lib]
-J[advapi32.lib]
+J[kernel32.lib]
+K[user32.lib]
+L[advapi32.lib]
 end
 A --> B
-A --> E
-A --> F
+A --> C
+A --> D
 A --> G
 A --> H
 A --> I
 A --> J
-B --> C
-B --> D
+A --> K
+A --> L
+D --> E
+D --> F
 ```
+
+**更新** 新增了通配符匹配和目录处理函数的依赖关系
 
 **图表来源**
 - [BUILD_INSTRUCTIONS.md](file://tools/xpkcon/BUILD_INSTRUCTIONS.md#L37-L79)
@@ -298,12 +347,18 @@ A[xpkcon.c] --> B[命令处理函数]
 A --> C[文件系统操作]
 A --> D[格式化工具]
 A --> E[进度跟踪]
-B --> F[xPack API调用]
-C --> G[目录遍历]
-C --> H[文件检测]
-D --> I[大小格式化]
-D --> J[时间格式化]
+A --> F[wildcard_match]
+A --> G[process_directory]
+B --> H[xPack API调用]
+C --> I[目录遍历]
+C --> J[文件检测]
+D --> K[大小格式化]
+D --> L[时间格式化]
+F --> M[通配符匹配]
+G --> N[路径处理]
 ```
+
+**更新** 新增了通配符匹配和路径处理模块的依赖关系
 
 **图表来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L14-L60)
@@ -368,6 +423,8 @@ H --> |空间不足| I[清理空间]
 H --> |空间充足| J[查看日志]
 ```
 
+**更新** 新增了通配符匹配和路径处理相关的错误诊断流程
+
 **图表来源**
 - [xpkcon.c](file://tools/xpkcon/xpkcon.c#L86-L90)
 
@@ -377,6 +434,7 @@ H --> |空间充足| J[查看日志]
 2. **合理使用固实模式**：对相似文件使用固实模式
 3. **分卷压缩**：大文件使用分卷压缩便于传输
 4. **批量操作**：尽量使用批量添加和提取操作
+5. **通配符优化**：使用高效的通配符模式减少不必要的文件扫描
 
 **章节来源**
 - [BUILD_INSTRUCTIONS.md](file://tools/xpkcon/BUILD_INSTRUCTIONS.md#L102-L115)
@@ -392,6 +450,7 @@ xpkcon 是一个功能完整、设计良好的命令行压缩工具，具有以�
 - **易于使用**：简洁的命令行界面，类似 7z 的使用体验
 - **性能优秀**：针对不同场景提供最优的压缩策略
 - **可扩展性强**：模块化设计便于功能扩展
+- **跨平台适配**：改进的Windows/Linux路径处理和位置索引管理
 
 ### 发展方向
 
@@ -399,6 +458,7 @@ xpkcon 是一个功能完整、设计良好的命令行压缩工具，具有以�
 2. **改进进度显示**：提供更详细的进度信息
 3. **增加网络支持**：支持远程文件操作
 4. **优化内存使用**：进一步减少内存占用
+5. **增强错误处理**：提供更友好的错误报告机制
 
 xpkcon 为 xPack 生态系统提供了重要的命令行工具，满足了开发者和用户的多样化需求。
 
@@ -425,10 +485,13 @@ xpkcon 为 xPack 生态系统提供了重要的命令行工具，满足了开发
 | `-l<level>` | 整数 | `7` | 压缩级别：0-15 |
 | `-s<0|1>` | 整数 | `0` | 固实模式：0=独立, 1=固实 |
 | `-V<size>` | 字符串 | `0` | 分卷大小（支持K/M/G后缀） |
+| `--split-mode` | 整数 | `0` | 分卷分割模式：0=字节, 1=文件 |
 | `-o<path>` | 字符串 | `.` | 输出目录 |
 | `-y` | 标志 | `false` | 自动确认所有提示 |
 | `-r` | 标志 | `false` | 递归处理子目录 |
 | `-v` | 标志 | `false` | 详细输出 |
+
+**更新** 新增了`--split-mode`选项，支持按文件数量进行分卷分割
 
 ### 构建配置
 
@@ -450,3 +513,15 @@ C --> K[GCC x86 动态]
 
 **图表来源**
 - [build.bat](file://tools/xpkcon/build.bat#L8-L15)
+
+### 版本历史
+
+| 版本 | 主要更新 |
+|------|----------|
+| 1.2.0 | 增强文件路径处理，改进Windows/Linux风格路径区分，增强通配符匹配，改进错误报告机制 |
+| 1.1.0 | 初始版本发布 |
+| 1.0.0 | 基础功能实现 |
+
+**章节来源**
+- [xpkcon.c](file://tools/xpkcon/xpkcon.c#L37-L37)
+- [README.md](file://tools/xpkcon/README.md#L366-L374)

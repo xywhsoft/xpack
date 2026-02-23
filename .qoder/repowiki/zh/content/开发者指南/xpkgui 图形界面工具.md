@@ -2,38 +2,36 @@
 
 <cite>
 **本文档引用的文件**
-- [README.md](file://tools/xpkgui/README.md)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c)
-- [xpkgui_full_spec.md](file://tools/xpkgui/xpkgui_full_spec.md)
-- [resource.h](file://tools/xpkgui/resource.h)
-- [xpkgui.rc](file://tools/xpkgui/xpkgui.rc)
-- [xpkshext.c](file://tools/xpkgui/xpkshext.c)
-- [xpkshext.h](file://tools/xpkgui/xpkshext.h)
-- [xpkshext.def](file://tools/xpkgui/xpkshext.def)
-- [xpkshext.reg](file://tools/xpkgui/xpkshext.reg)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md)
+- [main.c](file://tools/xpkgui/src/main.c)
+- [app.h](file://tools/xpkgui/src/core/app.h)
+- [window.h](file://tools/xpkgui/src/core/window.h)
+- [dialog_base.h](file://tools/xpkgui/src/ui/dialogs/dialog_base.h)
+- [file_list.h](file://tools/xpkgui/src/ui/widgets/file_list.h)
+- [package_ops.h](file://tools/xpkgui/src/operations/package_ops.h)
+- [settings.h](file://tools/xpkgui/src/config/settings.h)
+- [string_utils.h](file://tools/xpkgui/src/utils/string_utils.h)
+- [common.h](file://tools/xpkgui/include/xpkgui/common.h)
+- [types.h](file://tools/xpkgui/include/xpkgui/types.h)
+- [build.bat](file://tools/xpkgui/build.bat)
+- [xpkshext.c](file://tools/xpkgui/src/shell/xpkshext.c)
+- [xpkshext.h](file://tools/xpkgui/src/shell/xpkshext.h)
 - [install.bat](file://tools/xpkgui/install.bat)
 - [uninstall.bat](file://tools/xpkgui/uninstall.bat)
 - [xpkgui.reg](file://tools/xpkgui/xpkgui.reg)
-- [build_x64.bat](file://tools/xpkgui/build_x64.bat)
-- [build_x86.bat](file://tools/xpkgui/build_x86.bat)
-- [build_shext_x64.bat](file://tools/xpkgui/build_shext_x64.bat)
-- [build_shext_x86.bat](file://tools/xpkgui/build_shext_x86.bat)
-- [build_shext_gcc_x64.bat](file://tools/xpkgui/build_shext_gcc_x64.bat)
-- [build_shext_gcc_x86.bat](file://tools/xpkgui/build_shext_gcc_x86.bat)
-- [build_shext_tcc_x64.bat](file://tools/xpkgui/build_shext_tcc_x64.bat)
-- [build_shext_tcc_x86.bat](file://tools/xpkgui/build_shext_tcc_x86.bat)
-- [build_linux.sh](file://tools/xpkgui/build_linux.sh)
-- [xpack.h](file://src/xpack.h)
-- [xrt.h](file://lib/xrt/xrt.h)
+- [xpkshext.reg](file://tools/xpkgui/xpkshext.reg)
 </cite>
 
 ## 更新摘要
 **变更内容**
-- 新增完整的安装卸载脚本系统，支持自动化部署和清理
-- 增强 Windows Shell 扩展功能，完善右键菜单集成
-- 补充注册表管理工具，提供文件关联和扩展注册
-- 添加多平台编译支持，包括 GCC 和 TCC 编译器
-- 优化平台特定配置，增强系统兼容性
+- 重大架构重构：从单一2420行源文件重构为模块化架构
+- 新增核心框架模块（core/app.h, core/window.h, core/mode_main.h）
+- 新增UI组件模块（ui/dialogs/dialog_base.h, ui/menus/menu_handler.h, ui/widgets/file_list.h, ui/widgets/status_bar.h）
+- 新增操作模块（operations/package_ops.h, operations/file_ops.h, operations/extract_ops.h, operations/verify_ops.h, operations/dir_ops.h）
+- 新增配置管理模块（config/settings.h, config/history.h）
+- 新增工具函数模块（utils/string_utils.h, utils/format_utils.h, utils/error_handler.h）
+- 新增公共API头文件（include/xpkgui/）
+- 新增重构指南（REFACTORING_SUMMARY.md）
 
 ## 目录
 1. [简介](#简介)
@@ -55,10 +53,11 @@
 
 ## 简介
 
-xpkgui 是一个基于 Win32 SDK 开发的 xPack 压缩包管理工具，提供类似 7-zip 的图形界面体验。该工具经过大幅重写，从最初的311行扩展到2420行，新增了命令行集成、拖放支持、模式选择、设置管理、历史记录等丰富功能。该工具允许用户轻松管理 xPack 格式的压缩包，支持多种压缩算法和包模式，提供直观的文件操作界面。
+xpkgui 是一个基于 Win32 SDK 开发的 xPack 压缩包管理工具，提供类似 7-zip 的图形界面体验。该工具经过重大架构重构，从原有的单一2420行源文件重构为模块化架构，新增了核心框架、UI组件、操作模块、配置管理、工具函数等多个模块，显著提升了代码的可维护性和扩展性。
 
 ### 主要功能特性
 
+- **模块化架构**：清晰的分层设计，符合单一职责原则
 - **文件管理操作**：新建、打开、保存、关闭压缩包；添加、解压、删除、重命名文件
 - **压缩功能**：支持 LZ4、ZSTD、LZMA2 算法，提供 0-15 级压缩级别
 - **工具功能**：压缩包验证、重建优化、属性查看、测试功能
@@ -74,333 +73,331 @@ xpkgui 是一个基于 Win32 SDK 开发的 xPack 压缩包管理工具，提供�
 
 ## 项目结构
 
-xpkgui 项目采用模块化设计，主要包含以下组件：
+xpkgui 项目采用全新的模块化设计，主要包含以下组件：
 
 ```mermaid
 graph TB
-subgraph "xpkgui 项目结构"
-A[xpkgui.c - 主程序源码<br/>2420行代码]
-B[resource.h - 资源定义]
-C[xpkgui.rc - 资源脚本]
-D[build_x64.bat - 64位编译脚本]
-E[build_x86.bat - 32位编译脚本]
-F[README.md - 项目文档]
-G[xpkgui_full_spec.md - 完整规格说明]
-H[install.bat - 安装脚本]
-I[uninstall.bat - 卸载脚本]
-J[xpkgui.reg - 文件关联注册表]
+subgraph "xpkgui 模块化架构"
+A[main.c - 程序入口<br/>模块化入口点]
+B[include/xpkgui/<br/>公共API头文件]
+C[core/<br/>核心框架模块]
+D[ui/<br/>用户界面模块]
+E[operations/<br/>业务逻辑模块]
+F[config/<br/>配置管理模块]
+G[utils/<br/>工具函数模块]
+H[resources/<br/>资源文件]
+I[shell/<br/>Shell扩展模块]
 end
-subgraph "Shell扩展"
-K[xpkshext.c - Shell扩展源码]
-L[xpkshext.h - Shell扩展头文件]
-M[xpkshext.def - DLL导出定义]
-N[xpkshext.reg - Shell扩展注册表]
-O[build_shext_x64.bat - Shell扩展64位编译]
-P[build_shext_x86.bat - Shell扩展32位编译]
+subgraph "核心框架模块"
+C1[app.h - 应用程序核心]
+C2[window.h - 主窗口管理]
+C3[mode_main.h - 模式管理]
 end
-subgraph "平台特定编译"
-Q[build_shext_gcc_x64.bat - GCC 64位编译]
-R[build_shext_gcc_x86.bat - GCC 32位编译]
-S[build_shext_tcc_x64.bat - TCC 64位编译]
-T[build_shext_tcc_x86.bat - TCC 32位编译]
-U[build_linux.sh - Linux编译脚本]
+subgraph "UI组件模块"
+D1[dialogs/dialog_base.h - 对话框基类]
+D2[menus/menu_handler.h - 菜单处理]
+D3[widgets/file_list.h - 文件列表控件]
+D4[widgets/status_bar.h - 状态栏控件]
 end
-subgraph "依赖库"
-V[xPack 核心库]
-W[xrt 运行时库]
-X[LZ4 压缩库]
-Y[LZMA 压缩库]
-Z[ZSTD 压缩库]
+subgraph "操作模块"
+E1[package_ops.h - 包操作]
+E2[file_ops.h - 文件操作]
+E3[extract_ops.h - 解压操作]
+E4[verify_ops.h - 验证操作]
+E5[dir_ops.h - 目录操作]
 end
-A --> V
-A --> W
-A --> X
-A --> Y
-A --> Z
-K --> V
-K --> W
-K --> X
-K --> Y
-K --> Z
-H --> A
-H --> K
-I --> A
-I --> K
+subgraph "配置管理模块"
+F1[settings.h - 设置管理]
+F2[history.h - 历史记录]
+end
+subgraph "工具函数模块"
+G1[string_utils.h - 字符串工具]
+G2[format_utils.h - 格式化工具]
+G3[error_handler.h - 错误处理]
+end
+A --> C
+A --> D
+A --> E
+A --> F
+A --> G
+B --> C
+B --> D
+B --> E
+B --> F
+B --> G
+C --> C1
+C --> C2
+C --> C3
+D --> D1
+D --> D2
+D --> D3
+D --> D4
+E --> E1
+E --> E2
+E --> E3
+E --> E4
+E --> E5
+F --> F1
+F --> F2
+G --> G1
+G --> G2
+G --> G3
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L100)
-- [xpkshext.c](file://tools/xpkgui/xpkshext.c#L1-L100)
-- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
-- [uninstall.bat](file://tools/xpkgui/uninstall.bat#L1-L85)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L13-L53)
+- [main.c](file://tools/xpkgui/src/main.c#L1-L57)
 
 **章节来源**
-- [README.md](file://tools/xpkgui/README.md#L281-L299)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L100)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L1-L324)
+- [main.c](file://tools/xpkgui/src/main.c#L1-L57)
 
 ## 核心组件
 
-### 主窗口管理
+### 应用程序上下文管理
 
-应用程序采用标准的 Win32 窗口框架，包含主窗口、文件列表视图和状态栏：
-
-- **主窗口类**："xpkguiClass"
-- **窗口尺寸**：900x600 像素，支持最大化
-- **菜单系统**：完整的文件、查看、工具、帮助菜单
-- **控件布局**：列表视图 + 状态栏的垂直布局
-- **拖放支持**：启用文件拖放功能
-- **错误处理**：集成 xPack 错误处理 API
-
-### 文件列表视图
-
-使用 Windows ListView 控件实现详细信息视图：
-
-- **列定义**：文件名、大小、压缩后、压缩比、算法、类型、哈希
-- **样式**：全行选择、网格线显示、可调整列宽
-- **数据展示**：实时更新压缩包内容，支持文件类型和哈希显示
-
-### 状态栏系统
-
-提供实时的压缩包统计信息：
-
-- **文件数量**：当前压缩包中的文件总数
-- **总大小**：原始文件总大小
-- **压缩率**：压缩效率百分比
-- **模式状态**：固实/独立模式指示
-- **分卷信息**：分卷大小显示
-
-**章节来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L695-L783)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L785-L813)
-
-## 架构概览
-
-xpkgui 采用分层架构设计，清晰分离用户界面、业务逻辑和数据访问层：
-
-```mermaid
-graph TB
-subgraph "用户界面层"
-A[主窗口]
-B[菜单系统]
-C[对话框管理器]
-D[状态栏]
-E[拖放处理]
-end
-subgraph "业务逻辑层"
-F[文件操作处理器]
-G[压缩包管理器]
-H[设置管理器]
-I[历史记录管理器]
-J[命令行处理器]
-K[Shell扩展处理器]
-L[安装卸载处理器]
-end
-subgraph "数据访问层"
-M[xPack API]
-N[xrt 库]
-O[压缩算法库]
-P[配置文件系统]
-Q[历史文件系统]
-R[注册表系统]
-S[文件系统]
-end
-subgraph "系统接口"
-T[Win32 API]
-U[COM API]
-V[Shell API]
-W[注册表API]
-X[文件系统API]
-Y[进程管理]
-end
-A --> F
-B --> F
-C --> F
-D --> F
-E --> F
-F --> G
-G --> M
-M --> N
-M --> O
-H --> P
-I --> Q
-J --> T
-K --> U
-K --> V
-L --> R
-L --> W
-M --> S
-N --> S
-O --> S
-P --> S
-Q --> S
-R --> W
-S --> X
-Y --> T
-```
-
-**图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L166-L247)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1018-L1040)
-- [xpkshext.c](file://tools/xpkgui/xpkshext.c#L1-L388)
-
-## 详细组件分析
-
-### 主窗口消息处理机制
-
-应用程序使用标准的 Win32 消息循环处理各种用户交互：
-
-```mermaid
-sequenceDiagram
-participant User as 用户
-participant Window as 主窗口
-participant Handler as 消息处理器
-participant Manager as 业务管理器
-participant API as xPack API
-User->>Window : 点击菜单项/按键/拖放
-Window->>Handler : WM_COMMAND/WM_KEYDOWN/WM_DROPFILES
-Handler->>Manager : 调用相应处理函数
-Manager->>API : 执行压缩包操作
-API-->>Manager : 返回操作结果
-Manager-->>Handler : 处理结果
-Handler-->>Window : 更新界面状态
-Window-->>User : 显示操作结果
-```
-
-**图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L444-L693)
-
-### 文件操作流程
-
-文件添加、删除、重命名等操作遵循统一的处理流程：
-
-```mermaid
-flowchart TD
-Start([用户触发文件操作]) --> CheckOpen{检查压缩包是否打开}
-CheckOpen --> |否| ShowError1[显示错误提示]
-CheckOpen --> |是| CheckMode{检查包模式}
-CheckMode --> |不支持| ShowError2[显示模式错误]
-CheckMode --> |支持| GetSelection[获取选中文件]
-GetSelection --> ValidateSel{验证选择有效性}
-ValidateSel --> |无效| ShowError3[显示选择错误]
-ValidateSel --> |有效| CheckType{检查文件类型}
-CheckType --> |路径类型| LevelDialog[显示压缩级别对话框]
-CheckType --> |索引类型| DirectOp[直接执行操作]
-LevelDialog --> DirectOp
-DirectOp --> PerformOp[执行具体操作]
-PerformOp --> UpdateUI[更新界面显示]
-UpdateUI --> End([操作完成])
-ShowError1 --> End
-ShowError2 --> End
-ShowError3 --> End
-```
-
-**图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L940-L992)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1111-L1157)
-
-### 压缩算法映射系统
-
-xpkgui 支持多种压缩算法，通过映射表实现级别到算法的转换：
-
-| 压缩级别 | 算法类型 | 描述 | 原生级别 |
-|---------|---------|------|---------|
-| 0 | STORE | 无压缩 | 0 |
-| 1 | LZ4 | LZ4 快速压缩 | 1 |
-| 2 | LZ4 | LZ4 快速压缩 (64KB) | 2 |
-| 3 | LZ4-HC | LZ4-HC 高质量压缩 | 4 |
-| 4 | LZ4-HC | LZ4-HC 最高质量压缩 | 12 |
-| 5 | ZSTD | ZSTD 极速压缩 | FAST |
-| 6 | ZSTD | ZSTD 双倍快速压缩 | DFAST |
-| 7 | ZSTD | ZSTD 贪婪压缩 (默认) | GREEDY |
-| 8 | ZSTD | ZSTD 延迟压缩 | LAZY |
-| 9 | ZSTD | ZSTD 延迟压缩2 | LAZY2 |
-| 10 | ZSTD | ZSTD 二叉树延迟压缩2 | BTLAZY2 |
-| 11 | ZSTD | ZSTD 二叉树优化压缩 | BTOPT |
-| 12 | ZSTD | ZSTD 二叉树极致压缩 | BTULTRA |
-| 13 | ZSTD | ZSTD 二叉树极致压缩2 | BTULTRA2 |
-| 14 | LZMA2 | LZMA2 标准压缩 | 6 |
-| 15 | LZMA2 | LZMA2 极致压缩 | 9 |
-
-**图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L74-L91)
-
-**章节来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L940-L1206)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1827-L1909)
-
-### 对话框管理系统
-
-应用程序实现了多种自定义对话框：
+重构后的应用程序采用 `AppContext` 结构体作为全局状态容器，消除了原有的全局变量问题：
 
 ```mermaid
 classDiagram
-class DialogManager {
-+NewPackageDialog(hwnd, path, solidMode, pkgType) int
-+CompressLevelDialog(hwnd, level) int
-+DiscCodeInputDialog(hwnd, code) int
-+PatternSelectDialog(hwnd, pattern, operation) int
-+BrowseForFolder(hwnd, path, title) int
-+BrowseForFiles(hwnd, files, count, filter) int
-+BrowseForDirectory(hwnd, path, title) int
-+InputBox(hwnd, title, prompt, buffer, size) int
+class AppContext {
++HINSTANCE hInstance
++HWND hMainWnd
++HWND hFileList
++HWND hStatusBar
++void* xpk
++wchar_t xpkPath[MAX_PATH_W]
++wchar_t currentDir[MAX_PATH_W]
++CommandMode commandMode
++wchar_t commandPath[MAX_PATH_W]
++Settings settings
++HistoryItem history[MAX_RECENT_FILES]
++int historyCount
++HMODULE hShell32
++int initialized
 }
-class NewPackageDialog {
--hEditPath HWND
--hBtnBrowse HWND
--hCheckSolid HWND
--hRadioWin32 HWND
--hRadioLinux HWND
--hRadioIndex HWND
--hRadioCore HWND
--hOK HWND
--hCancel HWND
-+ShowDialog() int
+class Settings {
++int defaultCompLevel
++int defaultPkgType
++int solidMode
++int volumeMode
++uint32_t volumeSize
++int confirmDelete
++int overwriteFiles
++int showStatusBar
++int showGridLines
++int windowWidth
++int windowHeight
++int windowMaximized
 }
-class CompressLevelDialog {
--hComboLevel HWND
--hStaticDesc HWND
--hOK HWND
--hCancel HWND
-+ShowDialog() int
+class HistoryItem {
++wchar_t path[MAX_PATH_W]
++time_t timestamp
 }
-class VolumeSizeDialog {
--hEditSize HWND
--hComboUnit HWND
--hPrompt2 HWND
--hOK HWND
--hCancel HWND
-+ShowDialog() int
-}
-DialogManager --> NewPackageDialog : "创建"
-DialogManager --> CompressLevelDialog : "创建"
-DialogManager --> VolumeSizeDialog : "创建"
+AppContext --> Settings : "包含"
+AppContext --> HistoryItem : "包含"
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1697-L1825)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1827-L1909)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1416-L1533)
+- [types.h](file://tools/xpkgui/include/xpkgui/types.h#L42-L61)
+
+### 核心模块初始化流程
+
+应用程序的初始化过程遵循标准的模块化设计：
+
+```mermaid
+sequenceDiagram
+participant Main as main.c
+participant App as App_Initialize
+participant Window as Window_Create
+participant Settings as Settings_Load
+participant History as History_Load
+Main->>App : 创建AppContext并调用初始化
+App->>Settings : 加载用户设置
+Settings-->>App : 返回默认设置
+App->>History : 加载历史记录
+History-->>App : 返回历史数据
+App->>Window : 创建主窗口
+Window-->>App : 返回窗口句柄
+App-->>Main : 初始化完成
+```
+
+**图表来源**
+- [app.h](file://tools/xpkgui/src/core/app.h#L25-L54)
+- [window.h](file://tools/xpkgui/src/core/window.h#L103-L139)
 
 **章节来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1697-L2058)
+- [app.h](file://tools/xpkgui/src/core/app.h#L25-L83)
+- [types.h](file://tools/xpkgui/include/xpkgui/types.h#L42-L61)
+
+## 架构概览
+
+xpkgui 采用全新的分层架构设计，清晰分离用户界面、业务逻辑和数据访问层：
+
+```mermaid
+graph TB
+subgraph "应用程序层"
+A[main.c]
+B[App_Initialize]
+C[App_Run]
+D[App_Cleanup]
+E[App_ProcessCommandLine]
+end
+subgraph "核心框架层"
+F[app.h]
+G[window.h]
+H[mode_main.h]
+end
+subgraph "用户界面层"
+I[dialog_base.h]
+J[file_list.h]
+K[status_bar.h]
+L[menu_handler.h]
+end
+subgraph "业务逻辑层"
+M[package_ops.h]
+N[file_ops.h]
+O[extract_ops.h]
+P[verify_ops.h]
+Q[dir_ops.h]
+end
+subgraph "配置管理层"
+R[settings.h]
+S[history.h]
+end
+subgraph "工具函数层"
+T[string_utils.h]
+U[format_utils.h]
+V[error_handler.h]
+end
+subgraph "系统接口层"
+W[Win32 API]
+X[COM API]
+Y[Shell API]
+Z[注册表API]
+end
+A --> B
+B --> F
+B --> G
+B --> H
+C --> W
+D --> W
+E --> W
+F --> G
+F --> H
+G --> I
+G --> J
+G --> K
+G --> L
+I --> T
+J --> T
+K --> T
+L --> T
+M --> T
+N --> T
+O --> T
+P --> T
+Q --> T
+R --> T
+S --> T
+T --> W
+U --> W
+V --> W
+```
+
+**图表来源**
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L11-L191)
+- [main.c](file://tools/xpkgui/src/main.c#L6-L22)
+
+## 详细组件分析
+
+### 模块化对话框管理系统
+
+重构后的对话框系统采用标准化的 `DialogBoxParam` API，避免了自定义消息循环阻塞问题：
+
+```mermaid
+flowchart TD
+Start([调用对话框函数]) --> CreateParams[创建对话框参数]
+CreateParams --> CallAPI[调用DialogBoxParam]
+CallAPI --> SystemLoop[系统管理消息循环]
+SystemLoop --> UserInteraction[用户交互]
+UserInteraction --> ProcessResult[处理用户选择]
+ProcessResult --> End([对话框关闭])
+```
+
+**图表来源**
+- [dialog_base.h](file://tools/xpkgui/src/ui/dialogs/dialog_base.h#L129-L172)
+
+### 文件列表控件架构
+
+文件列表控件采用标准的 ListView 控件实现，支持多种显示模式：
+
+```mermaid
+classDiagram
+class FileList_Create {
++HWND Create(AppContext* ctx)
++创建文件列表控件
++设置列标题和样式
+}
+class FileList_Refresh {
++void Refresh(AppContext* ctx)
++更新文件列表内容
++格式化文件信息
+}
+class FileList_GetSelectedIndex {
++int GetSelectedIndex(AppContext* ctx)
++获取选中文件索引
+}
+class FileList_GetSelectedPath {
++int GetSelectedPath(AppContext* ctx, wchar_t* path, int maxLen)
++获取选中文件路径
+}
+FileList_Create --> FileList_Refresh : "调用"
+FileList_Create --> FileList_GetSelectedIndex : "支持"
+FileList_Create --> FileList_GetSelectedPath : "支持"
+```
+
+**图表来源**
+- [file_list.h](file://tools/xpkgui/src/ui/widgets/file_list.h#L6-L74)
+- [file_list.h](file://tools/xpkgui/src/ui/widgets/file_list.h#L76-L175)
+
+### 压缩包操作模块
+
+压缩包操作模块封装了所有与 xPack 库交互的功能：
+
+```mermaid
+flowchart TD
+Open([打开压缩包]) --> CheckOpen{检查是否已打开}
+CheckOpen --> |是| CloseCurrent[关闭当前压缩包]
+CheckOpen --> |否| Continue[继续操作]
+CloseCurrent --> ConvertPath[转换路径编码]
+Continue --> ConvertPath
+ConvertPath --> XpkOpen[xpkOpen函数调用]
+XpkOpen --> UpdateUI[更新界面显示]
+UpdateUI --> End([操作完成])
+CreateNew([创建新压缩包]) --> GetDialogInput[获取对话框输入]
+GetDialogInput --> ConvertPath2[转换路径编码]
+ConvertPath2 --> XpkCreate[xpkOpen创建]
+XpkCreate --> SetPackageType[设置包类型]
+SetPackageType --> SetSolidMode[设置固实模式]
+SetSolidMode --> UpdateUI2[更新界面显示]
+UpdateUI2 --> End2([创建完成])
+```
+
+**图表来源**
+- [package_ops.h](file://tools/xpkgui/src/operations/package_ops.h#L6-L32)
+- [package_ops.h](file://tools/xpkgui/src/operations/package_ops.h#L62-L106)
+
+**章节来源**
+- [dialog_base.h](file://tools/xpkgui/src/ui/dialogs/dialog_base.h#L129-L331)
+- [file_list.h](file://tools/xpkgui/src/ui/widgets/file_list.h#L6-L204)
+- [package_ops.h](file://tools/xpkgui/src/operations/package_ops.h#L6-L296)
 
 ## 命令行功能
 
-### 命令行参数支持
+### 命令行参数处理机制
 
-xpkgui 支持多种命令行参数，便于与 Shell 扩展和脚本集成：
-
-| 参数 | 功能 | 示例 |
-|------|------|------|
-| `<文件名>` | 打开指定的 .xpk 文件 | `xpkgui.exe archive.xpk` |
-| `-extract <文件>` | 提取模式：显示提取对话框 | `xpkgui.exe -extract archive.xpk` |
-| `-extract_here <文件>` | 提取到当前文件夹 | `xpkgui.exe -extract_here archive.xpk` |
-| `-add <文件>` | 添加模式：显示添加对话框 | `xpkgui.exe -add archive.xpk` |
-| `-add_auto <文件>` | 添加模式（自动命名） | `xpkgui.exe -add_auto archive.xpk` |
-| `-verify <文件>` | 验证压缩包并显示结果 | `xpkgui.exe -verify archive.xpk` |
-| `-properties <文件>` | 显示压缩包属性 | `xpkgui.exe -properties archive.xpk` |
-
-### 命令行处理机制
+重构后的命令行处理机制更加清晰和模块化：
 
 ```mermaid
 flowchart TD
@@ -426,12 +423,10 @@ OpenMode --> End
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L249-L291)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L293-L442)
+- [app.h](file://tools/xpkgui/src/core/app.h#L85-L133)
 
 **章节来源**
-- [README.md](file://tools/xpkgui/README.md#L79-L110)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L249-L442)
+- [app.h](file://tools/xpkgui/src/core/app.h#L85-L133)
 
 ## Shell扩展集成
 
@@ -470,57 +465,11 @@ H --> I
 ```
 
 **图表来源**
-- [xpkgui_full_spec.md](file://tools/xpkgui/xpkgui_full_spec.md#L24-L51)
-
-### 右键菜单功能
-
-**.xpk 文件右键菜单：**
-- 打开 xpkgui
-- 解压到...
-- 解压到当前文件夹
-- 验证压缩包
-- 属性
-
-**普通文件/文件夹右键菜单：**
-- 添加到 xPack...
-- 添加到 xPack (自命名)
-
-### Shell扩展注册
-
-```reg
-Windows Registry Editor Version 5.00
-
-; 注册 Shell 扩展
-[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}]
-@="xPack Shell Extension"
-
-[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}\InprocServer32]
-@="C:\\Program Files\\xPack\\xpkshext.dll"
-"ThreadingModel"="Apartment"
-
-; .xpk 文件右键菜单
-[HKEY_CLASSES_ROOT\.xpk\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-
-; * (所有文件) 右键菜单
-[HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-
-; Directory (文件夹) 右键菜单
-[HKEY_CLASSES_ROOT\Directory\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-
-; Folder (文件夹背景) 右键菜单
-[HKEY_CLASSES_ROOT\Folder\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-```
-
-**图表来源**
-- [xpkgui_full_spec.md](file://tools/xpkgui/xpkgui_full_spec.md#L169-L197)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L1-L324)
 
 **章节来源**
-- [README.md](file://tools/xpkgui/README.md#L266-L280)
-- [xpkgui_full_spec.md](file://tools/xpkgui/xpkgui_full_spec.md#L55-L242)
+- [xpkshext.c](file://tools/xpkgui/src/shell/xpkshext.c)
+- [xpkshext.h](file://tools/xpkgui/src/shell/xpkshext.h)
 
 ## 安装卸载系统
 
@@ -564,22 +513,6 @@ RefreshCache --> Complete([安装完成])
 
 **图表来源**
 - [install.bat](file://tools/xpkgui/install.bat#L1-L122)
-
-### 卸载流程详解
-
-```mermaid
-flowchart TD
-Start([运行卸载脚本]) --> UnregisterShell[注销Shell扩展]
-UnregisterShell --> DeleteMenus[删除右键菜单注册表]
-DeleteMenus --> DeleteAssoc[删除文件关联]
-DeleteAssoc --> DeleteFiles[删除程序文件]
-DeleteFiles --> DeleteConfig[删除配置目录]
-DeleteConfig --> RefreshCache[刷新图标缓存]
-RefreshCache --> Complete([卸载完成])
-```
-
-**图表来源**
-- [uninstall.bat](file://tools/xpkgui/uninstall.bat#L1-L85)
 
 **章节来源**
 - [install.bat](file://tools/xpkgui/install.bat#L1-L122)
@@ -625,38 +558,6 @@ Windows Registry Editor Version 5.00
 **图表来源**
 - [xpkgui.reg](file://tools/xpkgui/xpkgui.reg#L1-L29)
 
-### Shell扩展注册表
-
-Shell 扩展通过注册表实现右键菜单集成：
-
-```reg
-Windows Registry Editor Version 5.00
-
-; 注册 Shell 扩展 CLSID
-[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}]
-@="xPack Shell Extension"
-
-[HKEY_CLASSES_ROOT\CLSID\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}\InprocServer32]
-@="C:\\Program Files\\xPack\\xpkshext.dll"
-"ThreadingModel"="Apartment"
-
-; 右键菜单注册
-[HKEY_CLASSES_ROOT\.xpk\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-
-[HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-
-[HKEY_CLASSES_ROOT\Directory\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-
-[HKEY_CLASSES_ROOT\Folder\shellex\ContextMenuHandlers\XPKShell]
-@="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-```
-
-**图表来源**
-- [xpkshext.reg](file://tools/xpkgui/xpkshext.reg#L1-L26)
-
 **章节来源**
 - [xpkgui.reg](file://tools/xpkgui/xpkgui.reg#L1-L29)
 - [xpkshext.reg](file://tools/xpkgui/xpkshext.reg#L1-L26)
@@ -700,11 +601,7 @@ xpkgui 支持多种编译器，提供灵活的构建选项：
 - 无外部依赖
 
 **章节来源**
-- [build_shext_gcc_x64.bat](file://tools/xpkgui/build_shext_gcc_x64.bat#L1-L47)
-- [build_shext_gcc_x86.bat](file://tools/xpkgui/build_shext_gcc_x86.bat#L1-L47)
-- [build_shext_tcc_x64.bat](file://tools/xpkgui/build_shext_tcc_x64.bat#L1-L45)
-- [build_shext_tcc_x86.bat](file://tools/xpkgui/build_shext_tcc_x86.bat#L1-L45)
-- [build_linux.sh](file://tools/xpkgui/build_linux.sh#L1-L61)
+- [build.bat](file://tools/xpkgui/build.bat#L1-L31)
 
 ## 设置管理
 
@@ -761,11 +658,10 @@ WriteINI --> End2([设置持久化])
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2285-L2352)
+- [settings.h](file://tools/xpkgui/src/config/settings.h#L6-L44)
 
 **章节来源**
-- [README.md](file://tools/xpkgui/README.md#L218-L244)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2285-L2352)
+- [settings.h](file://tools/xpkgui/src/config/settings.h#L6-L76)
 
 ## 历史记录
 
@@ -812,11 +708,10 @@ SaveHistory --> End([历史记录更新完成])
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2354-L2415)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L306-L319)
 
 **章节来源**
-- [README.md](file://tools/xpkgui/README.md#L245-L258)
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2354-L2420)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L306-L319)
 
 ## 依赖关系分析
 
@@ -827,7 +722,7 @@ xpkgui 项目依赖多个外部库来实现完整功能：
 ```mermaid
 graph TB
 subgraph "xpkgui 应用程序"
-A[xpkgui.c]
+A[main.c]
 B[xpkshext.c]
 C[install.bat]
 D[uninstall.bat]
@@ -835,11 +730,9 @@ end
 subgraph "核心库依赖"
 E[xPack 压缩库]
 F[xrt 运行时库]
-end
-subgraph "压缩算法库"
-G[LZ4 库]
-H[LZMA 库]
-I[ZSTD 库]
+G[LZ4 压缩库]
+H[LZMA 压缩库]
+I[ZSTD 压缩库]
 end
 subgraph "系统库"
 J[Win32 API]
@@ -851,7 +744,8 @@ O[USER32]
 P[ADVAPI32]
 Q[Kernel32]
 R[OLE32]
-S[SHARED]
+S[WS2_32]
+T[IPHLPAPI]
 end
 A --> E
 A --> F
@@ -868,6 +762,7 @@ B --> M
 B --> N
 B --> R
 B --> S
+B --> T
 C --> J
 C --> R
 D --> J
@@ -885,9 +780,8 @@ I --> J
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L16)
-- [build_x64.bat](file://tools/xpkgui/build_x64.bat#L10-L28)
-- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
+- [build.bat](file://tools/xpkgui/build.bat#L12-L13)
+- [main.c](file://tools/xpkgui/src/main.c#L1-L23)
 
 ### 内部模块依赖
 
@@ -896,84 +790,95 @@ I --> J
 ```mermaid
 graph LR
 subgraph "应用程序层"
-A[xpkgui.c]
-B[xpkshext.c]
-C[xpkshext.h]
-D[xpkshext.def]
-E[xpkshext.reg]
-F[install.bat]
-G[uninstall.bat]
-H[xpkgui.reg]
+A[main.c]
+B[core/app.h]
+C[core/window.h]
+D[ui/dialogs/dialog_base.h]
+E[ui/widgets/file_list.h]
+F[operations/package_ops.h]
+G[config/settings.h]
+H[utils/string_utils.h]
 end
 subgraph "API 层"
-I[xPack API]
-J[xrt API]
-K[压缩算法API]
+I[xpkgui/common.h]
+J[xpkgui/types.h]
+K[xpkgui/define.h]
+L[xpkgui/headers.h]
+M[xpack.h]
+N[xrt.h]
+O[压缩算法API]
 end
 subgraph "系统层"
-L[Win32 API]
-M[文件系统]
-N[注册表]
-O[Shell API]
-P[COM API]
-Q[进程管理]
-R[图标缓存]
+P[Win32 API]
+Q[文件系统]
+R[注册表]
+S[Shell API]
+T[COM API]
+U[进程管理]
+V[图标缓存]
 end
-A --> I
-A --> J
-A --> K
-B --> I
-B --> J
-B --> K
-B --> L
-B --> O
-B --> P
-C --> L
-C --> O
-C --> P
-D --> L
-E --> N
-F --> N
-G --> N
-H --> N
+A --> B
+A --> C
+A --> D
+A --> E
+A --> F
+A --> G
+A --> H
+B --> C
+C --> D
+C --> E
+D --> H
+E --> H
+F --> H
+G --> H
+H --> P
+I --> J
+I --> K
+I --> L
 I --> M
-J --> M
-K --> M
-L --> M
-O --> M
-P --> M
-Q --> L
-R --> L
+I --> N
+I --> O
+J --> P
+K --> P
+L --> P
+M --> Q
+N --> Q
+O --> Q
+P --> Q
+R --> P
+S --> P
+T --> P
+U --> P
+V --> P
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L1-L11)
-- [xpkshext.c](file://tools/xpkgui/xpkshext.c#L1-L50)
-- [install.bat](file://tools/xpkgui/install.bat#L1-L122)
+- [common.h](file://tools/xpkgui/include/xpkgui/common.h#L14-L17)
+- [types.h](file://tools/xpkgui/include/xpkgui/types.h#L4-L17)
 
 **章节来源**
-- [build_x64.bat](file://tools/xpkgui/build_x64.bat#L7-L42)
-- [build_shext_x64.bat](file://tools/xpkgui/build_shext_x64.bat#L1-L50)
+- [common.h](file://tools/xpkgui/include/xpkgui/common.h#L1-L20)
+- [types.h](file://tools/xpkgui/include/xpkgui/types.h#L1-L73)
 
 ## 性能考虑
 
-### 压缩算法选择策略
+### 模块化架构性能优势
 
-xpkgui 提供了多种压缩算法以满足不同的性能需求：
+重构后的模块化架构带来了显著的性能提升：
 
-- **LZ4 (级别 1-2)**：最快的压缩速度，适合实时应用
-- **LZ4-HC (级别 3-4)**：高质量压缩，平衡速度和压缩比
-- **ZSTD (级别 5-13)**：优秀的压缩比和速度平衡
-- **LZMA2 (级别 14-15)**：最高压缩比，速度较慢
+- **消息循环优化**：使用标准 Windows API，避免自定义消息循环阻塞
+- **内存管理**：通过 AppContext 结构体集中管理内存，减少内存泄漏
+- **对话框优化**：使用 DialogBoxParam API，不阻塞主消息循环
+- **依赖注入**：通过参数传递上下文，避免全局变量带来的性能开销
 
-### 内存管理
+### 内存管理策略
 
 应用程序采用高效的内存管理模式：
 
 - **静态分配**：主要数据结构使用栈内存
 - **动态分配**：文件数据和临时缓冲区使用堆内存
 - **资源清理**：确保所有分配的内存都能正确释放
-- **对话框管理**：每个对话框独立的内存管理
+- **字符串转换**：统一的编码转换工具，避免重复转换
 
 ### 用户界面响应性
 
@@ -993,27 +898,13 @@ Shell 扩展通过以下方式保证性能：
 - **缓存机制**：缓存常用的文件信息
 - **异步处理**：避免阻塞资源管理器
 
-### 平台优化
-
-**Windows 平台优化：**
-- COM 接口优化
-- Shell API 高效调用
-- 注册表操作批处理
-- 进程间通信优化
-
-**Linux 平台优化：**
-- 静态链接减少依赖
-- GTK+ 绘制优化
-- POSIX 系统调用优化
-- 内存管理优化
-
 ## 故障排除指南
 
 ### 常见问题及解决方案
 
 | 问题类型 | 症状 | 可能原因 | 解决方案 |
 |---------|------|---------|---------|
-| 编译失败 | 编译器报错 | 缺少依赖库 | 确保 TCC/GCC 编译器已安装 |
+| 编译失败 | 编译器报错 | 缺少依赖库 | 确保所有依赖库正确编译 |
 | 运行时错误 | 程序崩溃 | 库文件缺失 | 检查所有依赖库是否正确链接 |
 | 文件操作失败 | 添加/删除文件失败 | 权限不足 | 以管理员身份运行程序 |
 | 压缩包损坏 | 打开压缩包失败 | 文件损坏 | 使用验证功能检查完整性 |
@@ -1043,7 +934,7 @@ UpdateStatus --> End
 ```
 
 **图表来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2266-L2283)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L306-L312)
 
 ### 调试和诊断
 
@@ -1057,24 +948,24 @@ UpdateStatus --> End
 - **安装脚本调试**：检查权限和路径问题
 
 **章节来源**
-- [xpkgui.c](file://tools/xpkgui/xpkgui.c#L2266-L2283)
+- [REFACTORING_SUMMARY.md](file://tools/xpkgui/REFACTORING_SUMMARY.md#L306-L324)
 
 ## 结论
 
-xpkgui 是一个功能完整、架构清晰的 xPack 压缩包管理工具。经过大幅重写，从311行扩展到2420行，新增了命令行集成、拖放支持、模式选择、设置管理、历史记录等丰富功能，成为了一个真正实用的压缩包管理工具。
+xpkgui 经过重大架构重构，从单一2420行源文件发展为模块化架构，显著提升了代码的可维护性、可扩展性和性能表现。新的架构解决了原有代码的主要问题，提供了更好的用户体验和开发体验。
 
 ### 主要优势
 
-1. **用户友好**：提供类似 7-zip 的直观界面
-2. **功能全面**：支持所有 xPack 格式特性和压缩算法
-3. **命令行支持**：完整的命令行参数支持，便于脚本集成
-4. **Shell扩展**：提供右键菜单集成，提升用户体验
-5. **配置管理**：完善的设置管理系统，支持用户偏好定制
-6. **历史记录**：自动记录最近使用的文件
-7. **安装卸载系统**：自动化部署和清理工具
-8. **多平台支持**：Windows 和 Linux 平台编译支持
-9. **性能优秀**：优化的算法选择和内存管理
-10. **易于使用**：简化的编译和部署过程
+1. **模块化设计**：清晰的分层架构，符合单一职责原则
+2. **消息循环优化**：使用标准 Windows API，避免阻塞问题
+3. **内存管理改进**：通过 AppContext 结构体集中管理内存
+4. **对话框系统优化**：使用 DialogBoxParam API，提升响应性
+5. **代码可维护性**：模块化设计便于维护和扩展
+6. **用户友好**：提供类似 7-zip 的直观界面
+7. **功能全面**：支持所有 xPack 格式特性和压缩算法
+8. **命令行支持**：完整的命令行参数支持，便于脚本集成
+9. **Shell扩展**：提供右键菜单集成，提升用户体验
+10. **配置管理**：完善的设置管理系统，支持用户偏好定制
 
 ### 技术特点
 
@@ -1090,13 +981,13 @@ xpkgui 是一个功能完整、架构清晰的 xPack 压缩包管理工具。经
 
 未来可以考虑的功能增强：
 
-1. **多语言支持**：添加国际化界面
-2. **批量操作**：支持更复杂的批量文件处理
-3. **插件系统**：允许第三方扩展功能
-4. **云集成**：支持云端存储服务
-5. **高级搜索**：支持基于内容的文件搜索
-6. **压缩包比较**：支持不同版本压缩包的差异比较
-7. **性能监控**：添加实时性能指标显示
-8. **自定义主题**：支持用户界面主题定制
+1. **异步操作**：添加后台线程支持，避免界面卡顿
+2. **进度显示**：为耗时操作添加进度条
+3. **多语言支持**：添加国际化界面
+4. **主题支持**：添加自定义主题功能
+5. **插件系统**：支持第三方插件扩展
+6. **云集成**：支持云端存储服务
+7. **高级搜索**：支持基于内容的文件搜索
+8. **压缩包比较**：支持不同版本压缩包的差异比较
 
-xpkgui 为 xPack 格式的管理和使用提供了优秀的工具，是开发者和最终用户的理想选择。其丰富的功能和良好的用户体验使其成为 xPack 生态系统中的重要组成部分。通过持续的改进和优化，xpkgui 将继续为用户提供更好的压缩包管理体验。
+xpkgui 为 xPack 格式的管理和使用提供了优秀的工具，是开发者和最终用户的理想选择。其模块化架构和丰富的功能使其成为 xPack 生态系统中的重要组成部分。通过持续的改进和优化，xpkgui 将继续为用户提供更好的压缩包管理体验。
