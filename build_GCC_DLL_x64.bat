@@ -1,43 +1,29 @@
+@echo off
+cd /d "%~dp0"
 
+if not exist "release\x64" mkdir "release\x64"
 
-
-set XRT_DIR=lib/xrt
-set LZ4_DIR=lib/lz4
-set LZMA_DIR=lib/lzma
-set ZSTD_DIR=lib/zstd
-
-
-
-set CFLAGS=-I%XRT_DIR% -I%LZ4_DIR% -I%LZMA_DIR% -I%ZSTD_DIR% -DZ7_ST -DXPK_BUILD_DLL -O2 -s -fPIC -ffunction-sections -fdata-sections -Wl,--gc-sections
-set LDFLAGS=-lws2_32 -liphlpapi
-
-
+set XRT_TRIM=-DXRT_NO_COROUTINE -DXRT_NO_NETWORK -DXRT_NO_XURL -DXRT_NO_HTTP_UTIL -DXRT_NO_XCODEC -DXRT_NO_CRYPTO -DXRT_NO_NETTLS -DXRT_NO_XHTTP -DXRT_NO_XHTTPD -DXRT_NO_XWS -DXRT_NO_XID -DXRT_NO_BUFFER -DXRT_NO_STACK -DXRT_NO_REGEX -DXRT_NO_VALUE -DXRT_NO_JSON -DXRT_NO_TEMPLATE
 
 gcc -m64 -shared ^
-	src/xpack.c ^
-	src/xpack_compress.c ^
-	src/xpack_core.c ^
-	src/xpack_index.c ^
-	src/xpack_ldb.c ^
-	src/xpack_path.c ^
-	src/xpack_util.c ^
-	src/xpack_volume.c ^
-	lib/xrt/xrt.c ^
-	lib/lz4/lz4.c ^
-	lib/lz4/lz4hc.c ^
-	lib/zstd/zstd.c ^
-	lib/lzma/Alloc.c ^
-	lib/lzma/CpuArch.c ^
-	lib/lzma/LzFind.c ^
-	lib/lzma/LzmaDec.c ^
-	lib/lzma/LzmaEnc.c ^
-	lib/lzma/Lzma2Dec.c ^
-	lib/lzma/Lzma2Enc.c ^
-	%CFLAGS%  ^
-	%LDFLAGS% ^
-	-o release/x64/xpack.dll
+    xpack.c ^
+    lib\lz4\lz4.c ^
+    lib\lz4\lz4hc.c ^
+    lib\zstd\zstd.c ^
+    lib\lzma\Alloc.c ^
+    lib\lzma\CpuArch.c ^
+    lib\lzma\LzFind.c ^
+    lib\lzma\LzmaDec.c ^
+    lib\lzma\LzmaEnc.c ^
+    lib\lzma\Lzma2Dec.c ^
+    lib\lzma\Lzma2Enc.c ^
+    -Ilib -Ilib\lz4 -Ilib\zstd -Ilib\lzma ^
+    -DXPACK_NO_MAIN -DZ7_ST %XRT_TRIM% ^
+    -O2 -s -fPIC -ffunction-sections -fdata-sections -Wl,--gc-sections ^
+    -lWs2_32 -lIPHLPAPI ^
+    -o release\x64\xpack.dll
 
-@echo;
-@echo off
+if errorlevel 1 exit /b %errorlevel%
 
-pause
+echo.
+echo Build successful: release\x64\xpack.dll

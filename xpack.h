@@ -1,25 +1,4 @@
-/*
- * xPack Ver7 - 文件压缩包库
- *
- * 版本: 7.0
- * 许可: MIT License
- *
- * 特性:
- *   - 四种包类型: Core, Index, Linux, Win32
- *   - 压缩级别: 0-15 (LZ4 + ZSTD + LZMA2)
- *   - 依赖: xrt 库
- *   - 64位文件支持: 单文件/整包最大 16EB
- *   - 分卷支持: 虚拟 I/O 透明跨卷读写
- *   - 高效更新: 追加写入，仅重写元数据段
- *
- * 文件结构:
- *   [xpkHead 64B] [文件数据...] [Meta] [LDB]
- *
- * 版本兼容性:
- *   - 文件头: 0x116B7078 ("xpk" + 版本号 7.0)
- *   - ver6 文件头: 0x106B7078 (版本 6.0)
- */
-
+/* Auto-generated from src/api/public_decl.h. */
 #ifndef XPACK_H
 #define XPACK_H
 
@@ -30,391 +9,243 @@
 extern "C" {
 #endif
 
-/* clang-format off */
+#ifndef XPK_PUBLIC_DECL_H
+#define XPK_PUBLIC_DECL_H
 
-// ============================================================================
-// 版本标识
-// ============================================================================
-#define XPK_VERSION         0x116B7078      // "xpk" + 版本号 (7.0 = 0x11)
-
-// ============================================================================
-// 包类型
-// ============================================================================
-#define XPK_TYPE_CORE       0               // Core 模式：顺序位置访问
-#define XPK_TYPE_INDEX      1               // Index 模式：int64 索引访问
-#define XPK_TYPE_LINUX      2               // Linux 模式：路径访问 (大小写敏感)
-#define XPK_TYPE_WIN32      3               // Win32 模式：路径访问 (不区分大小写)
-
-// ============================================================================
-// 压缩算法标识
-// ============================================================================
-#define XPK_ALG_STORE       0               // 无压缩
-#define XPK_ALG_LZ4         1               // LZ4
-#define XPK_ALG_LZ4HC       2               // LZ4-HC
-#define XPK_ALG_ZSTD        3               // ZSTD
-#define XPK_ALG_LZMA2       4               // LZMA2
-
-// ============================================================================
-// ZSTD 策略常量
-// ============================================================================
-#define XPK_ZSTD_FAST       1
-#define XPK_ZSTD_DFAST      2
-#define XPK_ZSTD_GREEDY     3
-#define XPK_ZSTD_LAZY       4
-#define XPK_ZSTD_LAZY2      5
-#define XPK_ZSTD_BTLAZY2    6
-#define XPK_ZSTD_BTOPT      7
-#define XPK_ZSTD_BTULTRA    8
-#define XPK_ZSTD_BTULTRA2   9
-
-// ============================================================================
-// 文件类型标识
-// ============================================================================
-#define XPK_FTYPE_UNKNOWN   0
-#define XPK_FTYPE_BINARY    1
-#define XPK_FTYPE_TEXT      2
-#define XPK_FTYPE_IMAGE     3
-#define XPK_FTYPE_AUDIO     4
-#define XPK_FTYPE_VIDEO     5
-#define XPK_FTYPE_ARCHIVE   6
-#define XPK_FTYPE_FOLDER    15
-
-// ============================================================================
-// 常量定义
-// ============================================================================
-#define XPK_PATH_MAX        260             // 文件路径最大长度
-#define XPK_COMP_DEFAULT    7               // 默认压缩级别
-#define XPK_META_COMP       6               // Meta 默认压缩级别
-#define XPK_LDB_COMP        8               // LDB 默认压缩级别
-#define XPK_HEAD_SIZE       64              // 包头大小
-
-// ============================================================================
-// 导出宏
-// ============================================================================
-#ifdef XPK_BUILD_DLL
-    #define XPKAPI __declspec(dllexport)
+#if defined(_WIN32) || defined(_WIN64)
+    #if defined(XPK_BUILD_DLL)
+        #define XPKAPI __declspec(dllexport)
+    #elif defined(XPK_USE_DLL)
+        #define XPKAPI __declspec(dllimport)
+    #else
+        #define XPKAPI
+    #endif
 #else
     #define XPKAPI
 #endif
 
-// ############################################################################
-//                              数据结构定义
-// ############################################################################
+#define XPK_FILE_HEAD        0x116B7078u
+#define XPK_HEAD_SIZE        64u
+#define XPK_VOLUME_MIN       0x00010000u
+#define XPK_VOLUME_MAX       0xFFFFFFFFu
+#define XPK_PATH_BYTES       260u
+#define XPK_PATH_ENTRY_SIZE  320u
 
-// ============================================================================
-// 包信息头 (64 bytes)
-// ============================================================================
-#pragma pack(push, 1)
-typedef struct {
-    // === 基础标识 (8 bytes) ===
-    uint32_t    fileHead;           // 0x00: 文件头标识 "xpk" + 版本号
-    uint32_t    fileCount;          // 0x04: 文件数量 (最大 4G)
+#define XPK_TYPE_CORE        0u
+#define XPK_TYPE_INDEX       1u
+#define XPK_TYPE_LINUX       2u
+#define XPK_TYPE_WIN32       3u
 
-    // === 位标记1 (4 bytes) ===
-    uint32_t    packType    : 2;    // 包类型: 0=Core, 1=Index, 2=Linux, 3=Win32
-    uint32_t    defComp     : 4;    // 默认压缩级别 (0-15)
-    uint32_t    metaComp    : 4;    // Meta 压缩级别 (0-15)
-    uint32_t    ldbComp     : 4;    // LDB 压缩级别 (0-15)
-    uint32_t    infoExtSize : 18;   // 文件信息扩展大小 (bytes, 最大 256KB)
+#define XPK_ALG_STORE        0u
+#define XPK_ALG_LZ4          1u
+#define XPK_ALG_LZ4HC        2u
+#define XPK_ALG_ZSTD         3u
+#define XPK_ALG_LZMA2        4u
 
-    // === 位标记2 (4 bytes) ===
-    uint32_t    solidMode   : 1;    // 固实压缩模式
-    uint32_t    volumeMode  : 1;    // 分卷模式
-    uint32_t    reserved1   : 30;   // 保留
+#define XPK_FLAG_COMP_MASK     0x0000000Fu
+#define XPK_FLAG_TYPE_MASK     0x000000F0u
+#define XPK_FLAG_DELETED_MASK  0x00000100u
 
-    // === 偏移信息 (12 bytes) ===
-    uint64_t    dataOffset;         // 0x10: Meta 段起始位置
-    uint32_t    volumeSize;         // 0x18: 分卷大小 (0=不分卷)
-
-    // === Meta 信息 (12 bytes) ===
-    uint32_t    metaRawSize;        // 0x1C: Meta 原始大小
-    uint32_t    metaCompSize;       // 0x20: Meta 压缩后大小
-    uint32_t    metaHash;           // 0x24: Meta 哈希值
-
-    // === LDB 信息 (8 bytes) ===
-    uint32_t    ldbCompSize;        // 0x28: LDB 压缩后大小
-    uint32_t    ldbHash;            // 0x2C: LDB 哈希值
-
-    // === 时间戳 (16 bytes) ===
-    xtime       createTime;         // 0x30: 创建时间
-    xtime       changeTime;         // 0x38: 修改时间
-} xpkHead;
-#pragma pack(pop)
-
-// ============================================================================
-// 文件信息头 - Core 模式 (32 bytes)
-// ============================================================================
-#pragma pack(push, 1)
-typedef struct {
-    uint32_t    flag;               // 标记位 (低4位=压缩级别, 4-7位=文件类型, 8位=删除标记)
-    uint32_t    fileHash;           // 文件哈希值
-    uint64_t    dataOffset;         // 数据偏移位置
-    uint64_t    dataSize;           // 压缩后大小
-    uint64_t    fileSize;           // 原始大小
-} xpkFileInfo;
-#pragma pack(pop)
-
-// ============================================================================
-// 文件信息头 - Index 模式 (40 bytes)
-// ============================================================================
-#pragma pack(push, 1)
-typedef struct {
-    uint32_t    flag;               // 标记位
-    uint32_t    fileHash;           // 文件哈希值
-    uint64_t    dataOffset;         // 数据偏移位置
-    uint64_t    dataSize;           // 压缩后大小
-    uint64_t    fileSize;           // 原始大小
-    int64_t     fileIndex;          // 文件索引号 (用户自定义)
-} xpkFileInfoIndex;
-#pragma pack(pop)
-
-// ============================================================================
-// 文件信息头 - Linux 模式 (304 bytes)
-// ============================================================================
-#pragma pack(push, 1)
-typedef struct {
-    uint32_t    flag;               // 标记位
-    uint32_t    fileHash;           // 文件哈希值
-    uint64_t    dataOffset;         // 数据偏移位置
-    uint64_t    dataSize;           // 压缩后大小
-    uint64_t    fileSize;           // 原始大小
-    char        filePath[XPK_PATH_MAX]; // 文件路径 (260 bytes)
-    uint32_t    fileMode;           // 文件权限模式 (chmod)
-    uint64_t    createTime;         // 创建时间
-    uint64_t    modifyTime;         // 修改时间
-    uint64_t    accessTime;         // 访问时间
-} xpkFileInfoLinux;
-#pragma pack(pop)
-
-// ============================================================================
-// 文件信息头 - Win32 模式 (304 bytes)
-// ============================================================================
-#pragma pack(push, 1)
-typedef struct {
-    uint32_t    flag;               // 标记位
-    uint32_t    fileHash;           // 文件哈希值
-    uint64_t    dataOffset;         // 数据偏移位置
-    uint64_t    dataSize;           // 压缩后大小
-    uint64_t    fileSize;           // 原始大小
-    char        filePath[XPK_PATH_MAX]; // 文件路径 (260 bytes)
-    uint32_t    fileAttr;           // 文件属性 (系统/隐藏/只读/存档)
-    uint64_t    createTime;         // 创建时间
-    uint64_t    modifyTime;         // 修改时间
-    uint64_t    accessTime;         // 访问时间
-} xpkFileInfoWin32;
-#pragma pack(pop)
-
-// ============================================================================
-// 文件信息标记位操作
-// ============================================================================
-#define XPK_FLAG_COMP_LEVEL(f)      ((f) & 0x0F)            // 压缩级别
-#define XPK_FLAG_FILE_TYPE(f)       (((f) >> 4) & 0x0F)     // 文件类型
-#define XPK_FLAG_DELETED(f)         (((f) >> 8) & 0x01)     // 删除标记
-
-#define XPK_FLAG_SET_COMP(l)        ((l) & 0x0F)
-#define XPK_FLAG_SET_TYPE(t)        (((t) & 0x0F) << 4)
-#define XPK_FLAG_SET_DELETED(d)     (((d) & 0x01) << 8)
-
-// ============================================================================
-// 压缩级别映射结构
-// ============================================================================
-typedef struct {
-    uint8_t algorithm;              // 算法类型
-    uint8_t nativeLevel;            // 原生级别参数
-} xpkCompMap;
-
-// ============================================================================
-// 压缩级别映射表
-// ============================================================================
-static const xpkCompMap xpkCompTable[16] = {
-    { XPK_ALG_STORE,  0 },                  // 0:  无压缩
-    { XPK_ALG_LZ4,    1 },                  // 1:  LZ4 fast
-    { XPK_ALG_LZ4,    2 },                  // 2:  LZ4 fast (64KB)
-    { XPK_ALG_LZ4HC,  4 },                  // 3:  LZ4-HC level 4
-    { XPK_ALG_LZ4HC,  12 },                 // 4:  LZ4-HC level 12
-    { XPK_ALG_ZSTD,  XPK_ZSTD_FAST },       // 5:  ZSTD fast
-    { XPK_ALG_ZSTD,  XPK_ZSTD_DFAST },      // 6:  ZSTD dfast
-    { XPK_ALG_ZSTD,  XPK_ZSTD_GREEDY },     // 7:  ZSTD greedy [DEFAULT]
-    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY },       // 8:  ZSTD lazy
-    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY2 },      // 9:  ZSTD lazy2
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTLAZY2 },    // 10: ZSTD btlazy2
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTOPT },      // 11: ZSTD btopt
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA },    // 12: ZSTD btultra
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA2 },   // 13: ZSTD btultra2
-    { XPK_ALG_LZMA2, 6 },                   // 14: LZMA2 level 6
-    { XPK_ALG_LZMA2, 9 },                   // 15: LZMA2 level 9
-};
-
-// ============================================================================
-// 错误回调函数类型
-// ============================================================================
-typedef void (*xpkErrorProc)(int code, const char* message);
-
-// ============================================================================
-// 遍历回调函数类型
-// ============================================================================
-typedef int (*xpkEachCallback)(void* xpk, uint32_t pos, void* info, void* userData);
-
-// ============================================================================
-// 统计信息结构
-// ============================================================================
-typedef struct {
-    uint32_t    fileCount;         // 文件数量
-    uint64_t    totalSize;         // 原始总大小
-    uint64_t    packedSize;        // 压缩后总大小
-    double      ratio;             // 压缩比
-} xpkStat;
-
-// ============================================================================
-// 分卷统计信息结构
-// ============================================================================
-typedef struct {
-    int         volumeCount;       // 分卷总数
-    uint64_t    totalSize;         // 总大小 (所有卷)
-    uint64_t    dataOffset;        // 数据偏移 (Meta 起始)
-    uint64_t    volumeSize;        // 单卷大小
-} xpkVolumeStat;
-
-// ============================================================================
-// xPack 对象 (不透明类型)
-// ============================================================================
 typedef struct xpkStruct* xpkObject;
 
-/* clang-format on */
+typedef enum xpkPackType {
+    XPK_PACK_CORE = 0,
+    XPK_PACK_INDEX = 1,
+    XPK_PACK_LINUX = 2,
+    XPK_PACK_WIN32 = 3
+} xpkPackType;
 
-// ############################################################################
-//                              API 接口定义
-// ############################################################################
+typedef enum xpkWritePolicy {
+    XPK_WRITE_BUFFERED = 0,
+    XPK_WRITE_IMMEDIATE = 1
+} xpkWritePolicy;
 
-// ============================================================================
-// 生命周期管理
-// ============================================================================
-XPKAPI xpkObject    xpkOpen(const char* path, uint64_t offset, int readonly);
-XPKAPI int          xpkSave(xpkObject xpk);
-XPKAPI void         xpkClose(xpkObject xpk);
+typedef enum xpkErrorCode {
+    XPK_OK = 0,
+    XPK_ERR_PARAM = -1,
+    XPK_ERR_STATE = -2,
+    XPK_ERR_MEMORY = -3,
+    XPK_ERR_IO = -4,
+    XPK_ERR_FORMAT = -5,
+    XPK_ERR_HASH = -6,
+    XPK_ERR_NOT_FOUND = -7,
+    XPK_ERR_EXISTS = -8,
+    XPK_ERR_SOLID_DATA_WRITE = -9,
+    XPK_ERR_READONLY = -10,
+    XPK_ERR_UNSUPPORTED = -11
+} xpkErrorCode;
 
-// ============================================================================
-// 包属性操作
-// ============================================================================
-XPKAPI int          xpkType(xpkObject xpk);
-XPKAPI int          xpkTypeSet(xpkObject xpk, int type);
-XPKAPI uint32_t     xpkCount(xpkObject xpk);
-XPKAPI xpkHead*     xpkGetHead(xpkObject xpk);
+typedef struct xpkOpenOptions {
+    uint8_t readonly;
+    uint8_t createIfMissing;
+    uint8_t bufferedDefault;
+    uint8_t reserved0;
+} xpkOpenOptions;
 
-// ============================================================================
-// 包元数据操作
-// ============================================================================
-XPKAPI void*        xpkMetaGet(xpkObject xpk, uint32_t* outSize);
-XPKAPI int          xpkMetaSet(xpkObject xpk, const void* data, uint32_t size, int level);
+typedef struct xpkWriteOptions {
+    uint8_t compLevel;
+    uint8_t writePolicy;
+    uint8_t fileType;
+    uint8_t reserved0;
+} xpkWriteOptions;
 
-// ============================================================================
-// 固实压缩控制
-// ============================================================================
-XPKAPI int          xpkSolidMode(xpkObject xpk);
-XPKAPI int          xpkSolidModeSet(xpkObject xpk, int enabled);
+typedef struct xpkBuildOptions {
+    const char* tempPath;
+    uint8_t replaceOriginal;
+    uint8_t reserved0[7];
+} xpkBuildOptions;
 
-// ============================================================================
-// 分卷控制
-// ============================================================================
-XPKAPI int          xpkVolumeMode(xpkObject xpk);
-XPKAPI int          xpkVolumeModeSet(xpkObject xpk, int enabled);
-XPKAPI uint32_t     xpkVolumeSize(xpkObject xpk);
-XPKAPI int          xpkVolumeSizeSet(xpkObject xpk, uint32_t size);
-XPKAPI int          xpkVolumeCount(xpkObject xpk);
-XPKAPI const char*  xpkVolumePath(xpkObject xpk, int index);
-XPKAPI int          xpkVolumeStatGet(xpkObject xpk, xpkVolumeStat* stat);
+typedef struct xpkStat {
+    uint32_t fileCount;
+    uint64_t liveDataBytes;
+    uint64_t holeBytes;
+    uint64_t metaBytes;
+    uint64_t entryTableBytes;
+} xpkStat;
 
-// ============================================================================
-// 文件操作 - Core 模式 (按位置)
-// ============================================================================
-XPKAPI uint32_t     xpkAppendFile(xpkObject xpk, const char* path, int level);
-XPKAPI uint32_t     xpkAppendData(xpkObject xpk, const void* data, uint64_t size, int level);
-XPKAPI int          xpkExtractFile(xpkObject xpk, uint32_t pos, const char* path);
-XPKAPI void*        xpkExtractData(xpkObject xpk, uint32_t pos, uint64_t* outSize);
-XPKAPI int          xpkUpdateFile(xpkObject xpk, uint32_t pos, const char* path, int level);
-XPKAPI int          xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint64_t size, int level);
-XPKAPI int          xpkRemove(xpkObject xpk, uint32_t pos);
+#pragma pack(push, 1)
+typedef struct {
+    uint32_t fileHead;
+    uint32_t fileCount;
 
-// ============================================================================
-// 文件信息获取
-// ============================================================================
-XPKAPI void*        xpkInfo(xpkObject xpk, uint32_t pos);
-XPKAPI uint64_t     xpkInfoSize(xpkObject xpk, uint32_t pos);
-XPKAPI uint64_t     xpkInfoPacked(xpkObject xpk, uint32_t pos);
-XPKAPI uint32_t     xpkInfoHash(xpkObject xpk, uint32_t pos);
-XPKAPI int          xpkInfoLevel(xpkObject xpk, uint32_t pos);
-XPKAPI int          xpkInfoType(xpkObject xpk, uint32_t pos);
-XPKAPI int          xpkInfoTypeSet(xpkObject xpk, uint32_t pos, int type);
-XPKAPI int          xpkInfoDeleted(xpkObject xpk, uint32_t pos);
+    uint32_t packType    : 2;
+    uint32_t defComp     : 4;
+    uint32_t metaComp    : 4;
+    uint32_t infoComp    : 4;
+    uint32_t infoExtSize : 18;
 
-// ============================================================================
-// Index 模式专用接口
-// ============================================================================
-XPKAPI uint32_t             xpkIndexFind(xpkObject xpk, int64_t index);
-XPKAPI xpkFileInfoIndex*    xpkIndexAppendFile(xpkObject xpk, int64_t index, const char* path, int level);
-XPKAPI xpkFileInfoIndex*    xpkIndexAppendData(xpkObject xpk, int64_t index, const void* data, uint64_t size, int level);
-XPKAPI int                  xpkIndexExtractFile(xpkObject xpk, int64_t index, const char* path);
-XPKAPI void*                xpkIndexExtractData(xpkObject xpk, int64_t index, uint64_t* outSize);
-XPKAPI int                  xpkIndexUpdateFile(xpkObject xpk, int64_t index, const char* path, int level);
-XPKAPI int                  xpkIndexUpdateData(xpkObject xpk, int64_t index, const void* data, uint64_t size, int level);
-XPKAPI int                  xpkIndexRemove(xpkObject xpk, int64_t index);
+    uint32_t solidMode   : 1;
+    uint32_t volumeMode  : 1;
+    uint32_t reserved1   : 30;
 
-// ============================================================================
-// 路径模式专用接口 (Linux/Win32)
-// ============================================================================
-XPKAPI uint32_t     xpkPathFind(xpkObject xpk, const char* filePath);
-XPKAPI int          xpkPathExists(xpkObject xpk, const char* filePath);
-XPKAPI void*        xpkPathAppendFile(xpkObject xpk, const char* filePath, const char* srcPath, int level);
-XPKAPI uint32_t     xpkPathAppendData(xpkObject xpk, const char* filePath, const void* data, uint64_t size, int level);
-XPKAPI int          xpkPathExtractFile(xpkObject xpk, const char* filePath, const char* dstPath);
-XPKAPI void*        xpkPathExtractData(xpkObject xpk, const char* filePath, uint64_t* outSize);
-XPKAPI int          xpkPathUpdateFile(xpkObject xpk, const char* filePath, const char* srcPath, int level);
-XPKAPI int          xpkPathUpdateData(xpkObject xpk, const char* filePath, const void* data, uint64_t size, int level);
-XPKAPI int          xpkPathRemove(xpkObject xpk, const char* filePath);
-XPKAPI const char*  xpkPathGet(xpkObject xpk, uint32_t pos);
+    uint64_t dataOffset;
+    uint32_t volumeSize;
 
-// ============================================================================
-// 遍历接口
-// ============================================================================
-XPKAPI int          xpkEach(xpkObject xpk, xpkEachCallback callback, void* userData);
-XPKAPI int          xpkEachMatch(xpkObject xpk, const char* pattern, xpkEachCallback callback, void* userData);
+    uint32_t metaRawSize;
+    uint32_t metaCompSize;
+    uint32_t metaHash;
 
-// ============================================================================
-// 批量操作
-// ============================================================================
-XPKAPI int          xpkExtractAll(xpkObject xpk, const char* dir);
-XPKAPI int          xpkAppendDir(xpkObject xpk, const char* dir, const char* pattern, int level, int recursive);
+    uint32_t infoCompSize;
+    uint32_t infoHash;
 
-// ============================================================================
-// 工具函数
-// ============================================================================
-XPKAPI void         xpkFree(void* ptr);
-XPKAPI uint32_t     xpkHash(const void* data, uint64_t size);
-XPKAPI int          xpkVerify(xpkObject xpk, uint32_t pos);
-XPKAPI int          xpkVerifyAll(xpkObject xpk);
-XPKAPI int          xpkStatGet(xpkObject xpk, xpkStat* stat);
-XPKAPI int          xpkRebuild(xpkObject xpk);
-XPKAPI int          xpkLastError(void);
-XPKAPI const char*  xpkLastErrorMsg(void);
+    xtime createTime;
+    xtime changeTime;
+} xpkHead;
 
-// ============================================================================
-// 原始读写（分卷虚拟 I/O 层）
-// ============================================================================
-XPKAPI int      xpkRawRead(xpkObject xpk, uint64_t offset, uint64_t size, void* data);
-XPKAPI int      xpkRawWrite(xpkObject xpk, uint64_t offset, uint64_t size, const void* data);
+typedef struct {
+    uint32_t flag;
+    uint32_t fileHash;
+    uint64_t dataOffset;
+    uint64_t dataSize;
+    uint64_t fileSize;
+} xpkFileInfo;
 
-// ============================================================================
-// 测试接口（内部测试用）
-// ============================================================================
-XPKAPI uint64_t     xpkTestCompressBound(int level, uint64_t srcSize);
-XPKAPI int          xpkTestCompress(int level, const void* src, uint64_t srcSize,
-                                    void* dst, uint64_t dstCapacity, 
-                                    uint64_t* outSize, uint32_t* outHash);
-XPKAPI int          xpkTestDecompress(int level, const void* src, uint64_t srcSize,
-                                       void* dst, uint64_t dstSize, uint32_t expectedHash);
+typedef struct {
+    uint32_t flag;
+    uint32_t fileHash;
+    uint64_t dataOffset;
+    uint64_t dataSize;
+    uint64_t fileSize;
+    int64_t  fileIndex;
+} xpkFileInfoIndex;
+
+typedef struct {
+    uint32_t flag;
+    uint32_t fileHash;
+    uint64_t dataOffset;
+    uint64_t dataSize;
+    uint64_t fileSize;
+    char     pathBytes[XPK_PATH_BYTES];
+    uint32_t platformAttr;
+    uint64_t createTime;
+    uint64_t modifyTime;
+    uint64_t accessTime;
+} xpkFileInfoPath;
+#pragma pack(pop)
+
+typedef char xpkStaticAssertHeadSize[(sizeof(xpkHead) == XPK_HEAD_SIZE) ? 1 : -1];
+typedef char xpkStaticAssertFileInfoSize[(sizeof(xpkFileInfo) == 32u) ? 1 : -1];
+typedef char xpkStaticAssertFileInfoIndexSize[(sizeof(xpkFileInfoIndex) == 40u) ? 1 : -1];
+typedef char xpkStaticAssertFileInfoPathSize[(sizeof(xpkFileInfoPath) == XPK_PATH_ENTRY_SIZE) ? 1 : -1];
+
+typedef int (*xpkEachProc)(xpkObject xpk, uint32_t pos, const void* info, void* userData);
+
+XPKAPI xpkObject xpkOpen(const char* packagePath, const xpkOpenOptions* options);
+XPKAPI int xpkClose(xpkObject xpk);
+XPKAPI int xpkSave(xpkObject xpk);
+XPKAPI int xpkBuild(xpkObject xpk, const xpkBuildOptions* options);
+
+XPKAPI int xpkGetPackType(xpkObject xpk, xpkPackType* outType);
+XPKAPI int xpkSetPackType(xpkObject xpk, xpkPackType type);
+XPKAPI int xpkGetDefaultComp(xpkObject xpk, uint8_t* outLevel);
+XPKAPI int xpkSetDefaultComp(xpkObject xpk, uint8_t level);
+XPKAPI int xpkGetMetaComp(xpkObject xpk, uint8_t* outLevel);
+XPKAPI int xpkSetMetaComp(xpkObject xpk, uint8_t level);
+XPKAPI int xpkGetInfoComp(xpkObject xpk, uint8_t* outLevel);
+XPKAPI int xpkSetInfoComp(xpkObject xpk, uint8_t level);
+XPKAPI int xpkGetInfoExtSize(xpkObject xpk, uint32_t* outSize);
+XPKAPI int xpkSetInfoExtSize(xpkObject xpk, uint32_t size);
+XPKAPI int xpkGetVolumeSize(xpkObject xpk, uint32_t* outSize);
+XPKAPI int xpkSetVolumeSize(xpkObject xpk, uint32_t size);
+XPKAPI int xpkGetSolidMode(xpkObject xpk, int* outEnabled);
+XPKAPI int xpkSetSolidMode(xpkObject xpk, int enabled);
+
+XPKAPI void* xpkMetaGet(xpkObject xpk, uint32_t* outSize);
+XPKAPI int xpkMetaSet(xpkObject xpk, const void* data, uint32_t size, uint8_t compLevel);
+XPKAPI int xpkMetaClear(xpkObject xpk);
+
+XPKAPI uint32_t xpkCount(xpkObject xpk);
+XPKAPI int xpkGetInfo(xpkObject xpk, uint32_t pos, xpkFileInfo* outInfo);
+XPKAPI int xpkGetInfoExt(xpkObject xpk, uint32_t pos, void* outData, uint32_t size);
+XPKAPI int xpkSetInfoExt(xpkObject xpk, uint32_t pos, const void* data, uint32_t size);
+XPKAPI int xpkAddFile(xpkObject xpk, const char* srcPath, const xpkWriteOptions* options, uint32_t* outPos);
+XPKAPI int xpkAddData(xpkObject xpk, const void* data, uint64_t size, const xpkWriteOptions* options, uint32_t* outPos);
+XPKAPI int xpkReadToFile(xpkObject xpk, uint32_t pos, const char* dstPath);
+XPKAPI void* xpkReadToMemory(xpkObject xpk, uint32_t pos, uint64_t* outSize);
+XPKAPI int xpkUpdateFile(xpkObject xpk, uint32_t pos, const char* srcPath, const xpkWriteOptions* options);
+XPKAPI int xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint64_t size, const xpkWriteOptions* options);
+XPKAPI int xpkRemove(xpkObject xpk, uint32_t pos);
+XPKAPI int xpkSetFlag(xpkObject xpk, uint32_t pos, uint32_t mask, uint32_t value);
+
+XPKAPI int xpkIndexFind(xpkObject xpk, int64_t fileIndex, uint32_t* outPos);
+XPKAPI int xpkIndexGetInfo(xpkObject xpk, int64_t fileIndex, xpkFileInfoIndex* outInfo);
+XPKAPI int xpkIndexAddFile(xpkObject xpk, int64_t fileIndex, const char* srcPath, const xpkWriteOptions* options);
+XPKAPI int xpkIndexAddData(xpkObject xpk, int64_t fileIndex, const void* data, uint64_t size, const xpkWriteOptions* options);
+XPKAPI int xpkIndexReadToFile(xpkObject xpk, int64_t fileIndex, const char* dstPath);
+XPKAPI void* xpkIndexReadToMemory(xpkObject xpk, int64_t fileIndex, uint64_t* outSize);
+XPKAPI int xpkIndexUpdateFile(xpkObject xpk, int64_t fileIndex, const char* srcPath, const xpkWriteOptions* options);
+XPKAPI int xpkIndexUpdateData(xpkObject xpk, int64_t fileIndex, const void* data, uint64_t size, const xpkWriteOptions* options);
+XPKAPI int xpkIndexRemove(xpkObject xpk, int64_t fileIndex);
+XPKAPI int xpkIndexSetFlag(xpkObject xpk, int64_t fileIndex, uint32_t mask, uint32_t value);
+
+XPKAPI int xpkPathExists(xpkObject xpk, const char* packagePath);
+XPKAPI int xpkPathGetInfo(xpkObject xpk, const char* packagePath, xpkFileInfoPath* outInfo);
+XPKAPI int xpkPathAddFile(xpkObject xpk, const char* packagePath, const char* srcPath, const xpkWriteOptions* options);
+XPKAPI int xpkPathAddData(xpkObject xpk, const char* packagePath, const void* data, uint64_t size, const xpkWriteOptions* options);
+XPKAPI int xpkPathReadToFile(xpkObject xpk, const char* packagePath, const char* dstPath);
+XPKAPI void* xpkPathReadToMemory(xpkObject xpk, const char* packagePath, uint64_t* outSize);
+XPKAPI int xpkPathUpdateFile(xpkObject xpk, const char* packagePath, const char* srcPath, const xpkWriteOptions* options);
+XPKAPI int xpkPathUpdateData(xpkObject xpk, const char* packagePath, const void* data, uint64_t size, const xpkWriteOptions* options);
+XPKAPI int xpkPathRename(xpkObject xpk, const char* oldPath, const char* newPath);
+XPKAPI int xpkPathRemove(xpkObject xpk, const char* packagePath);
+XPKAPI int xpkPathSetAttr(xpkObject xpk, const char* packagePath, uint32_t platformAttr);
+
+XPKAPI int xpkEach(xpkObject xpk, xpkEachProc proc, void* userData);
+XPKAPI int xpkEachMatch(xpkObject xpk, const char* pattern, xpkEachProc proc, void* userData);
+
+XPKAPI int xpkVerify(xpkObject xpk, uint32_t pos);
+XPKAPI int xpkVerifyAll(xpkObject xpk);
+XPKAPI int xpkStatGet(xpkObject xpk, xpkStat* outStat);
+XPKAPI void xpkFree(void* ptr);
+XPKAPI uint32_t xpkHash32(const void* data, uint64_t size);
+
+XPKAPI xpkErrorCode xpkLastError(xpkObject xpk);
+XPKAPI const char* xpkLastErrorMessage(xpkObject xpk);
+
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* XPACK_H */
+#endif

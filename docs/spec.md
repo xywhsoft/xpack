@@ -1,457 +1,615 @@
-# xPack Ver7 技术规范
+# xpk Implementation Spec
 
-> 版本: 7.0  
-> 日期: 2026-01-29  
-> 状态: 设计阶段
+版本: 1.0
+日期: 2026-03-19
+状态: Draft for Build
 
----
+## 1. 目的
 
-## 1. 概述
+本文档不是再次定义 xpk 文件格式，而是把 [design.md](/D:/Git/xPack/docs/design.md) 落成可执行的工程规格。
 
-### 1.1 项目简介
+本文档回答五个问题：
 
-xPack 是一个轻量级文件压缩包库，提供高效的文件打包、压缩、解压功能。Ver7 是第七个主要版本，在 Ver6 基础上进行了重大架构升级。
+1. 新实现的工程结构应该长什么样。
+2. 单入口 `.c` + 模块 `.h` 的开发模式如何组织。
+3. `xpack.h` 作为生成头文件，应由什么来源生成。
+4. vendor 依赖应如何参与编译。
+5. 实际编码时应按什么顺序推进，才能最快得到可运行版本。
 
-### 1.2 设计目标
+## 2. 基本立场
 
-- **多级压缩方案**：LZ4/ZSTD 为主力，LZMA2 作为最高压缩级别
-- **压缩级别体系**：0-15 级，保证严格单调性
-- **统一依赖库**：整合使用 xrt 库
-- **位域结构**：使用位域替代 MASK 掩码运算
-- **驼峰命名**：API 采用 `xpk` 前缀 + 驼峰命名
+1. `design.md` 是格式与行为规范，本文件是工程与实现规范。
+2. 新实现继续采用 clean-room 立场，不为旧代码保留兼容实现路径。
+3. 公开错误模型固定为“错误码 + 对象内错误消息”。
+4. 工程组织优先采用 `xrt.c` 与 `xserver/main.c` 的单入口聚合模式。
+5. 项目代码层面只保留一个正式实现入口：`xpack.c`。
 
-### 1.3 兼容性
+## 3. 工程约束
 
-- 文件格式签名：`xpk` + 版本号 (4字节，0x116B7078 = 0x706B7078 | 0x11000000)
-- 版本号：7.0 (存储在文件头前4字节中)
-- 与 Ver6 版本格式兼容，通过文件头可识别版本
-  - Ver6 文件头：0x106B7078 (版本 6.0)
-  - Ver7 文件头：0x116B7078 (版本 7.0)
-- 旧版本可通过检查文件头拒绝打开新版本文件（避免损坏文件）
+### 3.1 单入口约束
 
----
+1. `xpack.c` 是项目唯一正式实现入口。
+2. `src/` 下所有模块文件统一使用 `.h`，但这些 `.h` 是实现文件，不是公共头文件。
+3. `src/` 下的实现文件只能由 `xpack.c` 直接包含。
+4. 除测试、工具、vendor 依赖外，不再新增项目级 `.c` 实现文件。
 
-## 2. 压缩级别规范
+### 3.2 公共头文件约束
 
-### 2.1 级别定义
+1. `xpack.h` 是发布给外部使用的公共头文件。
+2. `xpack.h` 不手工维护，统一由声明源生成。
+3. 公开常量、类型、结构和 API 原型必须有唯一声明源，不能在 `xpack.c` 和 `xpack.h` 中重复手写两份。
 
-| 级别 | 算法 | 原生参数 | 压缩比 | 压缩速度 | 解压速度 |
-|:----:|------|----------|:------:|:--------:|:--------:|
-| 0 | 无压缩 | - | 1.00 | ∞ | ∞ |
-| 1 | LZ4 | fast | ~2.00 | 800 MB/s | 4500 MB/s |
-| 2 | LZ4 | fast (64KB) | ~2.10 | 750 MB/s | 4500 MB/s |
-| 3 | LZ4-HC | level 4 | ~2.45 | 120 MB/s | 4500 MB/s |
-| 4 | LZ4-HC | level 12 | ~2.72 | 40 MB/s | 4500 MB/s |
-| 5 | ZSTD | fast | ~2.88 | 500 MB/s | 1400 MB/s |
-| 6 | ZSTD | dfast | ~2.95 | 400 MB/s | 1380 MB/s |
-| **7** | **ZSTD** | **greedy** | **~3.08** | **250 MB/s** | **1350 MB/s** |
-| 8 | ZSTD | lazy | ~3.15 | 130 MB/s | 1300 MB/s |
-| 9 | ZSTD | lazy2 | ~3.22 | 70 MB/s | 1260 MB/s |
-| 10 | ZSTD | btlazy2 | ~3.28 | 45 MB/s | 1220 MB/s |
-| 11 | ZSTD | btopt | ~3.35 | 18 MB/s | 1140 MB/s |
-| 12 | ZSTD | btultra | ~3.43 | 10 MB/s | 1100 MB/s |
-| 13 | ZSTD | btultra2 | ~3.50 | 4 MB/s | 1000 MB/s |
-| 14 | LZMA2 | level 6 | ~3.70 | 3 MB/s | 150 MB/s |
-| 15 | LZMA2 | level 9 | ~3.90 | 1.5 MB/s | 150 MB/s |
+### 3.3 依赖约束
 
-### 2.2 单调性约束
+1. `xrt` 以单头文件方式嵌入项目，通过 `lib/xrt.h` 使用。
+2. `lz4`、`zstd`、`lzma` 保持 vendor 原始源码目录，不并入 `src/`。
+3. 非 codec 模块不得直接调用 `lz4`、`zstd`、`lzma` 的原生 API。
+4. 非 runtime 模块不得直接依赖 xrt 的文件、时间、错误接口。
+5. 默认模式 / Index 模式 / Path 模式对 xrt 容器的使用，必须通过 mode/service 层统一封装。
 
-**强制要求**：级别 N+1 的压缩比必须大于级别 N，速度必须小于级别 N。
+## 4. 目标目录结构
 
-### 2.3 算法标识
+```text
+xPack/
+├─ xpack.c
+├─ xpack.h
+├─ docs/
+│  ├─ design.md
+│  └─ spec.md
+├─ lib/
+│  ├─ xrt.h
+│  ├─ lz4/
+│  ├─ zstd/
+│  └─ lzma/
+├─ src/
+│  ├─ api/
+│  │  ├─ public_decl.h
+│  │  ├─ package_api.h
+│  │  ├─ default_api.h
+│  │  ├─ index_api.h
+│  │  ├─ path_api.h
+│  │  └─ admin_api.h
+│  ├─ base/
+│  │  ├─ config.h
+│  │  ├─ const.h
+│  │  ├─ types.h
+│  │  ├─ error.h
+│  │  ├─ memory.h
+│  │  ├─ hash.h
+│  │  └─ time.h
+│  ├─ model/
+│  │  ├─ entry.h
+│  │  ├─ object.h
+│  │  └─ dirty.h
+│  ├─ codec/
+│  │  ├─ codec.h
+│  │  ├─ router.h
+│  │  ├─ lz4.h
+│  │  ├─ zstd.h
+│  │  └─ lzma2.h
+│  ├─ storage/
+│  │  ├─ storage.h
+│  │  ├─ rawio.h
+│  │  ├─ single.h
+│  │  ├─ volume.h
+│  │  └─ queue.h
+│  ├─ format/
+│  │  ├─ head.h
+│  │  ├─ entry.h
+│  │  ├─ meta.h
+│  │  └─ layout.h
+│  ├─ service/
+│  │  ├─ open.h
+│  │  ├─ save.h
+│  │  ├─ build.h
+│  │  ├─ write.h
+│  │  ├─ meta.h
+│  │  └─ verify.h
+│  ├─ mode/
+│  │  ├─ default.h
+│  │  ├─ index.h
+│  │  ├─ path.h
+│  │  └─ normalize.h
+│  └─ internal/
+│     ├─ forward.h
+│     └─ trace.h
+├─ tests/
+│  ├─ smoke/
+│  ├─ unit/
+│  ├─ spec/
+│  └─ integration/
+└─ tools/
+   └─ make_header/
+```
+
+说明：
+
+1. `xpack.c` 负责聚合所有实现文件，类似 `xrt.c` 的组织方式。
+2. `src/` 下的 `.h` 文件按模块分层，类似 `xserver/main.c` 对 `src/` 的聚合方式。
+3. `xpack.h` 是构建产物，不作为声明事实来源。
+
+## 5. 核心文件职责
+
+### 5.1 xpack.c
+
+`xpack.c` 负责：
+
+1. 引入系统头。
+2. 定义 `XRT_IMPLEMENTATION` 并包含 `lib/xrt.h`。
+3. 依赖顺序包含 `src/` 下各模块实现头。
+4. 形成项目唯一实现翻译单元。
+
+`xpack.c` 不负责：
+
+1. 手写重复的公共 API 声明。
+2. 直接实现所有逻辑细节。
+3. 直接夹带 vendor 源码。
+
+### 5.2 xpack.h
+
+`xpack.h` 负责：
+
+1. 对外暴露公开常量、公开结构、公开枚举、公开 API 原型。
+2. 保持与实现一致的 ABI 视图。
+3. 作为发布产物和外部工程引用入口。
+
+`xpack.h` 约束：
+
+1. 不暴露内部对象结构。
+2. 不暴露 `src/` 下内部 helper。
+3. 不包含 vendor 私有头。
+4. 可以依赖 `xrt.h`，因为公开结构中使用了 `xtime`。
+
+### 5.3 src/api/public_decl.h
+
+这是公开声明的唯一事实来源。
+
+它应包含：
+
+1. `XPKAPI` 导出宏。
+2. 公开常量。
+3. 公开枚举。
+4. 公开结构。
+5. 公开 API 原型。
+
+它不应包含：
+
+1. 任何函数实现。
+2. 任何内部对象定义。
+3. 任何 vendor 依赖细节。
+
+## 6. xpack.c 的包含顺序
+
+`xpack.c` 的包含顺序固定如下：
 
 ```c
-#define XPK_ALG_STORE   0   // 无压缩
-#define XPK_ALG_LZ4     1   // LZ4
-#define XPK_ALG_LZ4HC   2   // LZ4-HC
-#define XPK_ALG_ZSTD    3   // ZSTD
-#define XPK_ALG_LZMA2   4   // LZMA2
+#include <...system headers...>
+
+#define XRT_IMPLEMENTATION
+#include "lib/xrt.h"
+
+#include "src/api/public_decl.h"
+
+#include "src/base/config.h"
+#include "src/base/const.h"
+#include "src/base/types.h"
+#include "src/base/error.h"
+#include "src/base/memory.h"
+#include "src/base/hash.h"
+#include "src/base/time.h"
+
+#include "src/internal/forward.h"
+
+#include "src/model/entry.h"
+#include "src/model/object.h"
+#include "src/model/dirty.h"
+
+#include "src/codec/codec.h"
+#include "src/codec/router.h"
+#include "src/codec/lz4.h"
+#include "src/codec/zstd.h"
+#include "src/codec/lzma2.h"
+
+#include "src/storage/storage.h"
+#include "src/storage/rawio.h"
+#include "src/storage/single.h"
+#include "src/storage/volume.h"
+#include "src/storage/queue.h"
+
+#include "src/format/head.h"
+#include "src/format/entry.h"
+#include "src/format/meta.h"
+#include "src/format/layout.h"
+
+#include "src/service/open.h"
+#include "src/service/write.h"
+#include "src/service/meta.h"
+#include "src/service/save.h"
+#include "src/service/build.h"
+#include "src/service/verify.h"
+
+#include "src/mode/default.h"
+#include "src/mode/index.h"
+#include "src/mode/path.h"
+#include "src/mode/normalize.h"
+
+#include "src/api/package_api.h"
+#include "src/api/default_api.h"
+#include "src/api/index_api.h"
+#include "src/api/path_api.h"
+#include "src/api/admin_api.h"
 ```
 
-### 2.4 默认值
+规则：
+
+1. 公共声明先于实现模块进入翻译单元。
+2. 基础类型和错误系统先于任何业务模块定义。
+3. service 层先于公开 API 实现。
+4. API 层始终最后包含。
+
+## 7. 公共头文件生成策略
+
+### 7.1 生成原则
+
+1. `xpack.h` 必须由工具生成。
+2. 生成工具应类似 `xrt` 的 single-header builder，但目标更简单。
+3. 生成后的 `xpack.h` 应可直接被外部项目包含。
+
+### 7.2 建议来源
+
+推荐由以下片段生成：
+
+1. 固定前导模板。
+2. `src/api/public_decl.h`。
+3. 固定尾模板。
+
+推荐的生成器位置：
+
+```text
+tools/make_header/make_header.c
+```
+
+### 7.3 生成后的内容约束
+
+生成后的 `xpack.h` 必须包含：
+
+1. include guard。
+2. `extern "C"` 包裹。
+3. `#include <stdint.h>`。
+4. `#include <xrt.h>`。
+5. 所有公开类型与 API。
+
+生成后的 `xpack.h` 不得包含：
+
+1. `src/` 路径。
+2. 内部 helper 宏。
+3. `static` 内部函数。
+4. vendor 头文件路径。
+
+## 8. xrt 依赖策略
+
+实现层面固定如下：
+
+1. `xpack.c` 内定义 `XRT_IMPLEMENTATION`，直接包含 `lib/xrt.h`。
+2. 不再单独编译 `xrt.c`。
+3. 文件与目录 I/O 走 xrt 的文件接口。
+4. 时间戳与时间处理走 xrt 的时间接口。
+5. 默认模式条目容器走 xrt 的 `xarray`。
+6. Index 模式条目容器走 xrt 的 `xlist`。
+7. Linux / Win32 模式条目容器走 xrt 的 `xdict`。
+
+引用来源以独立工程目录为准：
+
+1. `D:\Git\xrt\xrt.h`
+2. `D:\Git\xrt\lib\file.h`
+3. `D:\Git\xrt\lib\time.h`
+4. `D:\Git\xrt\lib\array.h`
+5. `D:\Git\xrt\lib\list.h`
+6. `D:\Git\xrt\lib\dict.h`
+
+## 9. vendor 编译策略
+
+### 9.1 默认策略
+
+项目代码维持单入口，但 vendor 依赖单独参与编译。
+
+需要参与编译的 vendor 源文件如下：
+
+```text
+lib/lz4/lz4.c
+lib/lz4/lz4hc.c
+lib/zstd/zstd.c
+lib/lzma/Alloc.c
+lib/lzma/CpuArch.c
+lib/lzma/LzFind.c
+lib/lzma/LzmaDec.c
+lib/lzma/LzmaEnc.c
+lib/lzma/Lzma2Dec.c
+lib/lzma/Lzma2Enc.c
+```
+
+### 9.2 必要编译宏
+
+```text
+-DZ7_ST
+```
+
+### 9.3 建议编译脚本形态
+
+Windows 共享库示例：
+
+```bat
+gcc -m64 -shared ^
+    xpack.c ^
+    lib/lz4/lz4.c ^
+    lib/lz4/lz4hc.c ^
+    lib/zstd/zstd.c ^
+    lib/lzma/Alloc.c ^
+    lib/lzma/CpuArch.c ^
+    lib/lzma/LzFind.c ^
+    lib/lzma/LzmaDec.c ^
+    lib/lzma/LzmaEnc.c ^
+    lib/lzma/Lzma2Dec.c ^
+    lib/lzma/Lzma2Enc.c ^
+    -Ilib -Ilib/lz4 -Ilib/zstd -Ilib/lzma ^
+    -DZ7_ST -O2 -s ^
+    -ffunction-sections -fdata-sections -Wl,--gc-sections ^
+    -lws2_32 -liphlpapi ^
+    -o release/xpack.dll
+```
+
+Linux 测试构建示例：
+
+```sh
+gcc tests/smoke/open_close.c xpack.c \
+    lib/lz4/lz4.c \
+    lib/lz4/lz4hc.c \
+    lib/zstd/zstd.c \
+    lib/lzma/Alloc.c \
+    lib/lzma/CpuArch.c \
+    lib/lzma/LzFind.c \
+    lib/lzma/LzmaDec.c \
+    lib/lzma/LzmaEnc.c \
+    lib/lzma/Lzma2Dec.c \
+    lib/lzma/Lzma2Enc.c \
+    -Ilib -Ilib/lz4 -Ilib/zstd -Ilib/lzma \
+    -DZ7_ST -O2 -ldl -lpthread \
+    -o release/xpk_smoke
+```
+
+## 10. 错误模型
+
+### 10.1 公开规则
+
+1. 公开函数返回 `0` 表示成功，负值表示失败。
+2. 每个 `xpkObject` 内保存最近一次错误码和错误文本。
+3. 错误文本长度固定，建议 `256` 字节。
+4. `xpkLastError(xpk)` 返回对象内最近错误码。
+5. `xpkLastErrorMessage(xpk)` 返回对象内最近错误文本。
+
+### 10.2 对象内实现
+
+建议对象中固定包含：
 
 ```c
-#define XPK_COMP_DEFAULT    7   // 默认压缩级别 (ZSTD greedy)
-#define XPK_LDB_COMP        8   // LDB 默认压缩级别
+typedef struct xpkErrorState {
+    int  code;
+    char text[256];
+} xpkErrorState;
 ```
 
----
-
-## 3. 包类型规范
-
-### 3.1 类型定义
-
-| 类型 | 值 | 说明 | 文件信息大小 |
-|------|:--:|------|:------------:|
-| Core | 0 | 顺序位置访问 | 20 bytes |
-| Index | 1 | 整数索引访问 | 28 bytes |
-| Linux | 2 | 路径访问（大小写敏感） | 232 bytes |
-| Win32 | 3 | 路径访问（不区分大小写） | 236 bytes |
-
-### 3.2 类型常量
+建议基础 helper：
 
 ```c
-#define XPK_TYPE_CORE       0
-#define XPK_TYPE_INDEX      1
-#define XPK_TYPE_LINUX      2
-#define XPK_TYPE_WIN32      3
+static void xpkClearError(xpkObject xpk);
+static int  xpkSetError(xpkObject xpk, int code, const char* text);
+static int  xpkSetErrorFmt(xpkObject xpk, int code, const char* fmt, ...);
 ```
 
-### 3.3 路径规范
+规则：
 
-```c
-#define XPK_PATH_MAX        200   // 文件路径最大长度
+1. 所有失败路径都必须调用 `xpkSetError*`。
+2. 所有成功返回前都必须保持对象错误状态可预测。
+3. 非对象上下文不得使用全局错误单例替代对象错误。
+
+### 10.3 构造期例外
+
+`xpkOpen` 在对象尚未成功建立前可能发生失败。
+
+实现要求如下：
+
+1. 优先尽早分配最小对象壳，以便后续失败能写入对象错误。
+2. 仅当对象壳分配本身失败时，才允许无法携带对象错误文本。
+3. 这类极早期失败不改变“对象错误为主”的整体设计。
+
+## 11. 模块边界
+
+### 11.1 base
+
+负责常量、基础类型、错误、内存、时间、哈希包装。
+
+### 11.2 model
+
+负责运行时对象、条目结构、脏标记和状态机。
+
+### 11.3 codec
+
+负责压缩级别映射、压缩路由、hash 校验和 STORE 回退。
+
+### 11.4 storage
+
+负责单卷/分卷逻辑文件视图、跨卷读写映射和写队列。
+
+### 11.5 format
+
+负责 `xpkHead`、`Package Meta`、`Entry Table` 的编码与解码。
+
+### 11.6 service
+
+负责 open/save/build/write/meta/verify 的核心流程。
+
+### 11.7 mode
+
+负责 default/index/path 三种访问模型及路径归一化策略。
+
+### 11.8 api
+
+负责参数校验、对象可见 API 和错误返回。
+
+## 12. 实现顺序
+
+### Phase 0: 工程骨架
+
+交付物：
+
+1. `xpack.c` 空骨架。
+2. `src/` 目录结构。
+3. `src/api/public_decl.h`。
+4. `tools/make_header/` 头文件生成器骨架。
+5. 基础编译脚本。
+
+通过标准：
+
+1. 工程可以空实现编译通过。
+2. `xpack.h` 可以成功生成。
+
+### Phase 1: base + model
+
+交付物：
+
+1. 常量和公开类型。
+2. `xpkObject` 内部结构。
+3. 错误系统。
+4. 脏标记与状态机 helper。
+
+通过标准：
+
+1. `xpkOpen` 可创建空对象。
+2. `xpkClose` 可释放空对象。
+3. 错误 API 可工作。
+
+### Phase 2: codec
+
+交付物：
+
+1. 压缩级别映射表。
+2. LZ4 / ZSTD / LZMA2 封装。
+3. STORE 回退逻辑。
+
+通过标准：
+
+1. 压缩/解压 smoke test 通过。
+2. hash 校验失败路径正确。
+
+### Phase 3: storage
+
+交付物：
+
+1. 单卷读写。
+2. 分卷虚拟 I/O。
+3. 写队列。
+
+通过标准：
+
+1. 跨卷边界读写测试通过。
+2. `volumeSize` 最小值校验通过。
+
+### Phase 4: format
+
+交付物：
+
+1. 64B 头编码/解码。
+2. Entry Table 编码/解码。
+3. Package Meta 编码/解码。
+4. normal/solid 布局解释。
+
+通过标准：
+
+1. 空包可读写。
+2. 头字段与表字段 round-trip 正确。
+
+### Phase 5: default 模式主路径
+
+交付物：
+
+1. `xpkAdd*` / `xpkRead*` / `xpkUpdate*` / `xpkRemove`。
+2. `xpkSave`。
+3. `xpkBuild`。
+
+通过标准：
+
+1. 默认模式完整增删改查通过。
+2. 立即写入与缓存写入语义符合规范。
+
+### Phase 6: Index 与 Path 模式
+
+交付物：
+
+1. `xpkIndex*`。
+2. `xpkPath*`。
+3. Linux / Win32 归一化规则。
+
+通过标准：
+
+1. `xlist` / `xdict` 驱动的访问路径通过。
+2. Path 320B 条目编码正确。
+
+### Phase 7: Solid 模式
+
+交付物：
+
+1. solid 读取路径。
+2. solid 下元数据可写、数据段只读边界。
+3. solid 下删除 / 重命名 / 属性修改路径。
+
+通过标准：
+
+1. solid 读路径通过。
+2. solid 数据写接口全部拒绝。
+3. solid 元数据修改和 `save` 通过。
+
+### Phase 8: 验证与收口
+
+交付物：
+
+1. verify/stat API。
+2. 头文件生成工具完成版。
+3. 构建脚本与测试资产整理。
+
+通过标准：
+
+1. smoke / unit / spec / integration 测试可运行。
+2. `xpack.h` 与实现保持同步。
+
+## 13. 首批必须创建的文件
+
+建议第一轮先落这些文件：
+
+```text
+xpack.c
+src/api/public_decl.h
+src/base/config.h
+src/base/const.h
+src/base/types.h
+src/base/error.h
+src/model/object.h
+src/model/entry.h
+src/model/dirty.h
+tools/make_header/make_header.c
 ```
 
----
-
-## 4. 文件格式规范
-
-### 4.1 文件布局
-
-```
-┌────────────────────────┐  偏移 0
-│      包信息头          │  48 bytes
-├────────────────────────┤  偏移 48
-│    包头扩展数据        │  可选，headExtSize bytes
-├────────────────────────┤
-│                        │
-│      文件数据区        │  压缩后的文件内容
-│                        │
-├────────────────────────┤  偏移 ldbOffset
-│      LDB 数据块        │  压缩后的文件信息列表
-└────────────────────────┘
-```
-
-### 4.2 包信息头 (48 bytes)
-
-| 偏移 | 大小 | 字段 | 说明 |
-|:----:|:----:|------|------|
-| 0 | 4 | fileHead | 文件头标识 "xpk" + 版本号 (0x116B7078) |
-| 4 | 1 | reserved0 | 保留 |
-| 5 | 2 | infoExtSize | 文件信息扩展大小 |
-| 7 | 1 | reserved1 | 保留 |
-| 8 | 4 | flag | 包标记位域 |
-| 12 | 4 | fileCount | 文件数量 |
-| 16 | 4 | headExtSize | 包头扩展数据大小 |
-| 20 | 4 | discCode | 识别代码 |
-| 24 | 4 | ldbOffset | LDB 偏移位置 |
-| 28 | 4 | ldbSize | LDB 压缩后大小 |
-| 32 | 4 | ldbRawSize | LDB 原始大小 |
-| 36 | 4 | ldbHash | LDB 哈希值 |
-| 40 | 4 | createTime | 创建时间 |
-| 44 | 4 | modifyTime | 修改时间 |
-
-### 4.3 包标记位域
-
-```c
-typedef union {
-    uint32_t value;
-    struct {
-        uint32_t packType   : 4;    // [0-3]   包类型
-        uint32_t ldbComp    : 4;    // [4-7]   LDB 压缩级别
-        uint32_t reserved1  : 8;    // [8-15]  保留
-        uint32_t reserved2  : 16;   // [16-31] 保留
-    };
-} xpkFlag;
-```
-
-### 4.4 文件标记位域
-
-```c
-typedef union {
-    uint32_t value;
-    struct {
-        uint32_t compLevel  : 4;    // [0-3]   压缩级别
-        uint32_t fileType   : 4;    // [4-7]   文件类型
-        uint32_t encrypted  : 1;    // [8]     加密标记
-        uint32_t reserved   : 23;   // [9-31]  保留
-    };
-} xpkFileFlag;
-```
-
----
-
-## 5. 数据结构规范
-
-### 5.1 文件信息 - Core (20 bytes)
-
-| 偏移 | 大小 | 字段 | 说明 |
-|:----:|:----:|------|------|
-| 0 | 4 | dataOffset | 数据偏移位置 |
-| 4 | 4 | dataSize | 压缩后大小 |
-| 8 | 4 | fileSize | 原始大小 |
-| 12 | 4 | fileHash | 文件哈希值 |
-| 16 | 4 | flag | 文件标记位域 |
-
-### 5.2 文件信息 - Index (28 bytes)
-
-| 偏移 | 大小 | 字段 | 说明 |
-|:----:|:----:|------|------|
-| 0-19 | 20 | (Core) | 基础信息 |
-| 20 | 4 | fileIndex | 文件索引号 |
-| 24 | 4 | userData | 用户自定义数据 |
-
-### 5.3 文件信息 - Linux (232 bytes)
-
-| 偏移 | 大小 | 字段 | 说明 |
-|:----:|:----:|------|------|
-| 0-19 | 20 | (Core) | 基础信息 |
-| 20 | 200 | filePath | 文件路径 |
-| 220 | 4 | pathHash | 路径哈希值（大小写敏感） |
-| 224 | 4 | fileAttr | 文件属性 |
-| 228 | 4 | modifyTime | 修改时间 |
-
-### 5.4 文件信息 - Win32 (236 bytes)
-
-| 偏移 | 大小 | 字段 | 说明 |
-|:----:|:----:|------|------|
-| 0-19 | 20 | (Core) | 基础信息 |
-| 20 | 200 | filePath | 文件路径 |
-| 220 | 4 | pathHash | 路径哈希值（转小写） |
-| 224 | 4 | fileAttr | 文件属性 |
-| 228 | 4 | createTime | 创建时间 |
-| 232 | 4 | modifyTime | 修改时间 |
-
----
-
-## 6. API 规范
-
-### 6.1 命名规范
-
-- **前缀**：`xpk`
-- **风格**：小驼峰 (lowerCamelCase)
-- **示例**：`xpkOpen`, `xpkAppendFile`, `xpkPathExtractData`
-
-### 6.2 生命周期
-
-```c
-xpkObject   xpkOpen(const char* path, uint32_t offset, int readonly);
-int         xpkSave(xpkObject xpk);
-void        xpkClose(xpkObject xpk);
-```
-
-### 6.3 包属性
-
-```c
-int         xpkType(xpkObject xpk);
-int         xpkTypeSet(xpkObject xpk, int type);
-uint32_t    xpkCount(xpkObject xpk);
-uint32_t    xpkDiscCode(xpkObject xpk);
-int         xpkDiscCodeSet(xpkObject xpk, uint32_t code);
-xpkHead*    xpkGetHead(xpkObject xpk);
-```
-
-### 6.4 Core 模式
-
-```c
-uint32_t    xpkAppendFile(xpkObject xpk, const char* path, int level);
-uint32_t    xpkAppendData(xpkObject xpk, const void* data, uint32_t size, int level);
-int         xpkExtractFile(xpkObject xpk, uint32_t pos, const char* path);
-void*       xpkExtractData(xpkObject xpk, uint32_t pos, uint32_t* outSize);
-int         xpkUpdateFile(xpkObject xpk, uint32_t pos, const char* path, int level);
-int         xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint32_t size, int level);
-int         xpkRemove(xpkObject xpk, uint32_t pos);
-```
-
-### 6.5 文件信息
-
-```c
-void*       xpkInfo(xpkObject xpk, uint32_t pos);
-uint32_t    xpkInfoSize(xpkObject xpk, uint32_t pos);
-uint32_t    xpkInfoPacked(xpkObject xpk, uint32_t pos);
-uint32_t    xpkInfoHash(xpkObject xpk, uint32_t pos);
-int         xpkInfoLevel(xpkObject xpk, uint32_t pos);
-int         xpkInfoType(xpkObject xpk, uint32_t pos);
-```
-
-### 6.6 Index 模式
-
-```c
-uint32_t            xpkIndexFind(xpkObject xpk, int32_t index);
-xpkFileInfoIndex*   xpkIndexAppendFile(xpkObject xpk, int32_t index, const char* path, int level);
-xpkFileInfoIndex*   xpkIndexAppendData(xpkObject xpk, int32_t index, const void* data, uint32_t size, int level);
-int                 xpkIndexExtractFile(xpkObject xpk, int32_t index, const char* path);
-void*               xpkIndexExtractData(xpkObject xpk, int32_t index, uint32_t* outSize);
-int                 xpkIndexRemove(xpkObject xpk, int32_t index);
-```
-
-### 6.7 路径模式
-
-```c
-uint32_t    xpkPathFind(xpkObject xpk, const char* filePath);
-int         xpkPathExists(xpkObject xpk, const char* filePath);
-void*       xpkPathAppendFile(xpkObject xpk, const char* filePath, const char* srcPath, int level);
-void*       xpkPathAppendData(xpkObject xpk, const char* filePath, const void* data, uint32_t size, int level);
-int         xpkPathExtractFile(xpkObject xpk, const char* filePath, const char* dstPath);
-void*       xpkPathExtractData(xpkObject xpk, const char* filePath, uint32_t* outSize);
-int         xpkPathRemove(xpkObject xpk, const char* filePath);
-const char* xpkPathGet(xpkObject xpk, uint32_t pos);
-```
-
-### 6.8 遍历与批量
-
-```c
-typedef int (*xpkEachCallback)(void* xpk, uint32_t pos, void* info, void* userData);
-
-int         xpkEach(xpkObject xpk, xpkEachCallback callback, void* userData);
-int         xpkEachMatch(xpkObject xpk, const char* pattern, xpkEachCallback callback, void* userData);
-int         xpkExtractAll(xpkObject xpk, const char* dir);
-int         xpkAppendDir(xpkObject xpk, const char* dir, const char* pattern, int level, int recursive);
-```
-
-### 6.9 工具函数
-
-```c
-void        xpkFree(void* ptr);
-uint32_t    xpkHash(const void* data, uint32_t size);
-int         xpkVerify(xpkObject xpk, uint32_t pos);
-int         xpkVerifyAll(xpkObject xpk);
-int         xpkStatGet(xpkObject xpk, xpkStat* stat);
-int         xpkRebuild(xpkObject xpk);
-int         xpkLastError(void);
-const char* xpkLastErrorMsg(void);
-```
-
----
-
-## 7. 依赖库规范
-
-### 7.1 必需依赖
-
-| 库 | 版本 | 用途 |
-|----|------|------|
-| xrt | latest | 文件操作、内存管理、哈希、数组 |
-| lz4 | 1.9+ | LZ4/LZ4-HC 压缩 |
-| zstd | 1.5+ | ZSTD 压缩 |
-| lzma | 2501+ | LZMA2 压缩 (LZMA SDK) |
-
-### 7.2 头文件引用
-
-```c
-#include <xrt/xrt.h>
-#include <lz4/lz4.h>
-#include <lz4/lz4hc.h>
-#include <zstd/zstd.h>
-#include <lzma/Lzma2Enc.h>
-#include <lzma/Lzma2Dec.h>
-```
-
-### 7.3 xrt 功能映射
-
-| 功能 | xrt 函数/类型 |
-|------|---------------|
-| 文件操作 | xfile, xrtOpen, xrtClose, xrtRead, xrtWrite |
-| 结构体数组 | xarray, xrtArrayCreate, xrtArrayGet |
-| 哈希计算 | xrtHash32 |
-| 内存管理 | xrtMalloc, xrtFree |
-| 路径操作 | xrtPathGetName, xrtPathJoin |
-| 时间操作 | xtime, xrtToUnixTime, xrtFromUnixTime |
-
----
-
-## 8. 文件类型标识
-
-```c
-#define XPK_FTYPE_UNKNOWN   0   // 未知/通用
-#define XPK_FTYPE_BINARY    1   // 二进制数据
-#define XPK_FTYPE_TEXT      2   // 文本文件
-#define XPK_FTYPE_IMAGE     3   // 图像文件
-#define XPK_FTYPE_AUDIO     4   // 音频文件
-#define XPK_FTYPE_VIDEO     5   // 视频文件
-#define XPK_FTYPE_ARCHIVE   6   // 归档文件
-#define XPK_FTYPE_FOLDER    15  // 目录标记
-```
-
----
-
-## 9. 错误码规范
-
-| 代码 | 说明 |
-|:----:|------|
-| 0 | 成功 |
-| 1 | 文件打开失败 |
-| 2 | 文件读取失败 |
-| 3 | 内存分配失败 |
-| 4 | 无效的包格式 |
-| 5 | 版本不支持 |
-| 6 | 文件位置无效 |
-| 7 | 压缩失败 |
-| 8 | 解压失败 |
-| 9 | 哈希校验失败 |
-| 10 | 只读模式禁止写入 |
-| 11 | 包类型不匹配 |
-
----
-
-## 10. 使用场景指南
-
-| 场景 | 推荐级别 | 推荐模式 |
-|------|:--------:|:--------:|
-| 游戏资源实时加载 | 1-3 | Core/Win32 |
-| 一般应用资源包 | 6 | Win32 |
-| 软件分发包 | 8-10 | Win32 |
-| 数据归档存储 | 12-15 | Linux |
-| 已压缩文件 | 0 | 任意 |
-| 整数 ID 索引资源 | 6 | Index |
-
----
-
-## 附录 A: 压缩级别映射表
-
-```c
-// ZSTD 策略常量
-#define XPK_ZSTD_FAST       1
-#define XPK_ZSTD_DFAST      2
-#define XPK_ZSTD_GREEDY     3
-#define XPK_ZSTD_LAZY       4
-#define XPK_ZSTD_LAZY2      5
-#define XPK_ZSTD_BTLAZY2    6
-#define XPK_ZSTD_BTOPT      7
-#define XPK_ZSTD_BTULTRA    8
-#define XPK_ZSTD_BTULTRA2   9
-
-static const xpkCompMap xpkCompTable[16] = {
-    { XPK_ALG_STORE,  0 },                  // 0:  无压缩
-    { XPK_ALG_LZ4,    1 },                  // 1:  LZ4 fast
-    { XPK_ALG_LZ4,    2 },                  // 2:  LZ4 fast (64KB)
-    { XPK_ALG_LZ4HC,  4 },                  // 3:  LZ4-HC level 4
-    { XPK_ALG_LZ4HC, 12 },                  // 4:  LZ4-HC level 12
-    { XPK_ALG_ZSTD,  XPK_ZSTD_FAST },       // 5:  ZSTD fast
-    { XPK_ALG_ZSTD,  XPK_ZSTD_DFAST },      // 6:  ZSTD dfast
-    { XPK_ALG_ZSTD,  XPK_ZSTD_GREEDY },     // 7:  ZSTD greedy [DEFAULT]
-    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY },       // 8:  ZSTD lazy
-    { XPK_ALG_ZSTD,  XPK_ZSTD_LAZY2 },      // 9:  ZSTD lazy2
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTLAZY2 },    // 10: ZSTD btlazy2
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTOPT },      // 11: ZSTD btopt
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA },    // 12: ZSTD btultra
-    { XPK_ALG_ZSTD,  XPK_ZSTD_BTULTRA2 },   // 13: ZSTD btultra2
-    { XPK_ALG_LZMA2, 6 },                   // 14: LZMA2 level 6
-    { XPK_ALG_LZMA2, 9 },                   // 15: LZMA2 level 9
-};
-```
-
----
-
-## 附录 B: 目录结构
-
-```
-d:\git\xPack\
-├── src/
-│   ├── xpack.h             # 公开头文件
-│   ├── xpack_internal.h    # 内部头文件
-│   ├── xpack.c             # 主实现
-│   ├── xpack_compress.c    # 压缩模块
-│   ├── xpack_index.c       # Index 模式
-│   ├── xpack_path.c        # 路径模式
-│   └── xpack_util.c        # 工具函数
-├── docs/
-│   ├── design.md           # 设计文档
-│   └── spec.md             # 技术规范
-├── test/
-│   └── ...                 # 测试文件
-└── lib/
-    ├── lz4/
-    ├── zstd/
-    └── xrt/
-```
+原因：
+
+1. 这批文件决定 ABI。
+2. 这批文件决定包含顺序。
+3. 这批文件决定错误模型和对象模型。
+4. 后续 codec/storage/format 都要建立在这批文件之上。
+
+## 14. 明确禁止
+
+1. 不再恢复旧的多 `.c` 项目实现结构。
+2. 不在 `src/` 中混放公开头与实现头。
+3. 不在 codec 以外直接调用 vendor API。
+4. 不在 runtime 以外直接调用 xrt 文件/时间错误接口。
+5. 不引入额外分卷元数据。
+6. 不为旧格式、旧命名或旧半成品结构做兼容实现。
