@@ -484,7 +484,7 @@ static inline int procXpkBuildCopyLiveEntriesSolid(xpkObject objDst, xpkObject o
 		iSolidRawSize64 += pEntry->iFileSize;
 	}
 	if ( iSolidRawSize64 > UINT32_MAX ) {
-		return procXpkSetError(objDst, XPK_ERR_UNSUPPORTED, sXpkErrorSeekRange);
+		return procXpkSetError(objDst, XPK_ERR_UNSUPPORTED, sXpkErrorBlockTooLarge);
 	}
 
 	if ( iSolidRawSize64 > 0 ) {

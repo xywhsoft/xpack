@@ -183,6 +183,19 @@ Windows 下当前顺序回归已经覆盖这些主链路：
 4. `read / add / update / remove / rename / attr`
 5. `solid / volume / buffered / immediate`
 6. 错误优先级、坏包保护、lookup 一致性、失败回滚与路径占位保护
+7. 基于新版 `xrt` 的 `64-bit seek`、超过 `4GB` 的文件定位、`INT64_MAX` 以上 seek 保护，以及大逻辑偏移分卷原始读写回归
+8. 大尾段 `xpkSave()` 失败回滚，已支持临时文件落盘而不是整块内存快照
+
+当前测试程序也已经支持这些稳定过滤入口：
+
+1. `all`
+2. `smoke`
+3. `smoke/open_core`
+4. `unit`
+5. `unit/index_path`
+6. `integration`
+7. `integration/build_volume`
+8. `integration/solid_readonly`
 
 ## 7. 当前明确边界
 
@@ -190,8 +203,9 @@ Windows 下当前顺序回归已经覆盖这些主链路：
 
 1. Linux 侧还没有正式回归。
 2. 接近 `4GB` 分卷上限和更大逻辑文件还缺真实压力验证。
-3. 测试体系虽然已经完成结构拆分，但仍然是“单测试程序中的顺序大回归”。
-4. 统一 helper 层已经成型，但夹具构造和更多断言场景还可以继续收敛。
+3. 当前文件定位已经支持 `4GB+`，`xpkReadToFile` 对普通未压缩条目也已支持分块直导出，但单文件数据块、整块编解码和 `solid` 整流仍然受当前 block 模型限制。
+4. 测试体系虽然已经完成结构拆分，但仍然是“单测试程序中的顺序大回归”。
+5. 统一 helper 层已经成型，但坏包夹具和更多断言场景还可以继续收敛。
 
 ## 8. 当前阶段建议
 

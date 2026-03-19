@@ -88,7 +88,7 @@
 		return 617;
 	}
 	xpkClose(objXpk);
-	procDeleteVolumeFiles(sPathPkgLayout);
+	procTestDeletePathFamily(sPathPkgLayout);
 
 	memset(&objOpt, 0, sizeof(objOpt));
 	objOpt.createIfMissing = TRUE;

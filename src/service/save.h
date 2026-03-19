@@ -12,12 +12,18 @@ typedef struct xpkFlushSnapshot {
 typedef struct xpkSaveRollback {
 	int bFileExisted;
 	int bHeadValid;
+	int bTailInFile;
+	int bKeepTailFile;
 	uint64_t iLogicalSize;
 	uint64_t iDataOffset;
-	uint32_t iTailSize;
+	uint64_t iTailSize;
 	uint8_t sHeadBuf[XPK_HEAD_SIZE];
 	void* pTailData;
+	char* sTailPath;
 } xpkSaveRollback;
+
+#define XPK_SAVE_ROLLBACK_MEM_LIMIT		(8u * 1024u * 1024u)
+#define XPK_SAVE_ROLLBACK_CHUNK_SIZE	(8u * 1024u * 1024u)
 
 static inline xpkFlushSnapshot* procXpkCaptureFlushSnapshots(xpkObject objXpk, uint32_t* pCountRet)
 {
@@ -114,6 +120,162 @@ static inline void procXpkFreeSaveRollback(xpkSaveRollback* pRollback)
 		xpkFreeInternal(pRollback->pTailData);
 		pRollback->pTailData = NULL;
 	}
+	if ( pRollback->sTailPath != NULL ) {
+		if ( !pRollback->bKeepTailFile && xrtFileExists((str)pRollback->sTailPath) ) {
+			(void)xrtFileDelete((str)pRollback->sTailPath);
+		}
+		xpkFreeInternal(pRollback->sTailPath);
+		pRollback->sTailPath = NULL;
+	}
+}
+
+static inline char* procXpkSaveRollbackPathDup(xpkObject objXpk)
+{
+	char sSuffix[96];
+	char* sPathRet;
+	uint64_t iStamp;
+	uint64_t iTag;
+	uint32_t iTry;
+	int iSizePrint;
+
+	if ( objXpk == NULL || objXpk->sPathPackage == NULL ) {
+		procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+		return NULL;
+	}
+
+	iStamp = (uint64_t)xpkNowInternal();
+	iTag = (uint64_t)(uintptr_t)objXpk;
+	for ( iTry = 0; iTry < 32; iTry++ ) {
+		iSizePrint = snprintf(
+			sSuffix,
+			sizeof(sSuffix),
+			".save.rollback.%llu.%llx.%u.tmp",
+			(unsigned long long)iStamp,
+			(unsigned long long)iTag,
+			(unsigned int)iTry
+		);
+		if ( iSizePrint <= 0 || (size_t)iSizePrint >= sizeof(sSuffix) ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite), NULL;
+		}
+
+		sPathRet = procXpkPathSuffixDupText(objXpk->sPathPackage, sSuffix);
+		if ( sPathRet == NULL ) {
+			procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+			return NULL;
+		}
+		if ( !xrtPathExists((str)sPathRet) ) {
+			return sPathRet;
+		}
+
+		xpkFreeInternal(sPathRet);
+	}
+
+	procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+	return NULL;
+}
+
+static inline int procXpkCaptureRollbackTailToFile(xpkObject objXpk, uint64_t iOffset, uint64_t iSize, const char* sPathTail)
+{
+	xfile hFile;
+	void* pChunk;
+	uint64_t iRemain;
+	uint64_t iOffsetCur;
+	uint32_t iChunk;
+	size_t iWrite;
+	int iRet;
+
+	if ( objXpk == NULL || sPathTail == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+
+	hFile = xrtOpen((str)sPathTail, FALSE, XRT_CP_BINARY);
+	if ( hFile == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
+	}
+
+	iRemain = iSize;
+	iOffsetCur = iOffset;
+	while ( iRemain > 0 ) {
+		iChunk = (uint32_t)((iRemain > XPK_SAVE_ROLLBACK_CHUNK_SIZE) ? XPK_SAVE_ROLLBACK_CHUNK_SIZE : iRemain);
+		pChunk = NULL;
+		iRet = procXpkReadAtAlloc(objXpk, NULL, iOffsetCur, iChunk, &pChunk);
+		if ( iRet != XPK_OK ) {
+			xrtClose(hFile);
+			return iRet;
+		}
+
+		iWrite = xrtWrite(hFile, (str)pChunk, iChunk);
+		xpkFreeInternal(pChunk);
+		if ( iWrite != iChunk ) {
+			xrtClose(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+		}
+
+		iOffsetCur += iChunk;
+		iRemain -= iChunk;
+	}
+
+	if ( !xrtSetEOF(hFile) ) {
+		xrtClose(hFile);
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+	}
+
+	xrtClose(hFile);
+	return XPK_OK;
+}
+
+static inline int procXpkRestoreRollbackTailFromFile(xpkObject objXpk, const xpkSaveRollback* pRollback)
+{
+	xfile hFile;
+	void* pChunk;
+	uint64_t iRemain;
+	uint64_t iOffsetCur;
+	uint64_t iBackupSize;
+	uint32_t iChunk;
+	size_t iRead;
+	int iRet;
+
+	if ( objXpk == NULL || pRollback == NULL || pRollback->sTailPath == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+
+	hFile = xrtOpen((str)pRollback->sTailPath, TRUE, XRT_CP_BINARY);
+	if ( hFile == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
+	}
+
+	iBackupSize = (uint64_t)xrtGetEOF(hFile);
+	if ( iBackupSize != pRollback->iTailSize ) {
+		xrtClose(hFile);
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+	}
+
+	iRemain = pRollback->iTailSize;
+	iOffsetCur = pRollback->iDataOffset;
+	while ( iRemain > 0 ) {
+		iChunk = (uint32_t)((iRemain > XPK_SAVE_ROLLBACK_CHUNK_SIZE) ? XPK_SAVE_ROLLBACK_CHUNK_SIZE : iRemain);
+		pChunk = xrtRead(hFile, iChunk, &iRead);
+		if ( pChunk == NULL || iRead != iChunk ) {
+			if ( pChunk != NULL ) {
+				xrtFree(pChunk);
+			}
+			xrtClose(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+		}
+
+		iRet = procXpkWriteAt(objXpk, NULL, iOffsetCur, pChunk, iChunk);
+		xrtFree(pChunk);
+		if ( iRet != XPK_OK ) {
+			xrtClose(hFile);
+			return iRet;
+		}
+
+		iOffsetCur += iChunk;
+		iRemain -= iChunk;
+	}
+
+	xrtClose(hFile);
+	return XPK_OK;
 }
 
 static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* pRollback)
@@ -159,16 +321,24 @@ static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* 
 	}
 
 	iTailSize64 = iLogicalSize - pRollback->iDataOffset;
-	if ( iTailSize64 > UINT32_MAX ) {
-		return procXpkSetError(objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorSeekRange);
+	pRollback->iTailSize = iTailSize64;
+	if ( iTailSize64 <= XPK_SAVE_ROLLBACK_MEM_LIMIT ) {
+		iRet = procXpkReadAtAlloc(objXpk, NULL, pRollback->iDataOffset, (uint32_t)iTailSize64, &pRollback->pTailData);
+		if ( iRet != XPK_OK ) {
+			return iRet;
+		}
+		return XPK_OK;
 	}
 
-	iRet = procXpkReadAtAlloc(objXpk, NULL, pRollback->iDataOffset, (uint32_t)iTailSize64, &pRollback->pTailData);
+	pRollback->sTailPath = procXpkSaveRollbackPathDup(objXpk);
+	if ( pRollback->sTailPath == NULL ) {
+		return xpkLastError(objXpk);
+	}
+	iRet = procXpkCaptureRollbackTailToFile(objXpk, pRollback->iDataOffset, iTailSize64, pRollback->sTailPath);
 	if ( iRet != XPK_OK ) {
 		return iRet;
 	}
-
-	pRollback->iTailSize = (uint32_t)iTailSize64;
+	pRollback->bTailInFile = TRUE;
 	return XPK_OK;
 }
 
@@ -193,9 +363,17 @@ static inline int procXpkRestoreSaveRollback(xpkObject objXpk, const xpkSaveRoll
 	}
 
 	if ( pRollback->iTailSize > 0 ) {
-		iRet = procXpkWriteAt(objXpk, NULL, pRollback->iDataOffset, pRollback->pTailData, pRollback->iTailSize);
-		if ( iRet != XPK_OK ) {
-			return iRet;
+		if ( pRollback->bTailInFile ) {
+			iRet = procXpkRestoreRollbackTailFromFile(objXpk, pRollback);
+			if ( iRet != XPK_OK ) {
+				((xpkSaveRollback*)pRollback)->bKeepTailFile = TRUE;
+				return iRet;
+			}
+		} else {
+			iRet = procXpkWriteAt(objXpk, NULL, pRollback->iDataOffset, pRollback->pTailData, (uint32_t)pRollback->iTailSize);
+			if ( iRet != XPK_OK ) {
+				return iRet;
+			}
 		}
 	}
 

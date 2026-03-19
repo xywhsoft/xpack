@@ -583,14 +583,19 @@ static inline int procXpkMoveVolumeFilesText(xpkObject objXpk, const char* sPath
 
 static inline int procXpkSeekFile(xpkObject objXpk, xfile hFile, uint64_t iOffset)
 {
+	size_t iPos;
+
 	if ( hFile == NULL ) {
 		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
 	}
-	if ( iOffset > LONG_MAX ) {
+	if ( iOffset > (uint64_t)INT64_MAX ) {
 		return procXpkSetError(objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorSeekRange);
 	}
 
-	xrtSeek(hFile, (long)iOffset, XRT_SEEK_SET);
+	iPos = xrtSeek(hFile, (int64)iOffset, XRT_SEEK_SET);
+	if ( ((uint64_t)iPos != iOffset) && ((uint64_t)xrtTell(hFile) != iOffset) ) {
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
+	}
 	return XPK_OK;
 }
 

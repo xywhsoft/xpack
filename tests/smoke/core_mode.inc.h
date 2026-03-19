@@ -258,7 +258,124 @@
 		xpkClose(objXpk);
 		return 279;
 	}
+	hFile = xrtOpen((str)sPathPkgCore, FALSE, XRT_CP_BINARY);
+	if ( hFile == NULL ) {
+		xpkClose(objXpk);
+		return 973;
+	}
+	iBuildSizeBefore = (uint64_t)UINT32_MAX + 4096u;
+	if ( procXpkSeekFile(objXpk, hFile, iBuildSizeBefore) != XPK_OK ) {
+		xrtClose(hFile);
+		xpkClose(objXpk);
+		return 974;
+	}
+	if ( xrtTell(hFile) != iBuildSizeBefore ) {
+		xrtClose(hFile);
+		xpkClose(objXpk);
+		return 975;
+	}
+	iRetCall = procXpkSeekFile(objXpk, hFile, (uint64_t)INT64_MAX + 1u);
+	if ( !procTestExpectCallError(iRetCall, XPK_ERR_UNSUPPORTED, objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorSeekRange) ) {
+		xrtClose(hFile);
+		xpkClose(objXpk);
+		return (iRetCall != XPK_ERR_UNSUPPORTED) ? 983 : 984;
+	}
+	if ( xrtTell(hFile) != iBuildSizeBefore ) {
+		xrtClose(hFile);
+		xpkClose(objXpk);
+		return 985;
+	}
+	xrtClose(hFile);
+	iDataLargeSize = (9u * 1024u * 1024u) + 321u;
+	pDataLarge = xpkAllocInternal(iDataLargeSize);
+	if ( pDataLarge == NULL ) {
+		xpkClose(objXpk);
+		return 976;
+	}
+	memset(pDataLarge, 'E', iDataLargeSize);
+	if ( procXpkWriteFileData(objXpk, sPathFileExport, pDataLarge, iDataLargeSize) != XPK_OK ) {
+		xpkFreeInternal(pDataLarge);
+		pDataLarge = NULL;
+		xpkClose(objXpk);
+		return 977;
+	}
+	if ( !procTestFileContentEquals(sPathFileExport, pDataLarge, iDataLargeSize) ) {
+		xpkFreeInternal(pDataLarge);
+		pDataLarge = NULL;
+		xpkClose(objXpk);
+		return 978;
+	}
+	xpkFreeInternal(pDataLarge);
+	pDataLarge = NULL;
+	if ( !procTestCreateSparseFileSize(sPathFileHuge, (uint64_t)UINT32_MAX + 12345u) ) {
+		xpkClose(objXpk);
+		return 979;
+	}
+	iRetCall = xpkAddFile(objXpk, sPathFileHuge, NULL, &iPosRet);
+	if ( !procTestExpectCallError(iRetCall, XPK_ERR_UNSUPPORTED, objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorBlockTooLarge) ) {
+		remove(sPathFileHuge);
+		xpkClose(objXpk);
+		return (iRetCall != XPK_ERR_UNSUPPORTED) ? 980 : 981;
+	}
+	if ( xpkCount(objXpk) != 1 ) {
+		remove(sPathFileHuge);
+		xpkClose(objXpk);
+		return 982;
+	}
+	remove(sPathFileHuge);
 	xpkClose(objXpk);
+
+	memset(&objOpt, 0, sizeof(objOpt));
+	objOpt.createIfMissing = TRUE;
+	objXpk = xpkOpen(sPathPkgStoreHuge, &objOpt);
+	if ( objXpk == NULL ) {
+		return 986;
+	}
+	memset(&objWriteOpt, 0, sizeof(objWriteOpt));
+	objWriteOpt.compLevel = 0;
+	objWriteOpt.writePolicy = XPK_WRITE_IMMEDIATE;
+	if ( xpkAddData(objXpk, "S", 1, &objWriteOpt, &iPosRet) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 987;
+	}
+	if ( xpkSave(objXpk) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 988;
+	}
+	pEntry = procXpkGetEntryByPos(objXpk, 1);
+	if ( pEntry == NULL ) {
+		xpkClose(objXpk);
+		return 989;
+	}
+	iBuildSizeAfter = (uint64_t)UINT32_MAX + 65537u;
+	if ( !procTestCreateSparseFileSize(sPathPkgStoreHuge, XPK_HEAD_SIZE + iBuildSizeAfter) ) {
+		xpkClose(objXpk);
+		return 990;
+	}
+	objXpk->objHead.dataOffset = XPK_HEAD_SIZE + iBuildSizeAfter;
+	pEntry->iFlag &= ~XPK_FLAG_COMP_MASK;
+	pEntry->iDataOffset = XPK_HEAD_SIZE;
+	pEntry->iDataSize = iBuildSizeAfter;
+	pEntry->iFileSize = iBuildSizeAfter;
+	procTestDeletePathFamily("release/x64/xpack_phase3_store_huge_dst");
+	if ( !procTestCreateDirOccupy("release/x64/xpack_phase3_store_huge_dst") ) {
+		xpkClose(objXpk);
+		return 991;
+	}
+	iRetCall = xpkReadToFile(objXpk, 1, "release/x64/xpack_phase3_store_huge_dst");
+	if ( !procTestExpectCallError(iRetCall, XPK_ERR_IO, objXpk, XPK_ERR_IO, sXpkErrorIoOpen) ) {
+		procTestDeletePathFamily("release/x64/xpack_phase3_store_huge_dst");
+		xpkClose(objXpk);
+		return (iRetCall != XPK_ERR_IO) ? 992 : 993;
+	}
+	if ( !xrtDirExists((str)"release/x64/xpack_phase3_store_huge_dst") ) {
+		procTestDeletePathFamily("release/x64/xpack_phase3_store_huge_dst");
+		xpkClose(objXpk);
+		return 994;
+	}
+	procTestDeletePathFamily("release/x64/xpack_phase3_store_huge_dst");
+	xpkClose(objXpk);
+	remove(sPathPkgStoreHuge);
 
 	objXpk = xpkOpen(sPathPkgCore, NULL);
 	if ( objXpk == NULL ) {

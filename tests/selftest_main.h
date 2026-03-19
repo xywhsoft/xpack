@@ -1,11 +1,6 @@
 ﻿static void procDeleteVolumeFiles(const char* sPathPackage)
 {
-	if ( sPathPackage == NULL ) {
-		return;
-	}
-
-	(void)procXpkDeleteVolumeFilesText(NULL, sPathPackage, 0);
-	(void)procXpkScanLooseVolumeFilesText(NULL, sPathPackage, TRUE, NULL);
+	procTestDeletePathFamily(sPathPackage);
 }
 
 static int procEachCountTxt(xpkObject objXpk, uint32_t iPos, const void* pInfo, void* pArg)
@@ -78,6 +73,15 @@ static bool procTestFilterValid(const char* sFilter)
 	if ( procTestFilterEquals(sFilter, "smoke", "open_core") ) {
 		return TRUE;
 	}
+	if ( procTestFilterEquals(sFilter, "unit", "index_path") ) {
+		return TRUE;
+	}
+	if ( procTestFilterEquals(sFilter, "integration", "build_volume") ) {
+		return TRUE;
+	}
+	if ( procTestFilterEquals(sFilter, "integration", "solid_readonly") ) {
+		return TRUE;
+	}
 	if ( strcmp(sFilter, "all") == 0 ) {
 		return TRUE;
 	}
@@ -106,10 +110,17 @@ static void procTestPrintFilterHelp(void)
 	printf("  all\n");
 	printf("  smoke\n");
 	printf("  smoke/open_core\n");
+	printf("  unit\n");
+	printf("  unit/index_path\n");
+	printf("  integration\n");
+	printf("  integration/build_volume\n");
+	printf("  integration/solid_readonly\n");
 	printf("\n");
 	printf("note:\n");
-	printf("  only smoke is currently isolated.\n");
-	printf("  unit/integration still run through the full regression path.\n");
+	printf("  filters use staged cumulative execution.\n");
+	printf("  unit runs smoke + unit.\n");
+	printf("  integration/build_volume runs smoke + unit + build_volume.\n");
+	printf("  integration/solid_readonly runs smoke + unit + build_volume + solid_readonly.\n");
 }
 
 int main(int argc, char** argv)
@@ -128,12 +139,15 @@ int main(int argc, char** argv)
 	const char* sPathPkgLayout;
 	const char* sPathPkgFormat;
 	const char* sPathFileExport;
+	const char* sPathFileHuge;
+	const char* sPathPkgStoreHuge;
 	const char* sPathPkgBuildFailTemp;
 	const char* sPathPkgSaveFail;
 	const char* sPathPkgReplace;
 	const char* sPathPkgReplaceNew;
 	const char* sPathPkgReplaceTemp;
 	const char* sPathPkgReplaceBackup;
+	const char* sPathPkgRaw64;
 	const char* sPathPkgReadonly;
 	const char* sPathPkgTest;
 	const char* sPathPkgVolumeTemp;
@@ -192,6 +206,7 @@ int main(int argc, char** argv)
 	xpkStat objStat;
 	void* pMetaRead;
 	void* pDataRead;
+	void* pDataLarge;
 	bool bNewItem;
 	char* sPathKey;
 	char* sPathSaved;
@@ -203,6 +218,7 @@ int main(int argc, char** argv)
 	uint32_t iMetaSize;
 	uint32_t iPosRet;
 	uint32_t iPosSaved;
+	uint32_t iDataLargeSize;
 	uint32_t iVolumeCount;
 	uint32_t iVolumeSize;
 	uint8_t iCorruptByte;
@@ -243,10 +259,22 @@ int main(int argc, char** argv)
 		return 2;
 	}
 
-	bRunSmoke = procTestFilterEquals(sTestFilter, "smoke", "open_core");
-	bRunUnit = (sTestFilter == NULL) || (sTestFilter[0] == '\0') || (strcmp(sTestFilter, "all") == 0);
-	bRunBuildVolume = bRunUnit;
-	bRunSolidReadonly = bRunUnit;
+	bRunSmoke =
+		procTestFilterEquals(sTestFilter, "smoke", "open_core")
+		|| procTestFilterEquals(sTestFilter, "unit", "index_path")
+		|| procTestFilterEquals(sTestFilter, "integration", "build_volume")
+		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
+
+	bRunUnit =
+		procTestFilterEquals(sTestFilter, "unit", "index_path")
+		|| procTestFilterEquals(sTestFilter, "integration", "build_volume")
+		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
+
+	bRunBuildVolume =
+		procTestFilterEquals(sTestFilter, "integration", "build_volume")
+		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
+
+	bRunSolidReadonly = procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
 
 	sPathPkgCore = "release/x64/xpack_phase3_core.xpk";
 	sPathPkgIndex = "release/x64/xpack_phase3_index.xpk";
@@ -262,12 +290,15 @@ int main(int argc, char** argv)
 	sPathPkgLayout = "release/x64/xpack_phase3_layout.xpk";
 	sPathPkgFormat = "release/x64/xpack_phase3_format_bad.xpk";
 	sPathFileExport = "release/x64/xpack_phase3_export.bin";
+	sPathFileHuge = "release/x64/xpack_phase3_huge_source.bin";
+	sPathPkgStoreHuge = "release/x64/xpack_phase3_store_huge.xpk";
 	sPathPkgBuildFailTemp = "release/x64/xpack_phase3_build_fail_cleanup.xpk.build.tmp";
 	sPathPkgSaveFail = "release/x64/xpack_phase3_save_fail_queue.xpk";
 	sPathPkgReplace = "release/x64/xpack_phase3_replace_safe.xpk";
 	sPathPkgReplaceNew = "release/x64/xpack_phase3_replace_new.xpk";
 	sPathPkgReplaceTemp = "release/x64/xpack_phase3_replace_safe.xpk.build.tmp";
 	sPathPkgReplaceBackup = "release/x64/xpack_phase3_replace_safe.xpk.replace.bak";
+	sPathPkgRaw64 = "release/x64/xpack_phase3_raw64.xpk";
 	sPathPkgReadonly = "release/x64/xpack_phase3_readonly.xpk";
 	sPathPkgTest = "release/x64/xpack_phase1_test.xpk";
 	sPathPkgVolumeTemp = "release/x64/xpack_phase3_volume.xpk.build.tmp";
@@ -280,28 +311,30 @@ int main(int argc, char** argv)
 	remove(sPathPkgPath);
 	remove(sPathPkgBuild);
 	remove(sPathPkgBuildExistsTemp);
-	xrtDirDelete((str)sPathPkgBuildExistsDir);
+	procTestDeletePathFamily(sPathPkgBuildExistsDir);
 	remove(sPathPkgCodec);
 	remove(sPathPkgSolid);
 	remove(sPathPkgSolidStore);
 	remove(sPathPkgFormat);
 	remove(sPathFileExport);
-	procDeleteVolumeFiles(sPathPkgBuildFailTemp);
-	procDeleteVolumeFiles(sPathPkgBuildExistsTemp);
-	procDeleteVolumeFiles(sPathPkgSaveFail);
+	remove(sPathFileHuge);
+	remove(sPathPkgStoreHuge);
+	procTestDeletePathFamily(sPathPkgBuildFailTemp);
+	procTestDeletePathFamily(sPathPkgBuildExistsTemp);
+	procTestDeletePathFamily(sPathPkgSaveFail);
 	remove(sPathPkgReadonly);
 	remove(sPathPkgTest);
-	procDeleteVolumeFiles(sPathPkgReplace);
-	procDeleteVolumeFiles(sPathPkgReplaceNew);
-	procDeleteVolumeFiles(sPathPkgReplaceTemp);
-	procDeleteVolumeFiles(sPathPkgReplaceBackup);
-	xrtDirDelete((str)sPathPkgReplaceNew);
-	procDeleteVolumeFiles(sPathPkgVolume);
-	procDeleteVolumeFiles(sPathPkgVolumeTemp);
-	procDeleteVolumeFiles(sPathPkgLayout);
-	xrtDirDelete((str)sPathPkgOpenDir);
-	procDeleteVolumeFiles(sPathPkgOpenSparse);
-	procDeleteVolumeFiles(sPathPkgOpenZeroSparse);
+	procTestDeletePathFamily(sPathPkgReplace);
+	procTestDeletePathFamily(sPathPkgReplaceNew);
+	procTestDeletePathFamily(sPathPkgReplaceTemp);
+	procTestDeletePathFamily(sPathPkgReplaceBackup);
+	procTestDeletePathFamily(sPathPkgRaw64);
+	procTestDeletePathFamily(sPathPkgVolume);
+	procTestDeletePathFamily(sPathPkgVolumeTemp);
+	procTestDeletePathFamily(sPathPkgLayout);
+	procTestDeletePathFamily(sPathPkgOpenDir);
+	procTestDeletePathFamily(sPathPkgOpenSparse);
+	procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 	memset(sDataBuildA, 'A', sizeof(sDataBuildA));
 	memset(sDataBuildB, 'B', sizeof(sDataBuildB));
 	memset(sDataSaveFailBase, 'Q', sizeof(sDataSaveFailBase));
@@ -432,17 +465,20 @@ int main(int argc, char** argv)
 	remove(sPathPkgSolidStore);
 	remove(sPathPkgFormat);
 	remove(sPathFileExport);
+	remove(sPathFileHuge);
+	remove(sPathPkgStoreHuge);
 	remove(sPathPkgReadonly);
-	procDeleteVolumeFiles(sPathPkgBuildExistsTemp);
-	procDeleteVolumeFiles(sPathPkgSaveFail);
-	procDeleteVolumeFiles(sPathPkgReplace);
-	procDeleteVolumeFiles(sPathPkgReplaceTemp);
-	procDeleteVolumeFiles(sPathPkgReplaceBackup);
-	procDeleteVolumeFiles(sPathPkgVolume);
-	procDeleteVolumeFiles(sPathPkgVolumeTemp);
-	procDeleteVolumeFiles(sPathPkgLayout);
-	procDeleteVolumeFiles(sPathPkgOpenSparse);
-	procDeleteVolumeFiles(sPathPkgOpenZeroSparse);
+	procTestDeletePathFamily(sPathPkgBuildExistsTemp);
+	procTestDeletePathFamily(sPathPkgSaveFail);
+	procTestDeletePathFamily(sPathPkgReplace);
+	procTestDeletePathFamily(sPathPkgReplaceTemp);
+	procTestDeletePathFamily(sPathPkgReplaceBackup);
+	procTestDeletePathFamily(sPathPkgRaw64);
+	procTestDeletePathFamily(sPathPkgVolume);
+	procTestDeletePathFamily(sPathPkgVolumeTemp);
+	procTestDeletePathFamily(sPathPkgLayout);
+	procTestDeletePathFamily(sPathPkgOpenSparse);
+	procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 
 	return 0;
 }

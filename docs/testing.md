@@ -73,29 +73,42 @@ tests/xpack_test_main.c
 6. `tests/integration/layout_state.inc.h`
 7. `tests/integration/readonly_guard.inc.h`
 
+其中 `tests/integration/volume_mode.inc.h` 当前还覆盖：
+
+1. 基于新版 `xrt` 的 `64-bit seek`、超过 `4GB` 的文件定位，以及 `INT64_MAX` 以上 seek 保护回归
+2. 超过 `4GB` 的大逻辑偏移分卷原始读写
+3. 大尾段 `save rollback` 的临时文件回滚路径
+4. 大结果导出的分块写路径、普通未压缩条目的分块直导出路径，以及超大单文件源输入的 block-limit 边界
+
 ## 4. 当前 helper
 
 `tests/test_helpers.h` 当前已经提供这些基础 helper：
 
 1. `procTestWriteBinaryFile`
    写入二进制测试夹具。
-2. `procTestFileContentEquals`
+2. `procTestWriteVolumeBinaryFile`
+   向某个分卷路径族写入分卷夹具文件。
+3. `procTestCreateDirOccupy`
+   创建目录占位，用于验证 `open / build` 的路径冲突保护。
+4. `procTestDeletePathFamily`
+   统一清理单文件、目录、连续分卷和稀疏残卷。
+5. `procTestFileContentEquals`
    读取并比对文件内容。
-3. `procTestExpectLastError`
+6. `procTestExpectLastError`
    校验 `last error`。
-4. `procTestCheckLastError`
+7. `procTestCheckLastError`
    在需要保留两段失败编号时校验 `last error`。
-5. `procTestExpectCallError`
+8. `procTestExpectCallError`
    统一“返回码 + last error”断言。
-6. `procTestCheckCallError`
+9. `procTestCheckCallError`
    在需要保留三段失败编号时统一“返回码 + last error”断言。
-7. `procTestExpectNullResultError`
+10. `procTestExpectNullResultError`
    统一“空返回值 + last error”断言。
-8. `procTestCheckNullResultError`
+11. `procTestCheckNullResultError`
    在需要保留三段失败编号时统一“空返回值 + last error”断言。
-9. `procTestExpectFalseError`
+12. `procTestExpectFalseError`
    统一“布尔假返回 + last error”断言。
-10. `procTestCheckFalseError`
+13. `procTestCheckFalseError`
    在需要保留三段失败编号时统一“布尔假返回 + last error”断言。
 
 ## 5. Helper 使用规则
@@ -134,11 +147,16 @@ release\x64\xpack_test.exe
 
 ### 7.2 当前稳定可用的过滤值
 
-当前稳定接受的过滤值只有：
+当前稳定接受的过滤值有：
 
 1. `all`
 2. `smoke`
 3. `smoke/open_core`
+4. `unit`
+5. `unit/index_path`
+6. `integration`
+7. `integration/build_volume`
+8. `integration/solid_readonly`
 
 也可以通过环境变量传入：
 
@@ -149,10 +167,13 @@ release\x64\xpack_test.exe
 
 ### 7.3 关于 unit / integration
 
-虽然测试目录已经按 `unit` 和 `integration` 拆分完成，但当前命令行过滤器还没有把它们作为稳定独立入口开放。也就是说：
+`unit` 和 `integration` 当前已经作为稳定过滤入口开放，但语义是阶段式累进执行，而不是彼此完全隔离。也就是说：
 
-1. `unit` 和 `integration` 当前是内部组织层次，不是稳定 CLI 过滤值。
-2. 如果改动落在 `unit` 或 `integration`，当前仍建议直接跑完整回归。
+1. `smoke` 只跑 `smoke`。
+2. `unit` 会跑 `smoke + unit`。
+3. `integration/build_volume` 会跑 `smoke + unit + integration/build_volume`。
+4. `integration/solid_readonly` 会跑 `smoke + unit + integration/build_volume + integration/solid_readonly`。
+5. `integration` 等价于当前完整回归。
 
 ## 8. Windows 验证清单
 
@@ -181,7 +202,8 @@ release\x64\xpack_test.exe
 1. 仍然是顺序大回归，不支持按用例粒度过滤执行。
 2. Linux 侧还没有正式进入回归。
 3. 超大文件和接近 `4GB` 分卷上限还缺压力测试。
-4. helper 层已经成型，但目录夹具、坏包夹具和更多断言场景仍可以继续收口。
+4. 文件定位已覆盖 `4GB+`，普通未压缩条目导出也已支持分块直通，但单块编解码、单文件数据块和 `solid` 整流仍然是当前实现边界。
+5. helper 层已经成型，但目录夹具、坏包夹具和更多断言场景仍可以继续收口。
 
 ## 10. 后续建议
 

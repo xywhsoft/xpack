@@ -43,9 +43,9 @@
 2. `tests/integration/codec_levels.inc.h`
    压缩级别映射、`STORE / LZ4 / LZ4HC / ZSTD / LZMA2`、压缩回退到 `STORE`。
 3. `tests/integration/volume_mode.inc.h`
-   分卷虚拟 I/O、跨卷读写、分卷尾段、分卷 `save / build`、残卷处理。
+   分卷虚拟 I/O、跨卷读写、分卷尾段、分卷 `save / build`、残卷处理，以及 `64-bit seek` / 超过 `4GB` 的大逻辑偏移分卷原始 I/O。
 4. `tests/integration/replace_rollback.inc.h`
-   替换原包、`.replace.bak`、替换失败回滚、半提交清理、备份路径冲突。
+   替换原包、`.replace.bak`、替换失败回滚、半提交清理、备份路径冲突，以及大尾段 `save rollback` 的临时文件回滚。
 5. `tests/integration/solid_mode.inc.h`
    `solid` 数据读取、`solid <-> normal` build、solid 统计和 `verify`。
 6. `tests/integration/layout_state.inc.h`
@@ -80,14 +80,26 @@
 
 1. Linux 侧还没有正式回归执行。
 2. 接近 `4GB` 分卷上限和更大逻辑文件还缺真实压力测试。
-3. 当前仍是顺序大回归，没有按测试名粒度过滤执行的能力。
+3. 文件定位已覆盖 `4GB+`，普通未压缩条目导出也已支持分块直通，但单块编解码、单文件数据块和 `solid` 整流仍然是当前实现边界。
+4. 当前仍是顺序大回归，没有按测试名粒度过滤执行的能力。
 
 ## 9. 过滤说明
 
-当前稳定接受的过滤值只有：
+当前稳定接受的过滤值有：
 
 1. `all`
 2. `smoke`
 3. `smoke/open_core`
+4. `unit`
+5. `unit/index_path`
+6. `integration`
+7. `integration/build_volume`
+8. `integration/solid_readonly`
 
-`unit` 和 `integration` 当前已经完成目录拆分，但仍然只作为覆盖索引和内部组织层，不作为稳定独立入口对外承诺。
+这些过滤值采用阶段式累进执行：
+
+1. `smoke` 只跑 `smoke`
+2. `unit` 会跑 `smoke + unit`
+3. `integration/build_volume` 会跑 `smoke + unit + integration/build_volume`
+4. `integration/solid_readonly` 会跑 `smoke + unit + integration/build_volume + integration/solid_readonly`
+5. `integration` 等价于当前完整回归

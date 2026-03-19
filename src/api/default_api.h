@@ -363,6 +363,7 @@ XPKAPI int xpkAddData(xpkObject objXpk, const void* pData, uint64_t iSize, const
 
 XPKAPI int xpkReadToFile(xpkObject objXpk, uint32_t iPos, const char* sDstPath)
 {
+	xpkEntry* pEntry;
 	void* pData;
 	uint64_t iSize;
 	int iRet;
@@ -374,7 +375,19 @@ XPKAPI int xpkReadToFile(xpkObject objXpk, uint32_t iPos, const char* sDstPath)
 		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 	}
 
-	pData = xpkReadToMemory(objXpk, iPos, &iSize);
+	if ( procXpkGetPublicEntryByPos(objXpk, iPos, &pEntry) != XPK_OK ) {
+		return xpkLastError(objXpk);
+	}
+	if ( procXpkValidatePublicPosAccess(objXpk, pEntry) != XPK_OK ) {
+		return xpkLastError(objXpk);
+	}
+	if ( !objXpk->bSolidApplied &&
+		(procXpkFindWriteNode(objXpk, pEntry->iPos, NULL) == NULL) &&
+		((pEntry->iFlag & XPK_FLAG_COMP_MASK) == 0) ) {
+		return procXpkCopyStoredEntryToFile(objXpk, pEntry, sDstPath);
+	}
+
+	pData = procXpkReadEntryData(objXpk, pEntry, &iSize);
 	if ( pData == NULL ) {
 		return xpkLastError(objXpk);
 	}

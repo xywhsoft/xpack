@@ -31,7 +31,7 @@ tests/
 2. `selftest_main.h`
    共享变量、初始化、清理和顺序聚合。
 3. `test_helpers.h`
-   文件夹具和错误断言 helper。
+   文件夹具、路径家族清理和错误断言 helper。
 4. `smoke / unit / integration`
    按专题拆分的测试块。
 
@@ -44,11 +44,16 @@ build_GCC_TEST_x64.bat
 release\x64\xpack_test.exe
 ```
 
-当前稳定可用的过滤值只有：
+当前稳定可用的过滤值有：
 
 ```bat
 release\x64\xpack_test.exe smoke
 release\x64\xpack_test.exe smoke/open_core
+release\x64\xpack_test.exe unit
+release\x64\xpack_test.exe unit/index_path
+release\x64\xpack_test.exe integration
+release\x64\xpack_test.exe integration/build_volume
+release\x64\xpack_test.exe integration/solid_readonly
 ```
 
 也可以通过：
@@ -77,7 +82,7 @@ release\x64\xpack_test.exe
 ## 5. 当前限制
 
 1. 测试程序仍然是单个顺序回归，不是多进程或按用例粒度运行。
-2. `unit` 和 `integration` 目前只是内部组织层，不是稳定 CLI 过滤入口。
+2. 当前过滤入口采用阶段式累进执行，不是完全隔离的独立子测试进程。
 3. Linux 回归和超大文件压力测试还未正式开始。
 
 ## 6. 配套文档

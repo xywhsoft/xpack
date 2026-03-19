@@ -97,7 +97,7 @@
 		}
 		return (iCheckRet == 2) ? 410 : 411;
 	}
-	if ( !xrtDirCreate((str)sPathPkgOpenDir) ) {
+	if ( !procTestCreateDirOccupy(sPathPkgOpenDir) ) {
 		return 925;
 	}
 	objXpk = xpkOpen(sPathPkgOpenDir, NULL);
@@ -105,10 +105,10 @@
 	if ( iCheckRet != 0 ) {
 		if ( objXpk != NULL ) {
 			xpkClose(objXpk);
-			xrtDirDelete((str)sPathPkgOpenDir);
+			procTestDeletePathFamily(sPathPkgOpenDir);
 			return 926;
 		}
-		xrtDirDelete((str)sPathPkgOpenDir);
+		procTestDeletePathFamily(sPathPkgOpenDir);
 		return (iCheckRet == 2) ? 927 : 928;
 	}
 
@@ -119,22 +119,22 @@
 	if ( iCheckRet != 0 ) {
 		if ( objXpk != NULL ) {
 			xpkClose(objXpk);
-			xrtDirDelete((str)sPathPkgOpenDir);
+			procTestDeletePathFamily(sPathPkgOpenDir);
 			return 929;
 		}
-		xrtDirDelete((str)sPathPkgOpenDir);
+		procTestDeletePathFamily(sPathPkgOpenDir);
 		return (iCheckRet == 2) ? 930 : 931;
 	}
 	if ( !xrtDirExists((str)sPathPkgOpenDir) ) {
-		xrtDirDelete((str)sPathPkgOpenDir);
+		procTestDeletePathFamily(sPathPkgOpenDir);
 		return 932;
 	}
-	xrtDirDelete((str)sPathPkgOpenDir);
+	procTestDeletePathFamily(sPathPkgOpenDir);
 	sPathKey = procXpkVolumePathDupText(sPathPkgOpenSparse, 5);
 	if ( sPathKey == NULL ) {
 		return 957;
 	}
-	if ( !procTestWriteBinaryFile(sPathKey, "KEEP", 4) ) {
+	if ( !procTestWriteVolumeBinaryFile(sPathPkgOpenSparse, 5, "KEEP", 4) ) {
 		xpkFreeInternal(sPathKey);
 		return 958;
 	}
@@ -144,21 +144,21 @@
 	objXpk = xpkOpen(sPathPkgOpenSparse, &objOpt);
 	if ( objXpk != NULL ) {
 		xpkClose(objXpk);
-		procDeleteVolumeFiles(sPathPkgOpenSparse);
+		procTestDeletePathFamily(sPathPkgOpenSparse);
 		xpkFreeInternal(sPathKey);
 		return 960;
 	}
 	if ( !procTestExpectLastError(NULL, XPK_ERR_EXISTS, sXpkErrorPackagePathExists) ) {
-		procDeleteVolumeFiles(sPathPkgOpenSparse);
+		procTestDeletePathFamily(sPathPkgOpenSparse);
 		xpkFreeInternal(sPathKey);
 		return 961;
 	}
 	if ( !procTestFileContentEquals(sPathKey, "KEEP", 4) ) {
-		procDeleteVolumeFiles(sPathPkgOpenSparse);
+		procTestDeletePathFamily(sPathPkgOpenSparse);
 		xpkFreeInternal(sPathKey);
 		return 962;
 	}
-	procDeleteVolumeFiles(sPathPkgOpenSparse);
+	procTestDeletePathFamily(sPathPkgOpenSparse);
 	xpkFreeInternal(sPathKey);
 	hFile = xrtOpen((str)sPathPkgOpenZeroSparse, FALSE, XRT_CP_BINARY);
 	if ( hFile == NULL ) {
@@ -170,7 +170,7 @@
 		remove(sPathPkgOpenZeroSparse);
 		return 967;
 	}
-	if ( !procTestWriteBinaryFile(sPathKey, "KEEP", 4) ) {
+	if ( !procTestWriteVolumeBinaryFile(sPathPkgOpenZeroSparse, 5, "KEEP", 4) ) {
 		remove(sPathPkgOpenZeroSparse);
 		xpkFreeInternal(sPathKey);
 		return 968;
@@ -179,22 +179,22 @@
 	if ( objXpk != NULL ) {
 		xpkClose(objXpk);
 		remove(sPathPkgOpenZeroSparse);
-		procDeleteVolumeFiles(sPathPkgOpenZeroSparse);
+		procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 		xpkFreeInternal(sPathKey);
 		return 970;
 	}
 	if ( !procTestExpectLastError(NULL, XPK_ERR_EXISTS, sXpkErrorPackagePathExists) ) {
 		remove(sPathPkgOpenZeroSparse);
-		procDeleteVolumeFiles(sPathPkgOpenZeroSparse);
+		procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 		xpkFreeInternal(sPathKey);
 		return 971;
 	}
 	if ( !procTestFileContentEquals(sPathKey, "KEEP", 4) ) {
 		remove(sPathPkgOpenZeroSparse);
-		procDeleteVolumeFiles(sPathPkgOpenZeroSparse);
+		procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 		xpkFreeInternal(sPathKey);
 		return 972;
 	}
 	remove(sPathPkgOpenZeroSparse);
-	procDeleteVolumeFiles(sPathPkgOpenZeroSparse);
+	procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 	xpkFreeInternal(sPathKey);

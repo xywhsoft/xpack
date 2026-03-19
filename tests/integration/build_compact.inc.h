@@ -163,27 +163,27 @@
 	}
 	iRetCall = xpkBuild(objXpk, NULL);
 	if ( !procTestExpectCallError(iRetCall, XPK_ERR_EXISTS, objXpk, XPK_ERR_EXISTS, sXpkErrorTempPathExists) ) {
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return (iRetCall != XPK_ERR_EXISTS) ? 900 : 901;
 	}
 	if ( !procTestFileContentEquals(sPathKey, "KEEP", 4) ) {
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 902;
 	}
 	sPathVolume = procXpkVolumePathDupText(sPathKey, 2);
 	if ( sPathVolume == NULL ) {
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 905;
 	}
 	if ( !procTestWriteBinaryFile(sPathVolume, "SPARSE", 6) ) {
 		xpkFreeInternal(sPathVolume);
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 906;
@@ -191,14 +191,14 @@
 	iRetCall = xpkBuild(objXpk, NULL);
 	if ( !procTestExpectCallError(iRetCall, XPK_ERR_EXISTS, objXpk, XPK_ERR_EXISTS, sXpkErrorTempPathExists) ) {
 		xpkFreeInternal(sPathVolume);
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return (iRetCall != XPK_ERR_EXISTS) ? 908 : 909;
 	}
 	if ( !procTestFileContentEquals(sPathVolume, "SPARSE", 6) ) {
 		xpkFreeInternal(sPathVolume);
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 910;
@@ -206,37 +206,37 @@
 	xpkFreeInternal(sPathVolume);
 	sPathVolume = procXpkVolumePathDupText(sPathKey, 1);
 	if ( sPathVolume == NULL ) {
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 917;
 	}
-	if ( !xrtDirCreate((str)sPathVolume) ) {
+	if ( !procTestCreateDirOccupy(sPathVolume) ) {
 		xpkFreeInternal(sPathVolume);
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 918;
 	}
 	iRetCall = xpkBuild(objXpk, NULL);
 	if ( !procTestExpectCallError(iRetCall, XPK_ERR_EXISTS, objXpk, XPK_ERR_EXISTS, sXpkErrorTempPathExists) ) {
-		xrtDirDelete((str)sPathVolume);
+		procTestDeletePathFamily(sPathVolume);
 		xpkFreeInternal(sPathVolume);
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return (iRetCall != XPK_ERR_EXISTS) ? 919 : 920;
 	}
 	if ( !xrtDirExists((str)sPathVolume) ) {
-		xrtDirDelete((str)sPathVolume);
+		procTestDeletePathFamily(sPathVolume);
 		xpkFreeInternal(sPathVolume);
-		procDeleteVolumeFiles(sPathKey);
+		procTestDeletePathFamily(sPathKey);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 921;
 	}
-	xrtDirDelete((str)sPathVolume);
-	if ( !xrtDirCreate((str)sPathPkgBuildExistsDir) ) {
+	procTestDeletePathFamily(sPathVolume);
+	if ( !procTestCreateDirOccupy(sPathPkgBuildExistsDir) ) {
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 913;
@@ -246,20 +246,20 @@
 	objBuildOpt.replaceOriginal = FALSE;
 	iRetCall = xpkBuild(objXpk, &objBuildOpt);
 	if ( !procTestExpectCallError(iRetCall, XPK_ERR_EXISTS, objXpk, XPK_ERR_EXISTS, sXpkErrorTempPathExists) ) {
-		xrtDirDelete((str)sPathPkgBuildExistsDir);
+		procTestDeletePathFamily(sPathPkgBuildExistsDir);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return (iRetCall != XPK_ERR_EXISTS) ? 914 : 915;
 	}
 	if ( !xrtDirExists((str)sPathPkgBuildExistsDir) ) {
-		xrtDirDelete((str)sPathPkgBuildExistsDir);
+		procTestDeletePathFamily(sPathPkgBuildExistsDir);
 		xpkFreeInternal(sPathKey);
 		xpkClose(objXpk);
 		return 916;
 	}
-	xrtDirDelete((str)sPathPkgBuildExistsDir);
+	procTestDeletePathFamily(sPathPkgBuildExistsDir);
 	xpkFreeInternal(sPathVolume);
-	procDeleteVolumeFiles(sPathKey);
+	procTestDeletePathFamily(sPathKey);
 	xpkFreeInternal(sPathKey);
 	xpkClose(objXpk);
 

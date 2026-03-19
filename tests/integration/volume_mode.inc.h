@@ -32,6 +32,48 @@
 	}
 	xpkClose(objXpk);
 
+	memset(&objOpt, 0, sizeof(objOpt));
+	objOpt.createIfMissing = TRUE;
+	objXpk = xpkOpen(sPathPkgRaw64, &objOpt);
+	if ( objXpk == NULL ) {
+		return 976;
+	}
+	if ( xpkSetVolumeSize(objXpk, XPK_VOLUME_MIN) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 977;
+	}
+	if ( !objXpk->bVolumeApplied || procXpkAppliedVolumeSize(objXpk) != XPK_VOLUME_MIN ) {
+		xpkClose(objXpk);
+		return 978;
+	}
+	iBuildSizeBefore = ((uint64_t)XPK_VOLUME_MIN * 65536u) + 123u;
+	if ( procXpkRawWrite(objXpk, iBuildSizeBefore, "SEEK64", 6) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 979;
+	}
+	memset(arrInfoExtCoreRead, 0, sizeof(arrInfoExtCoreRead));
+	if ( procXpkRawRead(objXpk, iBuildSizeBefore, arrInfoExtCoreRead, 6) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 980;
+	}
+	if ( memcmp(arrInfoExtCoreRead, "SEEK64", 6) != 0 ) {
+		xpkClose(objXpk);
+		return 981;
+	}
+	sPathVolume = procXpkVolumePathDupText(sPathPkgRaw64, 65536u);
+	if ( sPathVolume == NULL ) {
+		xpkClose(objXpk);
+		return 982;
+	}
+	if ( !xrtFileExists((str)sPathVolume) ) {
+		xpkFreeInternal(sPathVolume);
+		xpkClose(objXpk);
+		return 983;
+	}
+	xpkFreeInternal(sPathVolume);
+	xpkClose(objXpk);
+	procTestDeletePathFamily(sPathPkgRaw64);
+
 	sPathVolume = procXpkVolumePathDupText(sPathPkgVolume, 1);
 	if ( sPathVolume == NULL ) {
 		return 124;
@@ -141,19 +183,11 @@
 		xpkClose(objXpk);
 		return 336;
 	}
-	hFile = xrtOpen((str)sPathVolume, FALSE, XRT_CP_BINARY);
-	if ( hFile == NULL ) {
+	if ( !procTestWriteVolumeBinaryFile(sPathPkgVolume, 5, "STALE", 5) ) {
 		xpkFreeInternal(sPathVolume);
 		xpkClose(objXpk);
 		return 337;
 	}
-	if ( xrtWrite(hFile, (str)"STALE", 5) != 5 ) {
-		xrtClose(hFile);
-		xpkFreeInternal(sPathVolume);
-		xpkClose(objXpk);
-		return 338;
-	}
-	xrtClose(hFile);
 	if ( xpkBuild(objXpk, NULL) != XPK_OK ) {
 		xpkFreeInternal(sPathVolume);
 		xpkClose(objXpk);
