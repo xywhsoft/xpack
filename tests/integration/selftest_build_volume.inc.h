@@ -1,4 +1,4 @@
-﻿	/* build compaction / temp-path occupancy / package rebuild safety */
+	/* build compaction / temp-path occupancy / package rebuild safety */
 #include "build_compact.inc.h"
 
 	/* codec mapping / fallback / lz4-zstd-lzma roundtrip */

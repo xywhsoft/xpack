@@ -76,10 +76,25 @@ static bool procTestFilterValid(const char* sFilter)
 	if ( procTestFilterEquals(sFilter, "unit", "index_path") ) {
 		return TRUE;
 	}
+	if ( strcmp(sFilter, "unit/index_path/direct") == 0 ) {
+		return TRUE;
+	}
 	if ( procTestFilterEquals(sFilter, "integration", "build_volume") ) {
 		return TRUE;
 	}
+	if ( strcmp(sFilter, "integration/build_volume/direct") == 0 ) {
+		return TRUE;
+	}
+	if ( procTestFilterEquals(sFilter, "integration", "stress") ) {
+		return TRUE;
+	}
+	if ( strcmp(sFilter, "integration/stress/direct") == 0 ) {
+		return TRUE;
+	}
 	if ( procTestFilterEquals(sFilter, "integration", "solid_readonly") ) {
+		return TRUE;
+	}
+	if ( strcmp(sFilter, "integration/solid_readonly/direct") == 0 ) {
 		return TRUE;
 	}
 	if ( strcmp(sFilter, "all") == 0 ) {
@@ -105,22 +120,57 @@ static bool procTestFilterIsHelp(const char* sFilter)
 static void procTestPrintFilterHelp(void)
 {
 	printf("xpack_test usage:\n");
-	printf("  xpack_test [filter]\n\n");
+	printf("  xpack_test [filter] [stress_repeat]\n\n");
 	printf("available filters:\n");
 	printf("  all\n");
 	printf("  smoke\n");
 	printf("  smoke/open_core\n");
 	printf("  unit\n");
 	printf("  unit/index_path\n");
+	printf("  unit/index_path/direct\n");
 	printf("  integration\n");
 	printf("  integration/build_volume\n");
+	printf("  integration/build_volume/direct\n");
+	printf("  integration/stress\n");
+	printf("  integration/stress/direct\n");
 	printf("  integration/solid_readonly\n");
+	printf("  integration/solid_readonly/direct\n");
 	printf("\n");
 	printf("note:\n");
 	printf("  filters use staged cumulative execution.\n");
 	printf("  unit runs smoke + unit.\n");
 	printf("  integration/build_volume runs smoke + unit + build_volume.\n");
+	printf("  integration/stress runs smoke + unit + build_volume repeated N times.\n");
 	printf("  integration/solid_readonly runs smoke + unit + build_volume + solid_readonly.\n");
+	printf("  filters ending with /direct only run that stage itself.\n");
+	printf("  stress_repeat defaults to 5 and can also come from XPACK_TEST_STRESS_REPEAT.\n");
+}
+
+
+static bool procTestParseStressRepeat(const char* sText, uint32_t* pRepeatRet)
+{
+	char* sEndPtr;
+	unsigned long iRepeat;
+
+	if ( pRepeatRet == NULL ) {
+		return FALSE;
+	}
+	if ( (sText == NULL) || (sText[0] == '\0') ) {
+		*pRepeatRet = 5u;
+		return TRUE;
+	}
+
+	sEndPtr = NULL;
+	iRepeat = strtoul(sText, &sEndPtr, 10);
+	if ( (sEndPtr == NULL) || (sEndPtr[0] != '\0') ) {
+		return FALSE;
+	}
+	if ( (iRepeat == 0ul) || (iRepeat > 1000ul) ) {
+		return FALSE;
+	}
+
+	*pRepeatRet = (uint32_t)iRepeat;
+	return TRUE;
 }
 
 int main(int argc, char** argv)
@@ -150,10 +200,14 @@ int main(int argc, char** argv)
 	const char* sPathPkgRaw64;
 	const char* sPathPkgReadonly;
 	const char* sPathPkgTest;
+	const char* sPathPkgVolumeLarge;
+	const char* sPathPkgVolumeSolid;
 	const char* sPathPkgVolumeTemp;
 	const char* sPathPkgOpenDir;
 	const char* sPathPkgOpenSparse;
 	const char* sPathPkgOpenZeroSparse;
+	const char* sPathFileCodecSrc;
+	const char* sStressRepeatText;
 	const char sDataCore[] = "core-data-123";
 	const char sDataIndex[] = "index-buffered-data";
 	const char sDataIndexUpdate[] = "index-buffered-update";
@@ -183,6 +237,7 @@ int main(int argc, char** argv)
 	str sPathVolume;
 	xfile hFile;
 	xfile hFileTmp;
+	xpkMappedFile objMap;
 	xarray_struct arrTest;
 	xlist_struct lstTest;
 	xdict_struct tblTest;
@@ -200,8 +255,14 @@ int main(int argc, char** argv)
 	bool bRunSmoke;
 	bool bRunUnit;
 	bool bRunBuildVolume;
+	bool bRunStress;
 	bool bRunSolidReadonly;
+	bool bDirectUnit;
+	bool bDirectBuildVolume;
+	bool bDirectStress;
+	bool bDirectSolidReadonly;
 	xpkFileInfo objInfo;
+	xpkFileInfoIndex objInfoIndex;
 	xpkFileInfoPath objInfoPath;
 	xpkStat objStat;
 	void* pMetaRead;
@@ -219,6 +280,7 @@ int main(int argc, char** argv)
 	uint32_t iPosRet;
 	uint32_t iPosSaved;
 	uint32_t iDataLargeSize;
+	uint32_t iStressRepeat;
 	uint32_t iVolumeCount;
 	uint32_t iVolumeSize;
 	uint8_t iCorruptByte;
@@ -258,23 +320,50 @@ int main(int argc, char** argv)
 		procTestPrintFilterHelp();
 		return 2;
 	}
+	sStressRepeatText = (argc > 2) ? argv[2] : getenv("XPACK_TEST_STRESS_REPEAT");
+	if ( !procTestParseStressRepeat(sStressRepeatText, &iStressRepeat) ) {
+		fprintf(stderr, "invalid stress repeat: %s\n", (sStressRepeatText == NULL) ? "(null)" : sStressRepeatText);
+		return 2;
+	}
+
+	bDirectUnit = (sTestFilter != NULL) && (strcmp(sTestFilter, "unit/index_path/direct") == 0);
+	bDirectBuildVolume = (sTestFilter != NULL) && (strcmp(sTestFilter, "integration/build_volume/direct") == 0);
+	bDirectStress = (sTestFilter != NULL) && (strcmp(sTestFilter, "integration/stress/direct") == 0);
+	bDirectSolidReadonly = (sTestFilter != NULL) && (strcmp(sTestFilter, "integration/solid_readonly/direct") == 0);
 
 	bRunSmoke =
 		procTestFilterEquals(sTestFilter, "smoke", "open_core")
 		|| procTestFilterEquals(sTestFilter, "unit", "index_path")
 		|| procTestFilterEquals(sTestFilter, "integration", "build_volume")
+		|| procTestFilterEquals(sTestFilter, "integration", "stress")
 		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
 
 	bRunUnit =
 		procTestFilterEquals(sTestFilter, "unit", "index_path")
 		|| procTestFilterEquals(sTestFilter, "integration", "build_volume")
-		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
+		|| procTestFilterEquals(sTestFilter, "integration", "stress")
+		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly")
+		|| bDirectUnit;
 
 	bRunBuildVolume =
 		procTestFilterEquals(sTestFilter, "integration", "build_volume")
-		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
+		|| procTestFilterEquals(sTestFilter, "integration", "stress")
+		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly")
+		|| bDirectBuildVolume
+		|| bDirectStress;
 
-	bRunSolidReadonly = procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
+	bRunStress = procTestFilterEquals(sTestFilter, "integration", "stress") || bDirectStress;
+	bRunSolidReadonly = procTestFilterEquals(sTestFilter, "integration", "solid_readonly") || bDirectSolidReadonly;
+
+	if ( bDirectUnit || bDirectBuildVolume || bDirectStress || bDirectSolidReadonly ) {
+		bRunSmoke = FALSE;
+	}
+	if ( bDirectBuildVolume || bDirectStress || bDirectSolidReadonly ) {
+		bRunUnit = FALSE;
+	}
+	if ( bDirectSolidReadonly ) {
+		bRunBuildVolume = FALSE;
+	}
 
 	sPathPkgCore = "release/x64/xpack_phase3_core.xpk";
 	sPathPkgIndex = "release/x64/xpack_phase3_index.xpk";
@@ -301,29 +390,35 @@ int main(int argc, char** argv)
 	sPathPkgRaw64 = "release/x64/xpack_phase3_raw64.xpk";
 	sPathPkgReadonly = "release/x64/xpack_phase3_readonly.xpk";
 	sPathPkgTest = "release/x64/xpack_phase1_test.xpk";
+	sPathPkgVolumeLarge = "release/x64/xpack_phase3_volume_large.xpk";
+	sPathPkgVolumeSolid = "release/x64/xpack_phase3_volume_solid_store.xpk";
 	sPathPkgVolumeTemp = "release/x64/xpack_phase3_volume.xpk.build.tmp";
 	sPathPkgOpenDir = "release/x64/xpack_phase3_open_dir";
 	sPathPkgOpenSparse = "release/x64/xpack_phase3_open_sparse.xpk";
 	sPathPkgOpenZeroSparse = "release/x64/xpack_phase3_open_zero_sparse.xpk";
-	remove(sPathPkgCore);
-	remove(sPathPkgIndex);
-	remove(sPathPkgLinux);
-	remove(sPathPkgPath);
-	remove(sPathPkgBuild);
-	remove(sPathPkgBuildExistsTemp);
+	sPathFileCodecSrc = "release/x64/xpack_phase3_codec_src.bin";
+	procTestDeletePathFamily(sPathPkgCore);
+	procTestDeletePathFamily(sPathPkgIndex);
+	procTestDeletePathFamily(sPathPkgLinux);
+	procTestDeletePathFamily(sPathPkgPath);
+	procTestDeletePathFamily(sPathPkgBuild);
+	procTestDeletePathFamily(sPathPkgBuildExistsTemp);
 	procTestDeletePathFamily(sPathPkgBuildExistsDir);
-	remove(sPathPkgCodec);
-	remove(sPathPkgSolid);
-	remove(sPathPkgSolidStore);
-	remove(sPathPkgFormat);
+	procTestDeletePathFamily(sPathPkgCodec);
+	procTestDeletePathFamily(sPathPkgSolid);
+	procTestDeletePathFamily(sPathPkgSolidStore);
+	procTestDeletePathFamily(sPathPkgFormat);
 	remove(sPathFileExport);
+	remove(sPathFileCodecSrc);
 	remove(sPathFileHuge);
-	remove(sPathPkgStoreHuge);
+	procTestDeletePathFamily(sPathPkgStoreHuge);
 	procTestDeletePathFamily(sPathPkgBuildFailTemp);
 	procTestDeletePathFamily(sPathPkgBuildExistsTemp);
 	procTestDeletePathFamily(sPathPkgSaveFail);
-	remove(sPathPkgReadonly);
-	remove(sPathPkgTest);
+	procTestDeletePathFamily(sPathPkgReadonly);
+	procTestDeletePathFamily(sPathPkgTest);
+	procTestDeletePathFamily(sPathPkgVolumeLarge);
+	procTestDeletePathFamily(sPathPkgVolumeSolid);
 	procTestDeletePathFamily(sPathPkgReplace);
 	procTestDeletePathFamily(sPathPkgReplaceNew);
 	procTestDeletePathFamily(sPathPkgReplaceTemp);
@@ -353,7 +448,11 @@ int main(int argc, char** argv)
 	if ( (strlen(sPathPkgReadonly) + 4) >= sizeof(sPathReadonlyAlt) ) {
 		return 679;
 	}
+#ifdef _WIN32
 	strcpy(sPathReadonlyAlt, ".\\\\");
+#else
+	strcpy(sPathReadonlyAlt, "./");
+#endif
 	strcat(sPathReadonlyAlt, sPathPkgReadonly);
 #ifdef _WIN32
 	for ( iEachCount = 0; sPathReadonlyAlt[iEachCount] != '\0'; iEachCount++ ) {
@@ -447,7 +546,33 @@ int main(int argc, char** argv)
 
 	/* integration: build / codec / volume / replace / save rollback */
 	if ( bRunBuildVolume ) {
+		uint32_t iBuildRound;
+		uint32_t iBuildRepeat;
+
+		iBuildRepeat = bRunStress ? iStressRepeat : 1u;
+		for ( iBuildRound = 0; iBuildRound < iBuildRepeat; iBuildRound++ ) {
+			if ( bRunStress ) {
+				fprintf(stderr, "stress build round=%u/%u\n", (unsigned int)(iBuildRound + 1u), (unsigned int)iBuildRepeat);
+				fflush(stderr);
+			}
+			procTestDeletePathFamily(sPathPkgBuild);
+			procTestDeletePathFamily(sPathPkgBuildFailTemp);
+			procTestDeletePathFamily(sPathPkgBuildExistsTemp);
+			procTestDeletePathFamily(sPathPkgCodec);
+			procTestDeletePathFamily(sPathPkgVolume);
+			procTestDeletePathFamily(sPathPkgVolumeTemp);
+			procTestDeletePathFamily(sPathPkgVolumeLarge);
+			procTestDeletePathFamily(sPathPkgVolumeSolid);
+			procTestDeletePathFamily(sPathPkgSaveFail);
+			procTestDeletePathFamily(sPathPkgReplace);
+			procTestDeletePathFamily(sPathPkgReplaceNew);
+			procTestDeletePathFamily(sPathPkgReplaceTemp);
+			procTestDeletePathFamily(sPathPkgReplaceBackup);
+			remove(sPathFileExport);
+			remove(sPathFileCodecSrc);
+			remove(sPathFileHuge);
 #include "integration/selftest_build_volume.inc.h"
+		}
 	}
 
 	/* integration: solid / layout / readonly / internal state guards */
@@ -455,19 +580,24 @@ int main(int argc, char** argv)
 #include "integration/selftest_solid_readonly.inc.h"
 	}
 
-	remove(sPathPkgCore);
-	remove(sPathPkgIndex);
-	remove(sPathPkgPath);
-	remove(sPathPkgBuild);
-	remove(sPathPkgBuildExistsTemp);
-	remove(sPathPkgCodec);
-	remove(sPathPkgSolid);
-	remove(sPathPkgSolidStore);
-	remove(sPathPkgFormat);
+	procTestDeletePathFamily(sPathPkgCore);
+	procTestDeletePathFamily(sPathPkgIndex);
+	procTestDeletePathFamily(sPathPkgLinux);
+	procTestDeletePathFamily(sPathPkgPath);
+	procTestDeletePathFamily(sPathPkgBuild);
+	procTestDeletePathFamily(sPathPkgBuildExistsTemp);
+	procTestDeletePathFamily(sPathPkgCodec);
+	procTestDeletePathFamily(sPathPkgSolid);
+	procTestDeletePathFamily(sPathPkgSolidStore);
+	procTestDeletePathFamily(sPathPkgFormat);
 	remove(sPathFileExport);
+	remove(sPathFileCodecSrc);
 	remove(sPathFileHuge);
-	remove(sPathPkgStoreHuge);
-	remove(sPathPkgReadonly);
+	procTestDeletePathFamily(sPathPkgStoreHuge);
+	procTestDeletePathFamily(sPathPkgReadonly);
+	procTestDeletePathFamily(sPathPkgTest);
+	procTestDeletePathFamily(sPathPkgVolumeLarge);
+	procTestDeletePathFamily(sPathPkgVolumeSolid);
 	procTestDeletePathFamily(sPathPkgBuildExistsTemp);
 	procTestDeletePathFamily(sPathPkgSaveFail);
 	procTestDeletePathFamily(sPathPkgReplace);

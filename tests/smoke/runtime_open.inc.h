@@ -2,6 +2,7 @@
 	objOpt.createIfMissing = TRUE;
 	objXpk = xpkOpen(sPathPkgTest, &objOpt);
 	if ( objXpk == NULL ) {
+		fprintf(stderr, "runtime_open first open failed: last=%d text=%s\n", xpkLastError(NULL), xpkLastErrorMessage(NULL));
 		return 16;
 	}
 	if ( xpkSetPackType(objXpk, XPK_PACK_INDEX) != XPK_OK ) {
@@ -13,6 +14,7 @@
 		return 18;
 	}
 	if ( xpkSave(objXpk) != XPK_OK ) {
+		fprintf(stderr, "runtime_open phase1 save failed: last=%d text=%s\n", xpkLastError(objXpk), xpkLastErrorMessage(objXpk));
 		xpkClose(objXpk);
 		return 19;
 	}
@@ -112,6 +114,7 @@
 		return (iCheckRet == 2) ? 927 : 928;
 	}
 
+	procTestDeletePathFamily(sPathPkgTest);
 	memset(&objOpt, 0, sizeof(objOpt));
 	objOpt.createIfMissing = TRUE;
 	objXpk = xpkOpen(sPathPkgOpenDir, &objOpt);
@@ -184,6 +187,7 @@
 		return 970;
 	}
 	if ( !procTestExpectLastError(NULL, XPK_ERR_EXISTS, sXpkErrorPackagePathExists) ) {
+		fprintf(stderr, "runtime_open zero_sparse last=%d text=%s\n", xpkLastError(NULL), xpkLastErrorMessage(NULL));
 		remove(sPathPkgOpenZeroSparse);
 		procTestDeletePathFamily(sPathPkgOpenZeroSparse);
 		xpkFreeInternal(sPathKey);

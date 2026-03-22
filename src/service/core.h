@@ -897,6 +897,24 @@ static inline int procXpkAppliedVolumeMode(xpkObject objXpk)
 	return objXpk->bVolumeApplied ? TRUE : FALSE;
 }
 
+static inline uint64_t procXpkCurrentDataEnd(xpkObject objXpk)
+{
+	uint64_t iDataEnd;
+
+	if ( objXpk == NULL ) {
+		return 0;
+	}
+
+	iDataEnd = objXpk->objHead.dataOffset;
+	if ( objXpk->iAppendPos > iDataEnd ) {
+		iDataEnd = objXpk->iAppendPos;
+	}
+	if ( iDataEnd < XPK_HEAD_SIZE ) {
+		iDataEnd = XPK_HEAD_SIZE;
+	}
+	return iDataEnd;
+}
+
 static inline int procXpkVolumeLayoutChanged(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {

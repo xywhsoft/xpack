@@ -2,6 +2,148 @@
 #define XPK_STORAGE_FILEIO_H
 
 #include <stdio.h>
+#if !defined(_WIN32) && !defined(_WIN64)
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
+typedef struct xpkMappedFile {
+	const void* pView;
+	uint64_t iSize;
+#if defined(_WIN32) || defined(_WIN64)
+	HANDLE hMap;
+#else
+	void* pMap;
+#endif
+} xpkMappedFile;
+
+static inline void procXpkUnmapFile(xpkMappedFile* pMap)
+{
+	if ( pMap == NULL ) {
+		return;
+	}
+
+#if defined(_WIN32) || defined(_WIN64)
+	if ( pMap->pView != NULL ) {
+		UnmapViewOfFile(pMap->pView);
+		pMap->pView = NULL;
+	}
+	if ( pMap->hMap != NULL ) {
+		CloseHandle(pMap->hMap);
+		pMap->hMap = NULL;
+	}
+#else
+	if ( pMap->pView != NULL ) {
+		munmap((void*)pMap->pView, (size_t)pMap->iSize);
+		pMap->pView = NULL;
+	}
+	pMap->pMap = NULL;
+#endif
+	pMap->iSize = 0;
+}
+
+static inline int procXpkMapFileReadOnly(xpkObject objXpk, xfile hFile, uint64_t iSize, xpkMappedFile* pMapRet)
+{
+	if ( pMapRet != NULL ) {
+		memset(pMapRet, 0, sizeof(*pMapRet));
+	}
+	if ( objXpk == NULL || hFile == NULL || pMapRet == NULL ) {
+		return procXpkReturnParamError(objXpk);
+	}
+	if ( iSize == 0 ) {
+		return XPK_OK;
+	}
+	if ( iSize > (uint64_t)SIZE_MAX ) {
+		return procXpkSetError(objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorBlockTooLarge);
+	}
+
+#if defined(_WIN32) || defined(_WIN64)
+	{
+		LARGE_INTEGER iMapSize;
+
+		iMapSize.QuadPart = iSize;
+		pMapRet->hMap = CreateFileMapping((HANDLE)hFile->obj, NULL, PAGE_READONLY, iMapSize.HighPart, iMapSize.LowPart, NULL);
+		if ( pMapRet->hMap == NULL ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+		}
+		pMapRet->pView = MapViewOfFile(pMapRet->hMap, FILE_MAP_READ, 0, 0, 0);
+		if ( pMapRet->pView == NULL ) {
+			CloseHandle(pMapRet->hMap);
+			pMapRet->hMap = NULL;
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+		}
+	}
+#else
+	pMapRet->pMap = mmap(NULL, (size_t)iSize, PROT_READ, MAP_PRIVATE, hFile->idx, 0);
+	if ( pMapRet->pMap == MAP_FAILED ) {
+		pMapRet->pMap = NULL;
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+	}
+	pMapRet->pView = pMapRet->pMap;
+#endif
+
+	pMapRet->iSize = iSize;
+	return XPK_OK;
+}
+
+static inline int procXpkMapFileReadWrite(xpkObject objXpk, xfile hFile, uint64_t iSize, xpkMappedFile* pMapRet)
+{
+	size_t iPos;
+
+	if ( pMapRet != NULL ) {
+		memset(pMapRet, 0, sizeof(*pMapRet));
+	}
+	if ( objXpk == NULL || hFile == NULL || pMapRet == NULL ) {
+		return procXpkReturnParamError(objXpk);
+	}
+	if ( iSize == 0 ) {
+		return XPK_OK;
+	}
+	if ( iSize > (uint64_t)SIZE_MAX ) {
+		return procXpkSetError(objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorBlockTooLarge);
+	}
+	if ( iSize > (uint64_t)INT64_MAX ) {
+		return procXpkSetError(objXpk, XPK_ERR_UNSUPPORTED, sXpkErrorSeekRange);
+	}
+
+	iPos = xrtSeek(hFile, (int64)iSize, XRT_SEEK_SET);
+	if ( (uint64_t)iPos != iSize ) {
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
+	}
+	if ( !xrtSetEOF(hFile) ) {
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+	}
+
+#if defined(_WIN32) || defined(_WIN64)
+	{
+		LARGE_INTEGER iMapSize;
+
+		iMapSize.QuadPart = iSize;
+		pMapRet->hMap = CreateFileMapping((HANDLE)hFile->obj, NULL, PAGE_READWRITE, iMapSize.HighPart, iMapSize.LowPart, NULL);
+		if ( pMapRet->hMap == NULL ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+		}
+		pMapRet->pView = MapViewOfFile(pMapRet->hMap, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, 0);
+		if ( pMapRet->pView == NULL ) {
+			CloseHandle(pMapRet->hMap);
+			pMapRet->hMap = NULL;
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+		}
+	}
+#else
+	pMapRet->pMap = mmap(NULL, (size_t)iSize, PROT_READ | PROT_WRITE, MAP_SHARED, hFile->idx, 0);
+	if ( pMapRet->pMap == MAP_FAILED ) {
+		pMapRet->pMap = NULL;
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+	}
+	pMapRet->pView = pMapRet->pMap;
+#endif
+
+	pMapRet->iSize = iSize;
+	return XPK_OK;
+}
 
 static inline char* procXpkVolumePathDupText(const char* sPathPackage, uint32_t iVolume)
 {
@@ -66,6 +208,118 @@ typedef struct xpkLooseVolumeScan {
 	int bDelete;
 	int iError;
 } xpkLooseVolumeScan;
+
+static inline int procXpkLooseVolumeMatchName(const xpkLooseVolumeScan* pScan, const char* sName, uint32_t* pVolumeRet)
+{
+	const char* sDigit;
+	uint64_t iVolume;
+
+	if ( pVolumeRet != NULL ) {
+		*pVolumeRet = 0;
+	}
+	if ( pScan == NULL || sName == NULL ) {
+		return FALSE;
+	}
+	if ( strncmp(sName, pScan->sNameBase, pScan->iNameSize) != 0 ) {
+		return FALSE;
+	}
+	if ( sName[pScan->iNameSize] != '.' ) {
+		return FALSE;
+	}
+
+	sDigit = sName + pScan->iNameSize + 1;
+	if ( *sDigit == '\0' ) {
+		return FALSE;
+	}
+
+	iVolume = 0;
+	for ( ; *sDigit != '\0'; sDigit++ ) {
+		if ( (*sDigit < '0') || (*sDigit > '9') ) {
+			return FALSE;
+		}
+		iVolume = (iVolume * 10u) + (uint64_t)(*sDigit - '0');
+		if ( iVolume > UINT32_MAX ) {
+			return FALSE;
+		}
+	}
+	if ( iVolume < pScan->iStartVolume ) {
+		return FALSE;
+	}
+
+	if ( pVolumeRet != NULL ) {
+		*pVolumeRet = (uint32_t)iVolume;
+	}
+	return TRUE;
+}
+
+static inline char* procXpkPathJoinDupText(const char* sDirPath, const char* sName)
+{
+	size_t iSizeDir;
+	size_t iSizeName;
+	size_t iSizeSep;
+	char* sPathRet;
+
+	if ( sDirPath == NULL || sName == NULL ) {
+		return NULL;
+	}
+	if ( strcmp(sDirPath, ".") == 0 ) {
+		return procXpkDupText(sName);
+	}
+
+	iSizeDir = strlen(sDirPath);
+	iSizeName = strlen(sName);
+	iSizeSep = 0;
+	if ( iSizeDir > 0 && sDirPath[iSizeDir - 1] != '/' && sDirPath[iSizeDir - 1] != '\\' ) {
+		iSizeSep = 1;
+	}
+
+	sPathRet = (char*)xpkAllocInternal(iSizeDir + iSizeSep + iSizeName + 1);
+	if ( sPathRet == NULL ) {
+		return NULL;
+	}
+
+	memcpy(sPathRet, sDirPath, iSizeDir);
+	if ( iSizeSep != 0 ) {
+		sPathRet[iSizeDir] = '/';
+	}
+	memcpy(sPathRet + iSizeDir + iSizeSep, sName, iSizeName + 1);
+	return sPathRet;
+}
+
+static inline int procXpkHandleLooseVolumeEntry(xpkLooseVolumeScan* pScan, const char* sDirPath, const char* sName, int bDir)
+{
+	char* sPathEntry;
+	uint32_t iVolume;
+
+	if ( pScan == NULL || sDirPath == NULL || sName == NULL ) {
+		return procXpkSetError((pScan != NULL) ? pScan->objXpk : NULL, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+	if ( !procXpkLooseVolumeMatchName(pScan, sName, &iVolume) ) {
+		return XPK_OK;
+	}
+
+	(void)iVolume;
+	pScan->iCount++;
+	if ( !pScan->bDelete ) {
+		return XPK_OK;
+	}
+
+	sPathEntry = procXpkPathJoinDupText(sDirPath, sName);
+	if ( sPathEntry == NULL ) {
+		return procXpkSetError(pScan->objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+	}
+	if ( bDir ) {
+		xpkFreeInternal(sPathEntry);
+		return procXpkSetError(pScan->objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+	}
+	if ( !xrtFileDelete((str)sPathEntry) ) {
+		xpkFreeInternal(sPathEntry);
+		return procXpkSetError(pScan->objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+	}
+
+	xpkFreeInternal(sPathEntry);
+	return XPK_OK;
+}
 
 static inline const char* procXpkPathNameText(const char* sPath)
 {
@@ -188,6 +442,7 @@ static inline int procXpkScanLooseVolumeFilesFromText(xpkObject objXpk, const ch
 	xpkLooseVolumeScan objScan;
 	const char* sNameBase;
 	char* sDirPath;
+	int iRet;
 
 	if ( pCountRet != NULL ) {
 		*pCountRet = 0;
@@ -217,7 +472,80 @@ static inline int procXpkScanLooseVolumeFilesFromText(xpkObject objXpk, const ch
 	objScan.iStartVolume = iStartVolume;
 	objScan.bDelete = bDelete ? TRUE : FALSE;
 	objScan.iError = XPK_OK;
-	xrtDirScan((str)sDirPath, FALSE, procXpkLooseVolumeScanProc, &objScan);
+
+#if defined(_WIN32) || defined(_WIN64)
+	{
+		WIN32_FIND_DATAA objFindData;
+		HANDLE hFind;
+		char* sPattern;
+
+		sPattern = procXpkPathJoinDupText(sDirPath, "*");
+		if ( sPattern == NULL ) {
+			xpkFreeInternal(sDirPath);
+			return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+		}
+
+		hFind = FindFirstFileA(sPattern, &objFindData);
+		xpkFreeInternal(sPattern);
+		if ( hFind != INVALID_HANDLE_VALUE ) {
+			do {
+				if ( strcmp(objFindData.cFileName, ".") == 0 || strcmp(objFindData.cFileName, "..") == 0 ) {
+					continue;
+				}
+				iRet = procXpkHandleLooseVolumeEntry(&objScan, sDirPath, objFindData.cFileName,
+					(objFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? TRUE : FALSE);
+				if ( iRet != XPK_OK ) {
+					objScan.iError = iRet;
+					break;
+				}
+			} while ( FindNextFileA(hFind, &objFindData) );
+			FindClose(hFind);
+		}
+	}
+#else
+	{
+		DIR* pDir;
+		struct dirent* pEnt;
+
+		pDir = opendir(sDirPath);
+		if ( pDir != NULL ) {
+			while ( (pEnt = readdir(pDir)) != NULL ) {
+				int bDirEntry;
+
+				if ( strcmp(pEnt->d_name, ".") == 0 || strcmp(pEnt->d_name, "..") == 0 ) {
+					continue;
+				}
+#if defined(DT_DIR)
+				if ( pEnt->d_type == DT_DIR ) {
+					bDirEntry = TRUE;
+				} else if ( pEnt->d_type == DT_REG ) {
+					bDirEntry = FALSE;
+				} else
+#endif
+				{
+					struct stat objStat;
+					char* sPathEntry;
+
+					sPathEntry = procXpkPathJoinDupText(sDirPath, pEnt->d_name);
+					if ( sPathEntry == NULL ) {
+						objScan.iError = procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+						break;
+					}
+					bDirEntry = (stat(sPathEntry, &objStat) == 0 && S_ISDIR(objStat.st_mode)) ? TRUE : FALSE;
+					xpkFreeInternal(sPathEntry);
+				}
+
+				iRet = procXpkHandleLooseVolumeEntry(&objScan, sDirPath, pEnt->d_name, bDirEntry);
+				if ( iRet != XPK_OK ) {
+					objScan.iError = iRet;
+					break;
+				}
+			}
+			closedir(pDir);
+		}
+	}
+#endif
+
 	xpkFreeInternal(sDirPath);
 	if ( objScan.iError != XPK_OK ) {
 		return objScan.iError;
@@ -593,7 +921,7 @@ static inline int procXpkSeekFile(xpkObject objXpk, xfile hFile, uint64_t iOffse
 	}
 
 	iPos = xrtSeek(hFile, (int64)iOffset, XRT_SEEK_SET);
-	if ( ((uint64_t)iPos != iOffset) && ((uint64_t)xrtTell(hFile) != iOffset) ) {
+	if ( (uint64_t)iPos != iOffset ) {
 		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
 	}
 	return XPK_OK;
@@ -642,6 +970,164 @@ static inline int procXpkCalcLogicalFileSize(xpkObject objXpk, const xpkHead* pH
 	return XPK_OK;
 }
 
+static inline int procXpkReadVolumePartText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t iOffsetVolume, void* pData, uint32_t iSize)
+{
+	char* sPathVolume;
+
+	if ( sPathPackage == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+	if ( pData == NULL && iSize > 0 ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+	if ( iSize == 0 ) {
+		return XPK_OK;
+	}
+
+	sPathVolume = procXpkVolumePathDupText(sPathPackage, iVolume);
+	if ( sPathVolume == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+	}
+
+#if defined(_WIN32) || defined(_WIN64)
+	{
+		u16str sPathW;
+		HANDLE hFile;
+		LARGE_INTEGER iSeek;
+		DWORD iRead;
+
+		sPathW = xrtUTF8to16((str)sPathVolume, 0, NULL);
+		if ( sPathW == NULL ) {
+			xpkFreeInternal(sPathVolume);
+			return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+		}
+
+		hFile = CreateFileW(sPathW, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		xrtFree(sPathW);
+		xpkFreeInternal(sPathVolume);
+		if ( hFile == INVALID_HANDLE_VALUE ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
+		}
+
+		iSeek.QuadPart = (LONGLONG)iOffsetVolume;
+		if ( !SetFilePointerEx(hFile, iSeek, NULL, FILE_BEGIN) ) {
+			CloseHandle(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
+		}
+
+		iRead = 0;
+		if ( !ReadFile(hFile, pData, (DWORD)iSize, &iRead, NULL) || iRead != (DWORD)iSize ) {
+			CloseHandle(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+		}
+
+		CloseHandle(hFile);
+	}
+#else
+	{
+		int hFile;
+		ssize_t iRead;
+
+		hFile = open(sPathVolume, O_RDONLY);
+		xpkFreeInternal(sPathVolume);
+		if ( hFile < 0 ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
+		}
+		if ( lseek(hFile, (off_t)iOffsetVolume, SEEK_SET) < 0 ) {
+			close(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
+		}
+		iRead = read(hFile, pData, (size_t)iSize);
+		if ( iRead != (ssize_t)iSize ) {
+			close(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+		}
+		close(hFile);
+	}
+#endif
+
+	return XPK_OK;
+}
+
+static inline int procXpkWriteVolumePartText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t iOffsetVolume, const void* pData, uint32_t iSize)
+{
+	char* sPathVolume;
+
+	if ( sPathPackage == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+	if ( pData == NULL && iSize > 0 ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+	if ( iSize == 0 ) {
+		return XPK_OK;
+	}
+
+	sPathVolume = procXpkVolumePathDupText(sPathPackage, iVolume);
+	if ( sPathVolume == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+	}
+
+#if defined(_WIN32) || defined(_WIN64)
+	{
+		u16str sPathW;
+		HANDLE hFile;
+		LARGE_INTEGER iSeek;
+		DWORD iWrite;
+
+		sPathW = xrtUTF8to16((str)sPathVolume, 0, NULL);
+		if ( sPathW == NULL ) {
+			xpkFreeInternal(sPathVolume);
+			return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+		}
+
+		hFile = CreateFileW(sPathW, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		xrtFree(sPathW);
+		xpkFreeInternal(sPathVolume);
+		if ( hFile == INVALID_HANDLE_VALUE ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
+		}
+
+		iSeek.QuadPart = (LONGLONG)iOffsetVolume;
+		if ( !SetFilePointerEx(hFile, iSeek, NULL, FILE_BEGIN) ) {
+			CloseHandle(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
+		}
+
+		iWrite = 0;
+		if ( !WriteFile(hFile, pData, (DWORD)iSize, &iWrite, NULL) || iWrite != (DWORD)iSize ) {
+			CloseHandle(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+		}
+
+		CloseHandle(hFile);
+	}
+#else
+	{
+		int hFile;
+		ssize_t iWrite;
+
+		hFile = open(sPathVolume, O_RDWR | O_CREAT, 0644);
+		xpkFreeInternal(sPathVolume);
+		if ( hFile < 0 ) {
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
+		}
+		if ( lseek(hFile, (off_t)iOffsetVolume, SEEK_SET) < 0 ) {
+			close(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoSeek);
+		}
+		iWrite = write(hFile, pData, (size_t)iSize);
+		if ( iWrite != (ssize_t)iSize ) {
+			close(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
+		}
+		close(hFile);
+	}
+#endif
+
+	return XPK_OK;
+}
+
 static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData, uint32_t iSize)
 {
 	uint8_t* pCur;
@@ -650,9 +1136,6 @@ static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData
 	uint32_t iVolumeSize;
 	uint32_t iVolume;
 	uint32_t iSizePart;
-	xfile hFile;
-	size_t iRead;
-	void* pPart;
 	int iRet;
 
 	if ( iSize == 0 ) {
@@ -673,29 +1156,10 @@ static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData
 		iRemainVolume = (uint64_t)iVolumeSize - iOffsetVolume;
 		iSizePart = (uint32_t)((iRemainVolume < (uint64_t)iSize) ? iRemainVolume : (uint64_t)iSize);
 
-		hFile = NULL;
-		iRet = procXpkOpenVolumeText(objXpk, objXpk->sPathPackage, iVolume, TRUE, &hFile);
+		iRet = procXpkReadVolumePartText(objXpk, objXpk->sPathPackage, iVolume, iOffsetVolume, pCur, iSizePart);
 		if ( iRet != XPK_OK ) {
 			return iRet;
 		}
-
-		iRet = procXpkSeekFile(objXpk, hFile, iOffsetVolume);
-		if ( iRet != XPK_OK ) {
-			xrtClose(hFile);
-			return iRet;
-		}
-
-		pPart = xrtRead(hFile, iSizePart, &iRead);
-		xrtClose(hFile);
-		if ( (pPart == NULL) || (iRead != iSizePart) ) {
-			if ( pPart != NULL ) {
-				xrtFree(pPart);
-			}
-			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
-		}
-
-		memcpy(pCur, pPart, iSizePart);
-		xrtFree(pPart);
 
 		pCur += iSizePart;
 		iOffset += iSizePart;
@@ -713,8 +1177,6 @@ static inline int procXpkRawWrite(xpkObject objXpk, uint64_t iOffset, const void
 	uint32_t iVolumeSize;
 	uint32_t iVolume;
 	uint32_t iSizePart;
-	xfile hFile;
-	size_t iWrite;
 	int iRet;
 
 	if ( iSize == 0 ) {
@@ -735,22 +1197,9 @@ static inline int procXpkRawWrite(xpkObject objXpk, uint64_t iOffset, const void
 		iRemainVolume = (uint64_t)iVolumeSize - iOffsetVolume;
 		iSizePart = (uint32_t)((iRemainVolume < (uint64_t)iSize) ? iRemainVolume : (uint64_t)iSize);
 
-		hFile = NULL;
-		iRet = procXpkOpenVolumeText(objXpk, objXpk->sPathPackage, iVolume, FALSE, &hFile);
+		iRet = procXpkWriteVolumePartText(objXpk, objXpk->sPathPackage, iVolume, iOffsetVolume, pCur, iSizePart);
 		if ( iRet != XPK_OK ) {
 			return iRet;
-		}
-
-		iRet = procXpkSeekFile(objXpk, hFile, iOffsetVolume);
-		if ( iRet != XPK_OK ) {
-			xrtClose(hFile);
-			return iRet;
-		}
-
-		iWrite = xrtWrite(hFile, (str)pCur, iSizePart);
-		xrtClose(hFile);
-		if ( iWrite != iSizePart ) {
-			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite);
 		}
 
 		pCur += iSizePart;
@@ -802,26 +1251,76 @@ static inline int procXpkReadAtAlloc(xpkObject objXpk, xfile hFile, uint64_t iOf
 			xrtClose(hFile);
 			return iRet;
 		}
-
-		pData = xrtRead(hFile, iSize, &iRead);
+		pData = xpkAllocInternal(iSize);
+		if ( pData == NULL ) {
+			xrtClose(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+		}
+		iRead = xrtGetBuffer(hFile, pData, iSize);
 		xrtClose(hFile);
 	} else {
 		iRet = procXpkSeekFile(objXpk, hFile, iOffset);
 		if ( iRet != XPK_OK ) {
 			return iRet;
 		}
-
-		pData = xrtRead(hFile, iSize, &iRead);
+		pData = xpkAllocInternal(iSize);
+		if ( pData == NULL ) {
+			return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+		}
+		iRead = xrtGetBuffer(hFile, pData, iSize);
 	}
 
 	if ( (pData == NULL) || (iRead != iSize) ) {
 		if ( pData != NULL ) {
-			xrtFree(pData);
+			xpkFreeInternal(pData);
 		}
 		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
 	}
 
 	*pDataRet = pData;
+	return XPK_OK;
+}
+
+static inline int procXpkReadAtBuffer(xpkObject objXpk, xfile hFile, uint64_t iOffset, void* pData, uint32_t iSize)
+{
+	size_t iRead;
+	int iRet;
+
+	if ( objXpk == NULL || pData == NULL ) {
+		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
+	}
+	if ( iSize == 0 ) {
+		return XPK_OK;
+	}
+
+	if ( procXpkAppliedVolumeMode(objXpk) ) {
+		return procXpkRawRead(objXpk, iOffset, pData, iSize);
+	}
+
+	if ( hFile == NULL ) {
+		iRet = procXpkOpenVolumeText(objXpk, objXpk->sPathPackage, 0, TRUE, &hFile);
+		if ( iRet != XPK_OK ) {
+			return iRet;
+		}
+		iRet = procXpkSeekFile(objXpk, hFile, iOffset);
+		if ( iRet != XPK_OK ) {
+			xrtClose(hFile);
+			return iRet;
+		}
+		iRead = xrtGetBuffer(hFile, pData, iSize);
+		xrtClose(hFile);
+	} else {
+		iRet = procXpkSeekFile(objXpk, hFile, iOffset);
+		if ( iRet != XPK_OK ) {
+			return iRet;
+		}
+		iRead = xrtGetBuffer(hFile, pData, iSize);
+	}
+
+	if ( iRead != iSize ) {
+		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
+	}
+
 	return XPK_OK;
 }
 
@@ -853,7 +1352,7 @@ static inline int procXpkWriteAt(xpkObject objXpk, xfile hFile, uint64_t iOffset
 			return iRet;
 		}
 
-		iWrite = xrtWrite(hFile, (str)pData, iSize);
+		iWrite = xrtPut(hFile, (ptr)pData, iSize);
 		xrtClose(hFile);
 	} else {
 		iRet = procXpkSeekFile(objXpk, hFile, iOffset);
@@ -861,7 +1360,7 @@ static inline int procXpkWriteAt(xpkObject objXpk, xfile hFile, uint64_t iOffset
 			return iRet;
 		}
 
-		iWrite = xrtWrite(hFile, (str)pData, iSize);
+		iWrite = xrtPut(hFile, (ptr)pData, iSize);
 	}
 
 	if ( iWrite != iSize ) {

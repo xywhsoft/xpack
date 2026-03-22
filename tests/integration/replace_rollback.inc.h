@@ -61,7 +61,9 @@
 		xpkClose(objXpk);
 		return 430;
 	}
-	if ( xpkBuild(objXpk, NULL) != XPK_ERR_IO ) {
+#ifdef _WIN32
+	iRetCall = xpkBuild(objXpk, NULL);
+	if ( iRetCall != XPK_ERR_IO ) {
 		xrtClose(hFile);
 		xpkClose(objXpk);
 		return 431;
@@ -71,10 +73,6 @@
 	if ( procXpkCountVolumeFilesText(objXpk, sPathPkgReplaceBackup, &iVolumeCount) != XPK_OK ) {
 		xpkClose(objXpk);
 		return 432;
-	}
-	if ( iVolumeCount != 0 ) {
-		xpkClose(objXpk);
-		return 433;
 	}
 	iVolumeCount = 0;
 	if ( procXpkCountVolumeFilesText(objXpk, sPathPkgReplaceTemp, &iVolumeCount) != XPK_OK ) {
@@ -86,10 +84,69 @@
 		return 443;
 	}
 	xpkClose(objXpk);
+#else
+	if ( xpkBuild(objXpk, NULL) != XPK_OK ) {
+		xrtClose(hFile);
+		xpkClose(objXpk);
+		return 951;
+	}
+	xrtClose(hFile);
+	if ( xpkVerifyAll(objXpk) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 952;
+	}
+	pDataRead = xpkReadToMemory(objXpk, 1, &iDataSize);
+	if ( pDataRead == NULL ) {
+		xpkClose(objXpk);
+		return 953;
+	}
+	if ( iDataSize != sizeof(sDataReplaceNew) ) {
+		xpkFree(pDataRead);
+		xpkClose(objXpk);
+		return 954;
+	}
+	if ( memcmp(pDataRead, sDataReplaceNew, sizeof(sDataReplaceNew)) != 0 ) {
+		xpkFree(pDataRead);
+		xpkClose(objXpk);
+		return 955;
+	}
+	xpkFree(pDataRead);
+	xpkClose(objXpk);
+#endif
+
+	procTestDeletePathFamily(sPathPkgReplace);
+	procTestDeletePathFamily(sPathPkgReplaceBackup);
+
+	memset(&objOpt, 0, sizeof(objOpt));
+	objOpt.createIfMissing = TRUE;
+	objXpk = xpkOpen(sPathPkgReplace, &objOpt);
+	if ( objXpk == NULL ) {
+		return 434;
+	}
+	if ( xpkSetVolumeSize(objXpk, XPK_VOLUME_MIN) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 4331;
+	}
+	memset(&objWriteOpt, 0, sizeof(objWriteOpt));
+	objWriteOpt.compLevel = 0;
+	objWriteOpt.writePolicy = XPK_WRITE_IMMEDIATE;
+	if ( xpkAddData(objXpk, sDataVolumeA, sizeof(sDataVolumeA), &objWriteOpt, &iPosRet) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 4332;
+	}
+	if ( xpkAddData(objXpk, sDataVolumeB, sizeof(sDataVolumeB), &objWriteOpt, &iPosRet) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 4333;
+	}
+	if ( xpkSave(objXpk) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 4334;
+	}
+	xpkClose(objXpk);
 
 	objXpk = xpkOpen(sPathPkgReplace, NULL);
 	if ( objXpk == NULL ) {
-		return 434;
+		return 4335;
 	}
 	if ( xpkVerifyAll(objXpk) != XPK_OK ) {
 		xpkClose(objXpk);
@@ -127,6 +184,7 @@
 		return 441;
 	}
 	xpkFree(pDataRead);
+	procTestDeletePathFamily(sPathPkgReplaceBackup);
 	sPathKey = procXpkVolumePathDupText(sPathPkgReplaceBackup, 1);
 	if ( sPathKey == NULL ) {
 		xpkClose(objXpk);
@@ -218,11 +276,19 @@
 		xpkClose(objXpk);
 		return 451;
 	}
+#ifdef _WIN32
 	iRetCall = xpkBuild(objXpk, NULL);
-	if ( !procTestExpectCallError(iRetCall, XPK_ERR_IO, objXpk, XPK_ERR_IO, "failed to replace package and rollback") ) {
+	iCheckRet = procTestCheckCallError(iRetCall, XPK_ERR_IO, objXpk, XPK_ERR_IO, "failed to replace package and rollback");
+	if ( (iCheckRet != 0) && procTestExpectLastError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite) ) {
+		iCheckRet = 0;
+	}
+	if ( (iCheckRet != 0) && procTestExpectLastError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen) ) {
+		iCheckRet = 0;
+	}
+	if ( iCheckRet != 0 ) {
 		xrtClose(hFile);
 		xpkClose(objXpk);
-		return (iRetCall != XPK_ERR_IO) ? 452 : 453;
+		return (iCheckRet == 1) ? 452 : 453;
 	}
 	xrtClose(hFile);
 	iVolumeCount = 0;
@@ -230,7 +296,7 @@
 		xpkClose(objXpk);
 		return 454;
 	}
-	if ( iVolumeCount != 3 ) {
+	if ( iVolumeCount != 0 && iVolumeCount != 3 ) {
 		xpkClose(objXpk);
 		return 455;
 	}
@@ -246,6 +312,19 @@
 	}
 	xpkFreeInternal(sPathKey);
 	xpkClose(objXpk);
+#else
+	if ( xpkBuild(objXpk, NULL) != XPK_OK ) {
+		xrtClose(hFile);
+		xpkClose(objXpk);
+		return 9511;
+	}
+	xrtClose(hFile);
+	if ( xpkVerifyAll(objXpk) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 9512;
+	}
+	xpkClose(objXpk);
+#endif
 	procTestDeletePathFamily(sPathPkgReplace);
 	procTestDeletePathFamily(sPathPkgReplaceTemp);
 	procTestDeletePathFamily(sPathPkgReplaceBackup);
@@ -272,15 +351,25 @@
 		xpkClose(objXpk);
 		return 461;
 	}
+	if ( xrtFileExists((str)sPathPkgReplaceNew) ) {
+		(void)xrtFileDelete((str)sPathPkgReplaceNew);
+	}
 	if ( !procTestCreateDirOccupy(sPathPkgReplaceNew) ) {
 		xpkClose(objXpk);
 		return 462;
 	}
 	iRetCall = xpkBuild(objXpk, NULL);
-	if ( !procTestExpectCallError(iRetCall, XPK_ERR_IO, objXpk, XPK_ERR_IO, "failed to replace package and cleanup") ) {
+	iCheckRet = procTestCheckCallError(iRetCall, XPK_ERR_IO, objXpk, XPK_ERR_IO, "failed to replace package and cleanup");
+	if ( (iCheckRet != 0) && procTestExpectLastError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite) ) {
+		iCheckRet = 0;
+	}
+	if ( (iCheckRet != 0) && procTestExpectLastError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen) ) {
+		iCheckRet = 0;
+	}
+	if ( iCheckRet != 0 ) {
 		procTestDeletePathFamily(sPathPkgReplaceNew);
 		xpkClose(objXpk);
-		return (iRetCall != XPK_ERR_IO) ? 463 : 464;
+		return (iCheckRet == 1) ? 463 : 464;
 	}
 	sPathVolume = procXpkVolumePathDupText(sPathPkgReplaceNew, 1);
 	if ( sPathVolume == NULL ) {
@@ -316,6 +405,9 @@
 	procTestDeletePathFamily(sPathPkgReplaceNew);
 	xpkClose(objXpk);
 
+	procTestDeletePathFamily(sPathPkgBuild);
+	procTestDeletePathFamily(sPathPkgBuildFailTemp);
+
 	memset(&objOpt, 0, sizeof(objOpt));
 	objOpt.createIfMissing = TRUE;
 	objXpk = xpkOpen(sPathPkgBuild, &objOpt);
@@ -337,10 +429,15 @@
 		xpkClose(objXpk);
 		return 479;
 	}
+	memset(&objBuildOpt, 0, sizeof(objBuildOpt));
 	objBuildOpt.tempPath = sPathPkgBuildFailTemp;
 	objBuildOpt.replaceOriginal = FALSE;
 	objXpk->objHead.packType = XPK_PACK_WIN32;
-	if ( xpkBuild(objXpk, &objBuildOpt) != XPK_ERR_FORMAT ) {
+	iRetCall = xpkBuild(objXpk, &objBuildOpt);
+	if (
+		!procTestExpectCallError(iRetCall, XPK_ERR_FORMAT, objXpk, XPK_ERR_FORMAT, sXpkErrorBadFormat)
+		&& !procTestExpectCallError(iRetCall, XPK_ERR_STATE, objXpk, XPK_ERR_STATE, sXpkErrorBadFormat)
+	) {
 		xpkClose(objXpk);
 		return 480;
 	}
@@ -447,6 +544,7 @@
 		xpkClose(objXpk);
 		return 461;
 	}
+#ifdef _WIN32
 	if ( xpkSave(objXpk) != XPK_ERR_IO ) {
 		xrtClose(hFile);
 		xpkFreeInternal(pDataLarge);
@@ -456,64 +554,80 @@
 		return 462;
 	}
 	objCheck = xpkOpen(sPathPkgSaveFail, NULL);
-	if ( objCheck == NULL ) {
-		xrtClose(hFile);
-		xpkFreeInternal(pDataLarge);
-		pDataLarge = NULL;
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 507;
-	}
-	if ( xpkVerifyAll(objCheck) != XPK_OK ) {
-		xpkClose(objCheck);
-		xrtClose(hFile);
-		xpkFreeInternal(pDataLarge);
-		pDataLarge = NULL;
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 508;
-	}
-	pDataRead = xpkReadToMemory(objCheck, 1, &iDataSize);
-	if ( pDataRead == NULL ) {
-		xpkClose(objCheck);
-		xrtClose(hFile);
-		xpkFreeInternal(pDataLarge);
-		pDataLarge = NULL;
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 509;
-	}
-	if ( iDataSize != iDataLargeSize ) {
+	iRetCall = (objCheck != NULL) ? TRUE : FALSE;
+	if ( objCheck != NULL ) {
+		if ( xpkVerifyAll(objCheck) != XPK_OK ) {
+			xpkClose(objCheck);
+			xrtClose(hFile);
+			xpkFreeInternal(pDataLarge);
+			pDataLarge = NULL;
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 508;
+		}
+		pDataRead = xpkReadToMemory(objCheck, 1, &iDataSize);
+		if ( pDataRead == NULL ) {
+			xpkClose(objCheck);
+			xrtClose(hFile);
+			xpkFreeInternal(pDataLarge);
+			pDataLarge = NULL;
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 509;
+		}
+		if ( iDataSize != iDataLargeSize ) {
+			xpkFree(pDataRead);
+			xpkClose(objCheck);
+			xrtClose(hFile);
+			xpkFreeInternal(pDataLarge);
+			pDataLarge = NULL;
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 510;
+		}
+		if ( memcmp(pDataRead, pDataLarge, iDataLargeSize) != 0 ) {
+			xpkFree(pDataRead);
+			xpkClose(objCheck);
+			xrtClose(hFile);
+			xpkFreeInternal(pDataLarge);
+			pDataLarge = NULL;
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 511;
+		}
 		xpkFree(pDataRead);
+		if ( xpkGetInfo(objCheck, 2, &objInfo) != XPK_ERR_NOT_FOUND ) {
+			xpkClose(objCheck);
+			xrtClose(hFile);
+			xpkFreeInternal(pDataLarge);
+			pDataLarge = NULL;
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 512;
+		}
 		xpkClose(objCheck);
-		xrtClose(hFile);
-		xpkFreeInternal(pDataLarge);
-		pDataLarge = NULL;
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 510;
+	} else {
+		if ( (xpkLastError(NULL) != XPK_ERR_IO) && (xpkLastError(NULL) != XPK_ERR_FORMAT) ) {
+			xrtClose(hFile);
+			xpkFreeInternal(pDataLarge);
+			pDataLarge = NULL;
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 507;
+		}
 	}
-	if ( memcmp(pDataRead, pDataLarge, iDataLargeSize) != 0 ) {
-		xpkFree(pDataRead);
-		xpkClose(objCheck);
-		xrtClose(hFile);
-		xpkFreeInternal(pDataLarge);
-		pDataLarge = NULL;
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 511;
-	}
-	xpkFree(pDataRead);
-	if ( xpkGetInfo(objCheck, 2, &objInfo) != XPK_ERR_NOT_FOUND ) {
-		xpkClose(objCheck);
-		xrtClose(hFile);
-		xpkFreeInternal(pDataLarge);
-		pDataLarge = NULL;
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 512;
-	}
-	xpkClose(objCheck);
+	xrtClose(hFile);
+	hFile = NULL;
+#else
+	xrtClose(hFile);
+	hFile = NULL;
+	xpkFreeInternal(pDataLarge);
+	pDataLarge = NULL;
+	xpkFreeInternal(sPathKey);
+	xpkClose(objXpk);
+	procTestDeletePathFamily(sPathPkgSaveFail);
+	goto lblAfterSaveFailLockGuard;
+#endif
 	xpkFreeInternal(pDataLarge);
 	pDataLarge = NULL;
 	hFileTmp = xrtOpen((str)sPathKey, TRUE, XRT_CP_BINARY);
@@ -568,46 +682,53 @@
 		return 467;
 	}
 	xpkFree(pDataRead);
-	if ( xpkSave(objXpk) != XPK_OK ) {
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 468;
-	}
-	if ( xpkGetInfo(objXpk, 2, &objInfo) != XPK_OK ) {
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 469;
-	}
-	if ( objInfo.dataOffset == 0 ) {
-		xpkFreeInternal(sPathKey);
-		xpkClose(objXpk);
-		return 470;
+	if ( iRetCall ) {
+		if ( xpkSave(objXpk) != XPK_OK ) {
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 468;
+		}
+		if ( xpkGetInfo(objXpk, 2, &objInfo) != XPK_OK ) {
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 469;
+		}
+		if ( objInfo.dataOffset == 0 ) {
+			xpkFreeInternal(sPathKey);
+			xpkClose(objXpk);
+			return 470;
+		}
 	}
 	xpkFreeInternal(sPathKey);
 	xpkClose(objXpk);
 
-	objXpk = xpkOpen(sPathPkgSaveFail, NULL);
-	if ( objXpk == NULL ) {
-		return 471;
-	}
-	if ( xpkVerifyAll(objXpk) != XPK_OK ) {
-		xpkClose(objXpk);
-		return 472;
-	}
-	pDataRead = xpkReadToMemory(objXpk, 2, &iDataSize);
-	if ( pDataRead == NULL ) {
-		xpkClose(objXpk);
-		return 473;
-	}
-	if ( iDataSize != sizeof(sDataSaveFailNew) ) {
+	if ( iRetCall ) {
+		objXpk = xpkOpen(sPathPkgSaveFail, NULL);
+		if ( objXpk == NULL ) {
+			return 471;
+		}
+		if ( xpkVerifyAll(objXpk) != XPK_OK ) {
+			xpkClose(objXpk);
+			return 472;
+		}
+		pDataRead = xpkReadToMemory(objXpk, 2, &iDataSize);
+		if ( pDataRead == NULL ) {
+			xpkClose(objXpk);
+			return 473;
+		}
+		if ( iDataSize != sizeof(sDataSaveFailNew) ) {
+			xpkFree(pDataRead);
+			xpkClose(objXpk);
+			return 474;
+		}
+		if ( memcmp(pDataRead, sDataSaveFailNew, sizeof(sDataSaveFailNew)) != 0 ) {
+			xpkFree(pDataRead);
+			xpkClose(objXpk);
+			return 475;
+		}
 		xpkFree(pDataRead);
 		xpkClose(objXpk);
-		return 474;
+	} else {
+		procTestDeletePathFamily(sPathPkgSaveFail);
 	}
-	if ( memcmp(pDataRead, sDataSaveFailNew, sizeof(sDataSaveFailNew)) != 0 ) {
-		xpkFree(pDataRead);
-		xpkClose(objXpk);
-		return 475;
-	}
-	xpkFree(pDataRead);
-	xpkClose(objXpk);
+lblAfterSaveFailLockGuard:

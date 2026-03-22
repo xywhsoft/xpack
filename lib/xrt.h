@@ -1,7 +1,7 @@
 /*
 
     XRT Single Header File
-    Generated: 2026-03-20 01:49:26
+    Generated: 2026-03-20 22:38:40
 
     MIT License
 
@@ -223,71 +223,6 @@
 // ========================================
 // XRT 模块裁剪支持
 // ========================================
-// 模板引擎启用时，自动启用完整依赖链
-#if !defined(XRT_NO_TEMPLATE)
-	#undef XRT_NO_VALUE
-	#undef XRT_NO_JNUM
-	#undef XRT_NO_DICT
-	#undef XRT_NO_LIST
-	#undef XRT_NO_AVLTREE
-	#undef XRT_NO_BSMN
-	#undef XRT_NO_MEMUNIT
-	#undef XRT_NO_MEMPOOL_FS
-#endif
-// JSON启用时，自动启用依赖链
-#if !defined(XRT_NO_JSON)
-	#undef XRT_NO_VALUE
-	#undef XRT_NO_DICT
-	#undef XRT_NO_LIST
-	#undef XRT_NO_AVLTREE
-	#undef XRT_NO_BSMN
-	#undef XRT_NO_MEMUNIT
-	#undef XRT_NO_MEMPOOL_FS
-#endif
-// VALUE系统启用时，自动启用依赖链
-#if !defined(XRT_NO_VALUE)
-	#undef XRT_NO_DICT
-	#undef XRT_NO_LIST
-	#undef XRT_NO_AVLTREE
-	#undef XRT_NO_BSMN
-	#undef XRT_NO_MEMUNIT
-	#undef XRT_NO_MEMPOOL_FS
-#endif
-// MemPool启用时，自动启用依赖链
-#if !defined(XRT_NO_MEMPOOL)
-	#undef XRT_NO_BSMN
-	#undef XRT_NO_MEMUNIT
-#endif
-// FSMemPool启用时，自动启用依赖链
-#if !defined(XRT_NO_MEMPOOL_FS)
-	#undef XRT_NO_BSMN
-	#undef XRT_NO_MEMUNIT
-#endif
-// DICT/LIST启用时，自动启用AVLTree依赖
-#if (!defined(XRT_NO_DICT) || !defined(XRT_NO_LIST))
-	#undef XRT_NO_AVLTREE
-#endif
-// VALUE系统依赖检查
-#if defined(XRT_NO_VALUE) && (!defined(XRT_NO_TEMPLATE) || !defined(XRT_NO_JSON))
-	#error "错误: VALUE系统被禁用，但TEMPLATE或JSON模块需要它。请启用XRT_VALUE或禁用相关高级模块。"
-#endif
-// DICT/LIST依赖检查
-#if (defined(XRT_NO_DICT) || defined(XRT_NO_LIST)) && !defined(XRT_NO_VALUE)
-	#error "错误: DICT或LIST被禁用，但VALUE系统需要它们。请启用这些模块或禁用XRT_VALUE。"
-#endif
-// AVLTree依赖检查
-#if defined(XRT_NO_AVLTREE) && (!defined(XRT_NO_DICT) || !defined(XRT_NO_LIST))
-	#error "错误：AVLTree 被禁用，但 DICT/LIST 模块需要它。请启用AVLTREE 或禁用相关容器模块。"
-#endif
-// Regex 模块依赖检查（新增）
-// Regex 是独立模块，没有依赖关系，可以安全禁用
-// 内存管理层依赖检查
-#if defined(XRT_NO_BSMN) && !defined(XRT_NO_MEMPOOL_FS)
-	#error "错误: BSMM被禁用，但FSMemPool需要它。请启用BSMM或禁用XRT_NO_MEMPOOL_FS。"
-#endif
-#if defined(XRT_NO_MEMUNIT) && !defined(XRT_NO_MEMPOOL_FS)
-	#error "错误: MEMUNIT被禁用，但FSMemPool需要它。请启用MEMUNIT或禁用XRT_NO_MEMPOOL_FS。"
-#endif
 // 基础功能组
 #if defined(XRT_MINIMAL)
 	#define XRT_NO_TIME
@@ -300,7 +235,6 @@
 	#define XRT_NO_XID
 	#define XRT_NO_BUFFER
 	#define XRT_NO_ARRAY
-	#define XRT_NO_STACK
 	#define XRT_NO_BSMN
 	#define XRT_NO_MEMUNIT
 	#define XRT_NO_MEMPOOL_FS
@@ -314,6 +248,187 @@
 	#define XRT_NO_JSON
 	#define XRT_NO_TEMPLATE
 	#define XRT_NO_REGEX		// 禁用正则表达式模块
+#endif
+// 网络根模块裁剪时，同步裁剪全部网络子库
+#if defined(XRT_NO_NETWORK)
+	#ifndef XRT_NO_XURL
+		#define XRT_NO_XURL
+	#endif
+	#ifndef XRT_NO_HTTP_UTIL
+		#define XRT_NO_HTTP_UTIL
+	#endif
+	#ifndef XRT_NO_XCODEC
+		#define XRT_NO_XCODEC
+	#endif
+	#ifndef XRT_NO_XHTTP
+		#define XRT_NO_XHTTP
+	#endif
+	#ifndef XRT_NO_XHTTPD
+		#define XRT_NO_XHTTPD
+	#endif
+	#ifndef XRT_NO_XWS
+		#define XRT_NO_XWS
+	#endif
+#endif
+// 裁剪依赖警告辅助
+#if defined(_MSC_VER)
+	#define XRT_CUT_WARN_STR2(x) #x
+	#define XRT_CUT_WARN_STR(x) XRT_CUT_WARN_STR2(x)
+	#define XRT_CUT_WARN(sText) __pragma(message(__FILE__ "(" XRT_CUT_WARN_STR(__LINE__) "): warning: " sText))
+#else
+	#define XRT_CUT_WARN(sText)
+#endif
+#if defined(XRT_NO_XURL) && (!defined(XRT_NO_XHTTP) || !defined(XRT_NO_XHTTPD) || !defined(XRT_NO_XWS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_XURL ignored because XHTTP/XHTTPD/XWS require XURL."
+	#else
+		XRT_CUT_WARN("XRT_NO_XURL ignored because XHTTP/XHTTPD/XWS require XURL.")
+	#endif
+	#undef XRT_NO_XURL
+#endif
+#if defined(XRT_NO_HTTP_UTIL) && (!defined(XRT_NO_XHTTP) || !defined(XRT_NO_XHTTPD) || !defined(XRT_NO_XWS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_HTTP_UTIL ignored because XHTTP/XHTTPD/XWS require HTTP_UTIL."
+	#else
+		XRT_CUT_WARN("XRT_NO_HTTP_UTIL ignored because XHTTP/XHTTPD/XWS require HTTP_UTIL.")
+	#endif
+	#undef XRT_NO_HTTP_UTIL
+#endif
+#if defined(XRT_NO_XCODEC) && (!defined(XRT_NO_XHTTP) || !defined(XRT_NO_XHTTPD) || !defined(XRT_NO_XWS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_XCODEC ignored because XHTTP/XHTTPD/XWS require XCODEC."
+	#else
+		XRT_CUT_WARN("XRT_NO_XCODEC ignored because XHTTP/XHTTPD/XWS require XCODEC.")
+	#endif
+	#undef XRT_NO_XCODEC
+#endif
+#if defined(XRT_NO_CRYPTO) && (!defined(XRT_NO_NETTLS) || !defined(XRT_NO_XWS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_CRYPTO ignored because NETTLS/XWS require CRYPTO."
+	#else
+		XRT_CUT_WARN("XRT_NO_CRYPTO ignored because NETTLS/XWS require CRYPTO.")
+	#endif
+	#undef XRT_NO_CRYPTO
+#endif
+#if defined(XRT_NO_FILE) && (!defined(XRT_NO_JSON) || !defined(XRT_NO_NETTLS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_FILE ignored because JSON/NETTLS require FILE."
+	#else
+		XRT_CUT_WARN("XRT_NO_FILE ignored because JSON/NETTLS require FILE.")
+	#endif
+	#undef XRT_NO_FILE
+#endif
+// 高层模块依赖
+#if defined(XRT_NO_VALUE) && (!defined(XRT_NO_JSON) || !defined(XRT_NO_TEMPLATE))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_VALUE ignored because JSON/TEMPLATE require VALUE."
+	#else
+		XRT_CUT_WARN("XRT_NO_VALUE ignored because JSON/TEMPLATE require VALUE.")
+	#endif
+	#undef XRT_NO_VALUE
+#endif
+#if defined(XRT_NO_JNUM) && (!defined(XRT_NO_JSON) || !defined(XRT_NO_TEMPLATE))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_JNUM ignored because JSON/TEMPLATE require JNUM."
+	#else
+		XRT_CUT_WARN("XRT_NO_JNUM ignored because JSON/TEMPLATE require JNUM.")
+	#endif
+	#undef XRT_NO_JNUM
+#endif
+#if defined(XRT_NO_STACK) && !defined(XRT_NO_JSON)
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_STACK ignored because JSON requires STACK."
+	#else
+		XRT_CUT_WARN("XRT_NO_STACK ignored because JSON requires STACK.")
+	#endif
+	#undef XRT_NO_STACK
+#endif
+#if defined(XRT_NO_DICT) && (!defined(XRT_NO_VALUE) || !defined(XRT_NO_TEMPLATE))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_DICT ignored because VALUE/TEMPLATE require DICT."
+	#else
+		XRT_CUT_WARN("XRT_NO_DICT ignored because VALUE/TEMPLATE require DICT.")
+	#endif
+	#undef XRT_NO_DICT
+#endif
+// 容器与内存依赖
+#if defined(XRT_NO_LIST) && !defined(XRT_NO_VALUE)
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_LIST ignored because VALUE requires LIST."
+	#else
+		XRT_CUT_WARN("XRT_NO_LIST ignored because VALUE requires LIST.")
+	#endif
+	#undef XRT_NO_LIST
+#endif
+#if defined(XRT_NO_AVLTREE) && (!defined(XRT_NO_DICT) || !defined(XRT_NO_LIST) || !defined(XRT_NO_VALUE))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_AVLTREE ignored because DICT/LIST/VALUE require AVLTREE."
+	#else
+		XRT_CUT_WARN("XRT_NO_AVLTREE ignored because DICT/LIST/VALUE require AVLTREE.")
+	#endif
+	#undef XRT_NO_AVLTREE
+#endif
+#if defined(XRT_NO_MEMPOOL) && !defined(XRT_NO_DICT)
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_MEMPOOL ignored because DICT requires MEMPOOL."
+	#else
+		XRT_CUT_WARN("XRT_NO_MEMPOOL ignored because DICT requires MEMPOOL.")
+	#endif
+	#undef XRT_NO_MEMPOOL
+#endif
+#if defined(XRT_NO_MEMPOOL_FS) && !defined(XRT_NO_AVLTREE)
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_MEMPOOL_FS ignored because AVLTREE requires MEMPOOL_FS."
+	#else
+		XRT_CUT_WARN("XRT_NO_MEMPOOL_FS ignored because AVLTREE requires MEMPOOL_FS.")
+	#endif
+	#undef XRT_NO_MEMPOOL_FS
+#endif
+#if defined(XRT_NO_BSMN) && (!defined(XRT_NO_MEMPOOL) || !defined(XRT_NO_MEMPOOL_FS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_BSMN ignored because MEMPOOL/MEMPOOL_FS require BSMN."
+	#else
+		XRT_CUT_WARN("XRT_NO_BSMN ignored because MEMPOOL/MEMPOOL_FS require BSMN.")
+	#endif
+	#undef XRT_NO_BSMN
+#endif
+#if defined(XRT_NO_MEMUNIT) && (!defined(XRT_NO_MEMPOOL) || !defined(XRT_NO_MEMPOOL_FS))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_MEMUNIT ignored because MEMPOOL/MEMPOOL_FS require MEMUNIT."
+	#else
+		XRT_CUT_WARN("XRT_NO_MEMUNIT ignored because MEMPOOL/MEMPOOL_FS require MEMUNIT.")
+	#endif
+	#undef XRT_NO_MEMUNIT
+#endif
+#if defined(XRT_NO_ARRAY) && (!defined(XRT_NO_BSMN) || !defined(XRT_NO_STACK) || !defined(XRT_NO_VALUE) || !defined(XRT_NO_TEMPLATE))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_ARRAY ignored because BSMN/STACK/VALUE/TEMPLATE require ARRAY."
+	#else
+		XRT_CUT_WARN("XRT_NO_ARRAY ignored because BSMN/STACK/VALUE/TEMPLATE require ARRAY.")
+	#endif
+	#undef XRT_NO_ARRAY
+#endif
+// 线程与时间依赖
+#if defined(XRT_NO_THREAD)
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_THREAD ignored because current runtime core requires THREAD support."
+	#else
+		XRT_CUT_WARN("XRT_NO_THREAD ignored because current runtime core requires THREAD support.")
+	#endif
+	#undef XRT_NO_THREAD
+#endif
+#if defined(XRT_NO_TIME) && (!defined(XRT_NO_VALUE) || !defined(XRT_NO_TEMPLATE) || !defined(XRT_NO_XID))
+	#if defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
+		#warning "XRT_NO_TIME ignored because VALUE/TEMPLATE/XID require TIME."
+	#else
+		XRT_CUT_WARN("XRT_NO_TIME ignored because VALUE/TEMPLATE/XID require TIME.")
+	#endif
+	#undef XRT_NO_TIME
+#endif
+#undef XRT_CUT_WARN
+#if defined(_MSC_VER)
+	#undef XRT_CUT_WARN_STR
+	#undef XRT_CUT_WARN_STR2
 #endif
 // ========================================
 // XRT 头文件声明
@@ -1558,6 +1673,9 @@
 	// 向已打开的文件写入数据 ( iSize 为要写入的字节数 )
 	XXAPI size_t xrtWrite(xfile objFile, str sText, size_t iSize);
 	
+	// 从已打开的文件读取二进制数据到特定位置
+	XXAPI size_t xrtGetBuffer(xfile objFile, ptr sBuff, size_t iSize);
+	
 	// 从已打开的文件读取二进制数据 ( 需要使用 xrtFree 释放内存 )
 	XXAPI ptr xrtGet(xfile objFile, size_t iSize, size_t* iRetSize);
 	
@@ -2290,84 +2408,65 @@
 	/* ------------------------------------ Regex 正则表达式模块 ------------------------------------ */
 	
 	#ifndef XRT_NO_REGEX
-	// bbre 错误码
-	#define BBRE_ERR_MEM   (-1)  // 内存不足
-	#define BBRE_ERR_PARSE (-2)  // 解析失败
-	#define BBRE_ERR_LIMIT (-3)  // 超出限制
+	// Regex 错误码
+	#define XRT_REGEX_ERR_MEM			(-1)	// 内存不足
+	#define XRT_REGEX_ERR_PARSE		(-2)	// 解析失败
+	#define XRT_REGEX_ERR_LIMIT		(-3)	// 超出限制
 	
-	// 正则表达式标志
-	typedef enum bbre_flags {
-	  BBRE_FLAG_INSENSITIVE = 1,  // (?i) 不区分大小写
-	  BBRE_FLAG_MULTILINE = 2,    // (?m) 多行模式（^$匹配行首尾）
-	  BBRE_FLAG_DOTNEWLINE = 4,   // (?s) . 匹配换行符
-	  BBRE_FLAG_UNGREEDY = 8      // (?U) 量词变为非贪婪
-	} bbre_flags;
+	// Regex 标志
+	typedef uint32 xregexflags;
+	#define XRT_REGEX_FLAG_INSENSITIVE	((xregexflags)1u)	// (?i) 不区分大小写
+	#define XRT_REGEX_FLAG_MULTILINE	((xregexflags)2u)	// (?m) 多行模式（^$匹配行首尾）
+	#define XRT_REGEX_FLAG_DOTNEWLINE	((xregexflags)4u)	// (?s) . 匹配换行符
+	#define XRT_REGEX_FLAG_UNGREEDY		((xregexflags)8u)	// (?U) 量词变为非贪婪
 	
-	// 内存分配器回调
-	typedef void *(*bbre_alloc_cb)(void *user, void *ptr, size_t prev, size_t next);
+	// Regex 分配器
+	typedef ptr (*xregexallocproc)(ptr pUserData, ptr pMem, size_t iPrevSize, size_t iNextSize);
 	
-	typedef struct bbre_alloc {
-	  void *user;       // 用户上下文
-	  bbre_alloc_cb cb; // 分配器回调
-	} bbre_alloc;
+	typedef struct {
+		ptr pUserData;				// 用户上下文
+		xregexallocproc procAlloc;	// 分配器回调
+	} xregexalloc;
 	
-	// 匹配跨度（用于捕获组）
-	typedef struct bbre_span {
-	  size_t begin;  // 起始位置
-	  size_t end;    // 结束位置
-	} bbre_span;
+	// 匹配范围
+	typedef struct {
+		size_t iBegin;				// 起始位置
+		size_t iEnd;				// 结束位置
+	} xregexspan;
 	
 	// 前向声明
-	typedef struct bbre bbre;
-	typedef struct bbre_builder bbre_builder;
-	typedef struct bbre_set bbre_set;
-	typedef struct bbre_set_builder bbre_set_builder;
+	typedef struct xrt_regex xregex;
+	typedef struct xrt_regex_builder xregexbuilder;
+	typedef struct xrt_regex_set xregexset;
+	typedef struct xrt_regex_set_builder xregexsetbuilder;
 	
-	// 快速创建 API（null-terminated 字符串）
-	XXAPI bbre *bbre_init_pattern(const char *pat_nt);
+	// 单模式
+	XXAPI xregex* xrtRegexCreate(const char* sPatternNt);
+	XXAPI int xrtRegexCreateFromBuilder(xregex** ppRegex, const xregexbuilder* pBuilder, const xregexalloc* pAlloc);
+	XXAPI void xrtRegexDestroy(xregex* pRegex);
+	XXAPI int xrtRegexIsMatch(xregex* pRegex, const char* sText, size_t iTextSize);
+	XXAPI int xrtRegexFind(xregex* pRegex, const char* sText, size_t iTextSize, xregexspan* pOutSpan);
+	XXAPI int xrtRegexCaptures(xregex* pRegex, const char* sText, size_t iTextSize, xregexspan* pOutCaptures, uint32 iCaptureCount);
 	
-	// 完整初始化 API（从 builder 创建）
-	XXAPI int bbre_init(
-	  bbre **preg, const bbre_builder *build, const bbre_alloc *alloc);
+	// Builder
+	XXAPI int xrtRegexBuilderCreate(xregexbuilder** ppBuilder, const char* sPattern, size_t iPatternSize, const xregexalloc* pAlloc);
+	XXAPI void xrtRegexBuilderDestroy(xregexbuilder* pBuilder);
+	XXAPI void xrtRegexBuilderSetFlags(xregexbuilder* pBuilder, xregexflags iFlags);
 	
-	// 销毁 regex 对象
-	XXAPI void bbre_destroy(bbre *reg);
+	// 克隆
+	XXAPI int xrtRegexClone(xregex** ppOut, const xregex* pRegex, const xregexalloc* pAlloc);
 	
-	// 匹配函数
-	XXAPI int bbre_is_match(bbre *reg, const char *text, size_t text_size);
-	XXAPI int bbre_find(
-	  bbre *reg, const char *text, size_t text_size, bbre_span *out_bounds);
-	XXAPI int bbre_captures(
-	  bbre *reg, const char *text, size_t text_size, bbre_span *out_captures,
-	  unsigned int out_captures_size);
+	// 多模式
+	XXAPI int xrtRegexSetBuilderCreate(xregexsetbuilder** ppBuilder, const xregexalloc* pAlloc);
+	XXAPI void xrtRegexSetBuilderDestroy(xregexsetbuilder* pBuilder);
+	XXAPI int xrtRegexSetBuilderAdd(xregexsetbuilder* pBuilder, const xregex* pRegex);
+	XXAPI xregexset* xrtRegexSetCreate(const char* const* arrPatternsNt, size_t iPatternCount);
+	XXAPI int xrtRegexSetCreateFromBuilder(xregexset** ppSet, const xregexsetbuilder* pBuilder, const xregexalloc* pAlloc);
+	XXAPI void xrtRegexSetDestroy(xregexset* pSet);
+	XXAPI int xrtRegexSetIsMatch(xregexset* pSet, const char* sText, size_t iTextSize);
+	XXAPI int xrtRegexSetMatches(xregexset* pSet, const char* sText, size_t iTextSize, uint32* pOutIndexes, uint32 iMaxIndexes, uint32* pOutIndexCount);
+	XXAPI int xrtRegexSetClone(xregexset** ppOut, const xregexset* pSet, const xregexalloc* pAlloc);
 	
-	// Builder API（高级用法）
-	XXAPI int bbre_builder_init(
-	  bbre_builder **pbuild, const char *pat, size_t pat_size,
-	  const bbre_alloc *alloc);
-	XXAPI void bbre_builder_destroy(bbre_builder *build);
-	XXAPI void bbre_builder_flags(bbre_builder *build, bbre_flags flags);
-	
-	// 克隆 API（多线程安全）
-	XXAPI int bbre_clone(bbre **pout, const bbre *reg, const bbre_alloc *alloc);
-	
-	// bbre_set API（多模式匹配）
-	XXAPI int bbre_set_builder_init(bbre_set_builder **pbuild, const bbre_alloc *alloc);
-	XXAPI void bbre_set_builder_destroy(bbre_set_builder *build);
-	XXAPI int bbre_set_builder_add(bbre_set_builder *build, const bbre *reg);
-	XXAPI bbre_set *bbre_set_init_patterns(const char *const *ppats_nt, size_t num_pats);
-	XXAPI int bbre_set_init(
-	  bbre_set **pset, const bbre_set_builder *build, const bbre_alloc *alloc);
-	XXAPI void bbre_set_destroy(bbre_set *set);
-	XXAPI int bbre_set_is_match(bbre_set *set, const char *text, size_t text_size);
-	XXAPI int bbre_set_matches(
-	  bbre_set *set, const char *text, size_t text_size, unsigned int *out_idxs,
-	  unsigned int out_idxs_size, unsigned int *out_num_idxs);
-	XXAPI int bbre_set_clone(
-	  bbre_set **pout, const bbre_set *set, const bbre_alloc *alloc);
-	
-	// 版本号
-	XXAPI const char *bbre_version(void);
 	#endif // XRT_NO_REGEX
 	/* ------------------------------------ XNet V2 ------------------------------------ */
 	/*
@@ -2453,6 +2552,7 @@
 	typedef struct xrt_net_dgram    xdgramsock;
 	typedef struct xrt_net_chain    xnetchain;
 	typedef struct xrt_net_future   xnetfuture;
+	typedef struct xrt_net_proxy    xnetproxy;
 	typedef struct xrt_promise      xpromise;
 	typedef struct xrt_task         xtask;
 	typedef struct xrt_task_group   xtaskgroup;
@@ -2488,6 +2588,12 @@
 	#define XNET_CONNECT_F_NONE           0x00000000u
 	#define XNET_CONNECT_F_NO_DELAY       0x00000001u
 	#define XNET_CONNECT_F_KEEPALIVE      0x00000002u
+	#define XNET_PROXY_NONE               0
+	#define XNET_PROXY_SOCKS5             1
+	#define XNET_PROXY_HTTP_CONNECT       2
+	#define XNET_PROXY_HOST_CAP           256u
+	#define XNET_PROXY_USER_CAP           128u
+	#define XNET_PROXY_PASS_CAP           128u
 	#define XNET_DGRAM_F_NONE             0x00000000u
 	#define XNET_DGRAM_F_REUSE_ADDR       0x00000001u
 	#define XNET_DGRAM_F_REUSE_PORT       0x00000002u
@@ -2522,6 +2628,17 @@
 	const xtlsconfig* pTlsConfig;
 	} xnetlistenconfig;
 	typedef struct {
+	int iType;
+	char sHost[XNET_PROXY_HOST_CAP];
+	uint16 iPort;
+	char sUser[XNET_PROXY_USER_CAP];
+	char sPass[XNET_PROXY_PASS_CAP];
+	} xnetproxyconfig;
+	struct xrt_net_proxy {
+	volatile long iRefCount;
+	xnetproxyconfig tConfig;
+	};
+	typedef struct {
 	const char* sHost;
 	uint16 iPort;
 	uint32 iFlags;
@@ -2530,6 +2647,7 @@
 	uint32 iLowWater;
 	uint32 iRecvLimit;
 	const xtlsconfig* pTlsConfig;
+	xnetproxy* pProxy;
 	} xnetconnectconfig;
 	typedef struct {
 	xnetaddr tBindAddr;
@@ -3007,6 +3125,7 @@
 	size_t iBodyLen;
 	uint32 iTimeoutMs;
 	bool bVerifyPeer;
+	xnetproxy* pProxy;
 	} xhttprequest;
 	typedef struct {
 	uint32 iStatusCode;
@@ -3103,6 +3222,7 @@
 	uint32 iConnectTimeoutMs;
 	uint32 iRecvLimit;
 	bool bVerifyPeer;
+	xnetproxy* pProxy;
 	} xwsclientconfig;
 	typedef struct {
 	xnetaddr tBindAddr;
@@ -3138,6 +3258,10 @@
 	// 默认配置初始化
 	XXAPI void xrtNetEngineConfigInit(xnetengineconfig* pCfg);
 	XXAPI void xrtNetListenConfigInit(xnetlistenconfig* pCfg);
+	XXAPI void xrtNetProxyConfigInit(xnetproxyconfig* pCfg);
+	XXAPI xnetproxy* xrtNetProxyCreate(const xnetproxyconfig* pCfg);
+	XXAPI xnetproxy* xrtNetProxyAddRef(xnetproxy* pProxy);
+	XXAPI void xrtNetProxyRelease(xnetproxy* pProxy);
 	XXAPI void xrtNetConnectConfigInit(xnetconnectconfig* pCfg);
 	XXAPI void xrtNetDgramConfigInit(xnetdgramconfig* pCfg);
 	// XNet 内存上下文与数据链操作
@@ -13793,6 +13917,43 @@ XXAPI size_t xrtWrite(xfile objFile, str sText, size_t iSize)
 		}
 	#endif
 }
+// 从已打开的文件读取二进制数据到特定位置
+XXAPI size_t xrtGetBuffer(xfile objFile, ptr sBuff, size_t iSize)
+{
+	#if defined(_WIN32) || defined(_WIN64)
+		// windows 方案
+		if ( objFile && (objFile->obj != INVALID_HANDLE_VALUE) ) {
+			if ( iSize == 0 ) { return 0; }
+			// 读取数据
+			DWORD iRet;
+			if ( ReadFile(objFile->obj, sBuff, iSize, &iRet, NULL) ) {
+				return iRet;
+			} else {
+				xrtSetError(sErrorFile_Read, FALSE);
+				return 0;
+			}
+		} else {
+			xrtSetError(sErrorFile_Handle, FALSE);
+			return 0;
+		}
+	#else
+		// 其他平台方案
+		if ( objFile && (objFile->idx != -1) ) {
+			if ( iSize == 0 ) { return 0; }
+			// 读取数据
+			ssize_t iRet = read(objFile->idx, sBuff, iSize);
+			if ( iRet >= 0 ) {
+				return (size_t)iRet;
+			} else {
+				xrtSetError(sErrorFile_Read, FALSE);
+				return 0;
+			}
+		} else {
+			xrtSetError(sErrorFile_Handle, FALSE);
+			return 0;
+		}
+	#endif
+}
 // 从已打开的文件读取二进制数据 ( 需要使用 xrtFree 释放内存 )
 XXAPI ptr xrtGet(xfile objFile, size_t iSize, size_t* iRetSize)
 {
@@ -21329,6 +21490,7 @@ typedef struct xrt_net_stream   xnetstream;
 typedef struct xrt_net_dgram    xdgramsock;
 typedef struct xrt_net_chain    xnetchain;
 typedef struct xrt_net_future   xnetfuture;
+typedef struct xrt_net_proxy    xnetproxy;
 typedef struct xrt_tls_session  xtlssession;
 typedef void (*xnet_task_fn)(xnetworker* pWorker, ptr pArg);
 /* ============================== Address model ============================== */
@@ -21360,6 +21522,12 @@ typedef struct {
 #define XNET_CONNECT_F_NONE           0x00000000u
 #define XNET_CONNECT_F_NO_DELAY       0x00000001u
 #define XNET_CONNECT_F_KEEPALIVE      0x00000002u
+#define XNET_PROXY_NONE               0
+#define XNET_PROXY_SOCKS5             1
+#define XNET_PROXY_HTTP_CONNECT       2
+#define XNET_PROXY_HOST_CAP           256u
+#define XNET_PROXY_USER_CAP           128u
+#define XNET_PROXY_PASS_CAP           128u
 #define XNET_DGRAM_F_NONE             0x00000000u
 #define XNET_DGRAM_F_REUSE_ADDR       0x00000001u
 #define XNET_DGRAM_F_REUSE_PORT       0x00000002u
@@ -21394,6 +21562,17 @@ typedef struct {
 	const xtlsconfig* pTlsConfig;
 } xnetlistenconfig;
 typedef struct {
+	int iType;
+	char sHost[XNET_PROXY_HOST_CAP];
+	uint16 iPort;
+	char sUser[XNET_PROXY_USER_CAP];
+	char sPass[XNET_PROXY_PASS_CAP];
+} xnetproxyconfig;
+struct xrt_net_proxy {
+	volatile long iRefCount;
+	xnetproxyconfig tConfig;
+};
+typedef struct {
 	const char* sHost;
 	uint16 iPort;
 	uint32 iFlags;
@@ -21402,6 +21581,7 @@ typedef struct {
 	uint32 iLowWater;
 	uint32 iRecvLimit;
 	const xtlsconfig* pTlsConfig;
+	xnetproxy* pProxy;
 } xnetconnectconfig;
 typedef struct {
 	xnetaddr tBindAddr;
@@ -21477,6 +21657,24 @@ static bool __xnetAddrFromSockAddr(xnetaddr* pAddr, const struct sockaddr* pSA)
 		return true;
 	}
 	return false;
+}
+static void __xnetCopyFixedString(char* sDst, size_t iDstCap, const char* sSrc)
+{
+	size_t iLen;
+	if ( !sDst || iDstCap == 0 ) return;
+	sDst[0] = '\0';
+	if ( !sSrc || !sSrc[0] ) return;
+	iLen = strlen(sSrc);
+	if ( iLen >= iDstCap ) iLen = iDstCap - 1u;
+	memcpy(sDst, sSrc, iLen);
+	sDst[iLen] = '\0';
+}
+static bool __xnetProxyConfigIsValid(const xnetproxyconfig* pCfg)
+{
+	if ( !pCfg ) return false;
+	if ( pCfg->iType != XNET_PROXY_SOCKS5 && pCfg->iType != XNET_PROXY_HTTP_CONNECT ) return false;
+	if ( !pCfg->sHost[0] || pCfg->iPort == 0 ) return false;
+	return true;
 }
 static bool __xnetAddrToSockAddr(const xnetaddr* pAddr, struct sockaddr_storage* pStorage, socklen_t* pLen)
 {
@@ -21651,6 +21849,40 @@ XXAPI void xrtNetListenConfigInit(xnetlistenconfig* pCfg)
 	pCfg->iRecvLimit = 1048576;
 	pCfg->pTlsConfig = NULL;
 }
+XXAPI void xrtNetProxyConfigInit(xnetproxyconfig* pCfg)
+{
+	if ( !pCfg ) return;
+	memset(pCfg, 0, sizeof(xnetproxyconfig));
+	pCfg->iType = XNET_PROXY_NONE;
+}
+XXAPI xnetproxy* xrtNetProxyCreate(const xnetproxyconfig* pCfg)
+{
+	xnetproxy* pProxy;
+	if ( !__xnetProxyConfigIsValid(pCfg) ) return NULL;
+	pProxy = (xnetproxy*)xrtMalloc(sizeof(xnetproxy));
+	if ( !pProxy ) return NULL;
+	memset(pProxy, 0, sizeof(xnetproxy));
+	pProxy->iRefCount = 1;
+	pProxy->tConfig.iType = pCfg->iType;
+	pProxy->tConfig.iPort = pCfg->iPort;
+	__xnetCopyFixedString(pProxy->tConfig.sHost, sizeof(pProxy->tConfig.sHost), pCfg->sHost);
+	__xnetCopyFixedString(pProxy->tConfig.sUser, sizeof(pProxy->tConfig.sUser), pCfg->sUser);
+	__xnetCopyFixedString(pProxy->tConfig.sPass, sizeof(pProxy->tConfig.sPass), pCfg->sPass);
+	return pProxy;
+}
+XXAPI xnetproxy* xrtNetProxyAddRef(xnetproxy* pProxy)
+{
+	if ( !pProxy ) return NULL;
+	(void)__xnetAtomicAddFetch32(&pProxy->iRefCount, 1);
+	return pProxy;
+}
+XXAPI void xrtNetProxyRelease(xnetproxy* pProxy)
+{
+	if ( !pProxy ) return;
+	if ( __xnetAtomicAddFetch32(&pProxy->iRefCount, -1) == 0 ) {
+		xrtFree(pProxy);
+	}
+}
 XXAPI void xrtNetConnectConfigInit(xnetconnectconfig* pCfg)
 {
 	if ( !pCfg ) return;
@@ -21663,6 +21895,7 @@ XXAPI void xrtNetConnectConfigInit(xnetconnectconfig* pCfg)
 	pCfg->iLowWater = 65536;
 	pCfg->iRecvLimit = 1048576;
 	pCfg->pTlsConfig = NULL;
+	pCfg->pProxy = NULL;
 }
 XXAPI void xrtNetDgramConfigInit(xnetdgramconfig* pCfg)
 {
@@ -36053,6 +36286,323 @@ XXAPI void xrtP256DebugTest(const uint8 *pPriv, const uint8 *pPub65, const uint8
 #ifndef XRT_NO_NETWORK
 
 // ========================================
+// File: D:/Git/xrt/lib/xnet_proxy.h
+// ========================================
+
+#ifndef XRT_XNET_PROXY_H
+#define XRT_XNET_PROXY_H
+/*
+	XNet internal proxy handshake helpers.
+	This header keeps protocol parsing isolated from stream lifecycle so the
+	mainline transport can drive proxy negotiation as another pre-open stage.
+*/
+#define __XNET_PROXY_RECV_CAP         8192u
+#define __XNET_PROXY_ACTION_WAIT      0u
+#define __XNET_PROXY_ACTION_SEND      1u
+#define __XNET_PROXY_ACTION_READY     2u
+#define __XNET_PROXY_ACTION_ERROR     3u
+#define __XNET_PROXY_STAGE_INIT               0u
+#define __XNET_PROXY_STAGE_SOCKS5_METHOD      1u
+#define __XNET_PROXY_STAGE_SOCKS5_AUTH        2u
+#define __XNET_PROXY_STAGE_SOCKS5_CONNECT     3u
+#define __XNET_PROXY_STAGE_HTTP_CONNECT       4u
+#define __XNET_PROXY_STAGE_READY              5u
+typedef struct {
+	int iType;
+	uint16 iTargetPort;
+	uint8 iStage;
+	bool bTargetAddrValid;
+	char sTargetHost[XNET_PROXY_HOST_CAP];
+	xnetaddr tTargetAddr;
+	char aRecv[__XNET_PROXY_RECV_CAP];
+	uint32 iRecvLen;
+} __xnet_proxy_state;
+static bool __xnetProxyHasAuth(const xnetproxy* pProxy)
+{
+	if ( !pProxy ) return false;
+	return pProxy->tConfig.sUser[0] != '\0' || pProxy->tConfig.sPass[0] != '\0';
+}
+static void __xnetProxyConsumeRecv(__xnet_proxy_state* pState, uint32 iLen)
+{
+	if ( !pState || iLen == 0 ) return;
+	if ( iLen >= pState->iRecvLen ) {
+		pState->iRecvLen = 0;
+		return;
+	}
+	memmove(pState->aRecv, pState->aRecv + iLen, pState->iRecvLen - iLen);
+	pState->iRecvLen -= iLen;
+}
+static bool __xnetProxyAppendRecv(__xnet_proxy_state* pState, const void* pData, size_t iLen)
+{
+	if ( !pState || (!pData && iLen > 0) ) return false;
+	if ( iLen == 0 ) return true;
+	if ( iLen > (size_t)(__XNET_PROXY_RECV_CAP - pState->iRecvLen) ) return false;
+	memcpy(pState->aRecv + pState->iRecvLen, pData, iLen);
+	pState->iRecvLen += (uint32)iLen;
+	return true;
+}
+static bool __xnetProxyFormatAuthority(const char* sHost, uint16 iPort, char* sOut, size_t iOutCap)
+{
+	xnetaddr tAddr;
+	int iWritten;
+	if ( !sHost || !sHost[0] || !sOut || iOutCap == 0 ) return false;
+	memset(&tAddr, 0, sizeof(tAddr));
+	if ( xrtNetAddrParse(&tAddr, sHost, iPort) == XRT_NET_OK && tAddr.iFamily == AF_INET6 ) {
+		iWritten = snprintf(sOut, iOutCap, "[%s]:%u", sHost, (unsigned)iPort);
+	} else {
+		iWritten = snprintf(sOut, iOutCap, "%s:%u", sHost, (unsigned)iPort);
+	}
+	return iWritten > 0 && (size_t)iWritten < iOutCap;
+}
+static bool __xnetProxyBuildSocks5Greeting(const xnetproxy* pProxy, char* pOut, size_t iOutCap, size_t* pOutLen)
+{
+	size_t iLen = 0;
+	if ( pOutLen ) *pOutLen = 0;
+	if ( !pProxy || !pOut || iOutCap < 4u ) return false;
+	pOut[iLen++] = 0x05;
+	if ( __xnetProxyHasAuth(pProxy) ) {
+		pOut[iLen++] = 0x02;
+		pOut[iLen++] = 0x00;
+		pOut[iLen++] = 0x02;
+	} else {
+		pOut[iLen++] = 0x01;
+		pOut[iLen++] = 0x00;
+	}
+	if ( pOutLen ) *pOutLen = iLen;
+	return true;
+}
+static bool __xnetProxyBuildSocks5Auth(const xnetproxy* pProxy, char* pOut, size_t iOutCap, size_t* pOutLen)
+{
+	size_t iUserLen;
+	size_t iPassLen;
+	size_t iPos = 0;
+	if ( pOutLen ) *pOutLen = 0;
+	if ( !pProxy || !pOut ) return false;
+	iUserLen = strlen(pProxy->tConfig.sUser);
+	iPassLen = strlen(pProxy->tConfig.sPass);
+	if ( iUserLen > 255u || iPassLen > 255u ) return false;
+	if ( iOutCap < (size_t)(3u + iUserLen + iPassLen) ) return false;
+	pOut[iPos++] = 0x01;
+	pOut[iPos++] = (uint8)iUserLen;
+	if ( iUserLen > 0 ) {
+		memcpy(pOut + iPos, pProxy->tConfig.sUser, iUserLen);
+		iPos += iUserLen;
+	}
+	pOut[iPos++] = (uint8)iPassLen;
+	if ( iPassLen > 0 ) {
+		memcpy(pOut + iPos, pProxy->tConfig.sPass, iPassLen);
+		iPos += iPassLen;
+	}
+	if ( pOutLen ) *pOutLen = iPos;
+	return true;
+}
+static bool __xnetProxyBuildSocks5ConnectReq(const __xnet_proxy_state* pState, char* pOut, size_t iOutCap, size_t* pOutLen)
+{
+	size_t iPos = 0;
+	size_t iHostLen;
+	if ( pOutLen ) *pOutLen = 0;
+	if ( !pState || !pOut || !pState->sTargetHost[0] || pState->iTargetPort == 0 ) return false;
+	pOut[iPos++] = 0x05;
+	pOut[iPos++] = 0x01;
+	pOut[iPos++] = 0x00;
+	if ( pState->bTargetAddrValid && pState->tTargetAddr.iFamily == AF_INET ) {
+		if ( iOutCap < iPos + 1u + 4u + 2u ) return false;
+		pOut[iPos++] = 0x01;
+		memcpy(pOut + iPos, pState->tTargetAddr.aAddr, 4u);
+		iPos += 4u;
+	} else if ( pState->bTargetAddrValid && pState->tTargetAddr.iFamily == AF_INET6 ) {
+		if ( iOutCap < iPos + 1u + 16u + 2u ) return false;
+		pOut[iPos++] = 0x04;
+		memcpy(pOut + iPos, pState->tTargetAddr.aAddr, 16u);
+		iPos += 16u;
+	} else {
+		iHostLen = strlen(pState->sTargetHost);
+		if ( iHostLen == 0 || iHostLen > 255u ) return false;
+		if ( iOutCap < iPos + 1u + 1u + iHostLen + 2u ) return false;
+		pOut[iPos++] = 0x03;
+		pOut[iPos++] = (uint8)iHostLen;
+		memcpy(pOut + iPos, pState->sTargetHost, iHostLen);
+		iPos += iHostLen;
+	}
+	pOut[iPos++] = (char)((pState->iTargetPort >> 8) & 0xFFu);
+	pOut[iPos++] = (char)(pState->iTargetPort & 0xFFu);
+	if ( pOutLen ) *pOutLen = iPos;
+	return true;
+}
+static bool __xnetProxyBuildHttpConnectReq(const xnetproxy* pProxy, const __xnet_proxy_state* pState, char* pOut, size_t iOutCap, size_t* pOutLen)
+{
+	char sAuthority[384];
+	int iWritten;
+	if ( pOutLen ) *pOutLen = 0;
+	if ( !pProxy || !pState || !pOut ) return false;
+	if ( !__xnetProxyFormatAuthority(pState->sTargetHost, pState->iTargetPort, sAuthority, sizeof(sAuthority)) ) return false;
+	if ( __xnetProxyHasAuth(pProxy) ) {
+		char sCred[512];
+		str sAuth;
+		iWritten = snprintf(sCred, sizeof(sCred), "%s:%s", pProxy->tConfig.sUser, pProxy->tConfig.sPass);
+		if ( iWritten < 0 || (size_t)iWritten >= sizeof(sCred) ) return false;
+		sAuth = xrtBase64Encode(sCred, (size_t)iWritten, NULL);
+		if ( !sAuth || sAuth == xCore.sNull || !sAuth[0] ) return false;
+		iWritten = snprintf(pOut, iOutCap,
+			"CONNECT %s HTTP/1.1\r\n"
+			"Host: %s\r\n"
+			"Proxy-Authorization: Basic %s\r\n"
+			"Proxy-Connection: Keep-Alive\r\n"
+			"\r\n",
+			sAuthority,
+			sAuthority,
+			sAuth);
+		xrtFree(sAuth);
+	} else {
+		iWritten = snprintf(pOut, iOutCap,
+			"CONNECT %s HTTP/1.1\r\n"
+			"Host: %s\r\n"
+			"Proxy-Connection: Keep-Alive\r\n"
+			"\r\n",
+			sAuthority,
+			sAuthority);
+	}
+	if ( iWritten <= 0 || (size_t)iWritten >= iOutCap ) return false;
+	if ( pOutLen ) *pOutLen = (size_t)iWritten;
+	return true;
+}
+static uint32 __xnetProxyFindHttpHeaderEnd(const char* pData, uint32 iLen)
+{
+	if ( !pData || iLen < 4u ) return 0u;
+	for ( uint32 i = 0; i + 3u < iLen; ++i ) {
+		if ( pData[i] == '\r' && pData[i + 1u] == '\n' &&
+			pData[i + 2u] == '\r' && pData[i + 3u] == '\n' ) {
+			return i + 4u;
+		}
+	}
+	return 0u;
+}
+static __xnet_proxy_state* __xnetProxyStateCreate(const xnetproxy* pProxy, const char* sTargetHost, uint16 iTargetPort)
+{
+	__xnet_proxy_state* pState;
+	if ( !pProxy || !sTargetHost || !sTargetHost[0] || iTargetPort == 0 ) return NULL;
+	pState = (__xnet_proxy_state*)XNET_ALLOC(sizeof(__xnet_proxy_state));
+	if ( !pState ) return NULL;
+	memset(pState, 0, sizeof(__xnet_proxy_state));
+	pState->iType = pProxy->tConfig.iType;
+	pState->iTargetPort = iTargetPort;
+	__xnetCopyFixedString(pState->sTargetHost, sizeof(pState->sTargetHost), sTargetHost);
+	memset(&pState->tTargetAddr, 0, sizeof(pState->tTargetAddr));
+	if ( xrtNetAddrParse(&pState->tTargetAddr, pState->sTargetHost, iTargetPort) == XRT_NET_OK ) {
+		pState->bTargetAddrValid = true;
+	}
+	return pState;
+}
+static void __xnetProxyStateDestroy(__xnet_proxy_state* pState)
+{
+	if ( !pState ) return;
+	XNET_FREE(pState);
+}
+static uint32 __xnetProxyStateBegin(__xnet_proxy_state* pState, const xnetproxy* pProxy, char* pOut, size_t iOutCap, size_t* pOutLen)
+{
+	if ( pOutLen ) *pOutLen = 0;
+	if ( !pState || !pProxy || !pOut ) return __XNET_PROXY_ACTION_ERROR;
+	if ( pState->iStage != __XNET_PROXY_STAGE_INIT ) return __XNET_PROXY_ACTION_ERROR;
+	if ( pProxy->tConfig.iType == XNET_PROXY_SOCKS5 ) {
+		if ( !__xnetProxyBuildSocks5Greeting(pProxy, pOut, iOutCap, pOutLen) ) return __XNET_PROXY_ACTION_ERROR;
+		pState->iStage = __XNET_PROXY_STAGE_SOCKS5_METHOD;
+		return __XNET_PROXY_ACTION_SEND;
+	}
+	if ( pProxy->tConfig.iType == XNET_PROXY_HTTP_CONNECT ) {
+		if ( !__xnetProxyBuildHttpConnectReq(pProxy, pState, pOut, iOutCap, pOutLen) ) return __XNET_PROXY_ACTION_ERROR;
+		pState->iStage = __XNET_PROXY_STAGE_HTTP_CONNECT;
+		return __XNET_PROXY_ACTION_SEND;
+	}
+	return __XNET_PROXY_ACTION_ERROR;
+}
+static uint32 __xnetProxyStateFeed(__xnet_proxy_state* pState, const xnetproxy* pProxy, const void* pData, size_t iLen, char* pOut, size_t iOutCap, size_t* pOutLen)
+{
+	if ( pOutLen ) *pOutLen = 0;
+	if ( !pState || !pProxy || !__xnetProxyAppendRecv(pState, pData, iLen) ) return __XNET_PROXY_ACTION_ERROR;
+	for ( ;; ) {
+		switch ( pState->iStage ) {
+			case __XNET_PROXY_STAGE_SOCKS5_METHOD:
+				if ( pState->iRecvLen < 2u ) return __XNET_PROXY_ACTION_WAIT;
+				if ( (uint8)pState->aRecv[0] != 0x05 ) return __XNET_PROXY_ACTION_ERROR;
+				if ( (uint8)pState->aRecv[1] == 0xFF ) return __XNET_PROXY_ACTION_ERROR;
+				if ( (uint8)pState->aRecv[1] == 0x02 ) {
+					if ( !__xnetProxyHasAuth(pProxy) || !__xnetProxyBuildSocks5Auth(pProxy, pOut, iOutCap, pOutLen) ) {
+						return __XNET_PROXY_ACTION_ERROR;
+					}
+					__xnetProxyConsumeRecv(pState, 2u);
+					pState->iStage = __XNET_PROXY_STAGE_SOCKS5_AUTH;
+					return __XNET_PROXY_ACTION_SEND;
+				}
+				if ( (uint8)pState->aRecv[1] != 0x00 ) return __XNET_PROXY_ACTION_ERROR;
+				if ( !__xnetProxyBuildSocks5ConnectReq(pState, pOut, iOutCap, pOutLen) ) return __XNET_PROXY_ACTION_ERROR;
+				__xnetProxyConsumeRecv(pState, 2u);
+				pState->iStage = __XNET_PROXY_STAGE_SOCKS5_CONNECT;
+				return __XNET_PROXY_ACTION_SEND;
+			case __XNET_PROXY_STAGE_SOCKS5_AUTH:
+				if ( pState->iRecvLen < 2u ) return __XNET_PROXY_ACTION_WAIT;
+				if ( (uint8)pState->aRecv[0] != 0x01 || (uint8)pState->aRecv[1] != 0x00 ) return __XNET_PROXY_ACTION_ERROR;
+				if ( !__xnetProxyBuildSocks5ConnectReq(pState, pOut, iOutCap, pOutLen) ) return __XNET_PROXY_ACTION_ERROR;
+				__xnetProxyConsumeRecv(pState, 2u);
+				pState->iStage = __XNET_PROXY_STAGE_SOCKS5_CONNECT;
+				return __XNET_PROXY_ACTION_SEND;
+			case __XNET_PROXY_STAGE_SOCKS5_CONNECT:
+				{
+					uint32 iNeed = 0;
+					uint8 iAtyp;
+					if ( pState->iRecvLen < 5u ) return __XNET_PROXY_ACTION_WAIT;
+					if ( (uint8)pState->aRecv[0] != 0x05 || (uint8)pState->aRecv[1] != 0x00 || (uint8)pState->aRecv[2] != 0x00 ) {
+						return __XNET_PROXY_ACTION_ERROR;
+					}
+					iAtyp = (uint8)pState->aRecv[3];
+					if ( iAtyp == 0x01 ) {
+						iNeed = 4u + 4u + 2u;
+					} else if ( iAtyp == 0x04 ) {
+						iNeed = 4u + 16u + 2u;
+					} else if ( iAtyp == 0x03 ) {
+						iNeed = 5u + (uint8)pState->aRecv[4] + 2u;
+					} else {
+						return __XNET_PROXY_ACTION_ERROR;
+					}
+					if ( pState->iRecvLen < iNeed ) return __XNET_PROXY_ACTION_WAIT;
+					__xnetProxyConsumeRecv(pState, iNeed);
+					pState->iStage = __XNET_PROXY_STAGE_READY;
+					return __XNET_PROXY_ACTION_READY;
+				}
+			case __XNET_PROXY_STAGE_HTTP_CONNECT:
+				{
+					uint32 iHeaderEnd = __xnetProxyFindHttpHeaderEnd(pState->aRecv, pState->iRecvLen);
+					char chSaved;
+					char* pStatus;
+					int iStatusCode;
+					if ( iHeaderEnd == 0u ) return __XNET_PROXY_ACTION_WAIT;
+					chSaved = pState->aRecv[iHeaderEnd - 1u];
+					pState->aRecv[iHeaderEnd - 1u] = '\0';
+					if ( strncmp(pState->aRecv, "HTTP/1.", 7) != 0 ) {
+						pState->aRecv[iHeaderEnd - 1u] = chSaved;
+						return __XNET_PROXY_ACTION_ERROR;
+					}
+					pStatus = strchr(pState->aRecv, ' ');
+					if ( !pStatus ) {
+						pState->aRecv[iHeaderEnd - 1u] = chSaved;
+						return __XNET_PROXY_ACTION_ERROR;
+					}
+					iStatusCode = atoi(pStatus + 1);
+					pState->aRecv[iHeaderEnd - 1u] = chSaved;
+					if ( iStatusCode != 200 ) return __XNET_PROXY_ACTION_ERROR;
+					__xnetProxyConsumeRecv(pState, iHeaderEnd);
+					pState->iStage = __XNET_PROXY_STAGE_READY;
+					return __XNET_PROXY_ACTION_READY;
+				}
+			case __XNET_PROXY_STAGE_READY:
+				return __XNET_PROXY_ACTION_READY;
+			default:
+				return __XNET_PROXY_ACTION_ERROR;
+		}
+	}
+}
+#endif
+
+// ========================================
 // File: D:/Git/xrt/lib/xnet_stream.h
 // ========================================
 
@@ -36163,6 +36713,8 @@ struct xrt_net_stream {
 	xnetworker* pWorker;
 	xnetlistener* pListener;
 	xtlssession* pTls;
+	xnetproxy* pProxy;
+	__xnet_proxy_state* pProxyState;
 	const xnetstreamevents* pEvents;
 	xsocket hSocket;
 	xnetaddr tLocalAddr;
@@ -36174,8 +36726,10 @@ struct xrt_net_stream {
 	uint32 iState;
 	uint32 iFlags;
 	uint32 iRecvLimit;
+	uint32 iConnectTimeoutMs;
 	xnet_result iCloseReason;
 	volatile long iAsyncHoldCount;
+	volatile long iOpenTimerState;
 	bool bReadPaused;
 	bool bRecvArmed;
 	bool bSendArmed;
@@ -36192,13 +36746,19 @@ static bool __xnetStreamArmSendWatch(xnetstream* pStream);
 static void __xnetStreamFinalizeSocketClose(xnetstream* pStream);
 static void __xnetStreamFinishClose(xnetstream* pStream, xnet_result iReason);
 static void __xnetStreamBeginGracefulCloseWait(xnetstream* pStream);
+static bool __xnetStreamHasPreOpenGate(const xnetstream* pStream);
 static void __xnetStreamDetachTls(xnetstream* pStream);
 static void __xnetStreamNotifyDestroyWaiters(xnetstream* pStream);
 static void __xnetStreamAbandonUnownedAccepted(xnetstream* pStream);
 static void __xnetSocketCloseHandle(xsocket* phSocket);
+static void __xnetStreamKickWrite(xnetstream* pStream);
 static bool __xnetStreamDrainTlsPlain(xnetstream* pStream);
+static bool __xnetStreamDriveProxyState(xnetstream* pStream, const void* pData, size_t iLen);
 static bool __xnetStreamDriveTlsHandshake(xnetstream* pStream);
+static void __xnetStreamDetachProxy(xnetstream* pStream);
 static void __xnetStreamEmitOpen(xnetstream* pStream);
+static void __xnetStreamHandleRecvEvent(xnetstream* pStream, xnetchain* pChain);
+static void __xnetStreamHandleOpenTimer(xnetstream* pStream);
 static bool __xnetListenerRegisterSyncAcceptWait(xnetlistener* pListener, __xnet_listener_sync_wait_fn pfnWait, __xnet_listener_sync_wait_ready_fn pfnCanAccept, ptr pCtx);
 static bool __xnetListenerCancelSyncAcceptWait(xnetlistener* pListener, ptr pCtx);
 /* ============================== Internal helpers ============================== */
@@ -36283,6 +36843,7 @@ static void __xnetStreamReleaseAsyncHold(xnetstream* pStream)
 		xrtNetChainClear(&pStream->tSendQ.tQueue);
 		__xnetStreamFinalizeSocketClose(pStream);
 		__xnetStreamDetachTls(pStream);
+		__xnetStreamDetachProxy(pStream);
 		XNET_FREE(pStream);
 	}
 }
@@ -36379,6 +36940,9 @@ static bool __xnetStreamResolveSyncWaitNow(xnetstream* pStream, uint32 iWaitKind
 			if ( pStream->bClosing ) {
 				*pStatus = XRT_NET_CLOSED;
 				return true;
+			}
+			if ( __xnetStreamHasPreOpenGate(pStream) ) {
+				return false;
 			}
 			if ( !pStream->tSendQ.bHighWaterHit || pStream->tSendQ.iQueuedBytes <= pStream->tSendQ.iLowWater ) {
 				*pStatus = XRT_NET_OK;
@@ -36800,6 +37364,35 @@ static void __xnetStreamApplyDefaults(xnetstream* pStream, const xnetconnectconf
 	}
 	__xnetStreamApplyWatermark(pStream, iHighWater, iLowWater);
 	pStream->iRecvLimit = iRecvLimit;
+	pStream->iConnectTimeoutMs = pConnectCfg ? pConnectCfg->iConnectTimeoutMs : 0u;
+}
+static bool __xnetStreamHasPreOpenGate(const xnetstream* pStream)
+{
+	return pStream && (pStream->iState & __XNET_STREAM_STATE_OPEN_EMITTED) == 0;
+}
+static uint64 __xnetStreamOpenTimerId(const xnetstream* pStream)
+{
+	return pStream ? (uint64)(uintptr_t)pStream : 0u;
+}
+static bool __xnetStreamArmOpenTimer(xnetstream* pStream, uint32 iTimeoutMs)
+{
+	if ( !pStream || !pStream->pWorker || iTimeoutMs == 0u ) return false;
+	if ( __xnetAtomicCompareExchange32(&pStream->iOpenTimerState, 1, 0) != 0 ) return false;
+	__xnetStreamAddAsyncHold(pStream);
+	if ( xrtNetPortArmTimer(&pStream->pWorker->tPort, __xnetStreamOpenTimerId(pStream), iTimeoutMs) != XRT_NET_OK ) {
+		(void)__xnetAtomicExchange32(&pStream->iOpenTimerState, 0);
+		__xnetStreamReleaseAsyncHold(pStream);
+		return false;
+	}
+	return true;
+}
+static void __xnetStreamCancelOpenTimer(xnetstream* pStream)
+{
+	if ( !pStream || !pStream->pWorker ) return;
+	if ( __xnetAtomicCompareExchange32(&pStream->iOpenTimerState, 0, 1) != 1 ) return;
+	if ( xrtNetPortCancelTimer(&pStream->pWorker->tPort, __xnetStreamOpenTimerId(pStream)) == XRT_NET_OK ) {
+		__xnetStreamReleaseAsyncHold(pStream);
+	}
 }
 static ptr __xnetStreamOwner(xnetstream* pStream)
 {
@@ -36818,6 +37411,21 @@ static void __xnetStreamDetachTls(xnetstream* pStream)
 	xrtNetTlsSessionDestroy(pStream->pTls);
 	pStream->pTls = NULL;
 	pStream->bTlsCloseQueued = false;
+}
+static void __xnetStreamClearProxyState(xnetstream* pStream)
+{
+	if ( !pStream || !pStream->pProxyState ) return;
+	__xnetProxyStateDestroy(pStream->pProxyState);
+	pStream->pProxyState = NULL;
+}
+static void __xnetStreamDetachProxy(xnetstream* pStream)
+{
+	if ( !pStream ) return;
+	__xnetStreamClearProxyState(pStream);
+	if ( pStream->pProxy ) {
+		xrtNetProxyRelease(pStream->pProxy);
+		pStream->pProxy = NULL;
+	}
 }
 static bool __xnetStreamTlsReady(const xnetstream* pStream)
 {
@@ -36996,6 +37604,68 @@ static void __xnetStreamDispatchRecv(xnetstream* pStream)
 		pStream->pEvents->OnRecv(__xnetStreamOwner(pStream), pStream, &pStream->tRxChain);
 	}
 }
+static bool __xnetStreamDriveProxyState(xnetstream* pStream, const void* pData, size_t iLen)
+{
+	char aSend[2048];
+	size_t iSendLen = 0;
+	uint32 iAction;
+	xnetchain* pCarry = NULL;
+	if ( !pStream || !pStream->pProxy || !pStream->pProxyState ) return true;
+	if ( pStream->pProxyState->iStage == __XNET_PROXY_STAGE_INIT ) {
+		iAction = __xnetProxyStateBegin(pStream->pProxyState, pStream->pProxy, aSend, sizeof(aSend), &iSendLen);
+	} else {
+		iAction = __xnetProxyStateFeed(pStream->pProxyState, pStream->pProxy, pData, iLen, aSend, sizeof(aSend), &iSendLen);
+	}
+	if ( iAction == __XNET_PROXY_ACTION_WAIT ) {
+		return true;
+	}
+	if ( iAction == __XNET_PROXY_ACTION_SEND ) {
+		if ( iSendLen == 0 || !__xnetStreamAppendSendCopy(pStream, aSend, iSendLen) ) {
+			iAction = __XNET_PROXY_ACTION_ERROR;
+		} else {
+			__xnetStreamKickWrite(pStream);
+			return true;
+		}
+	}
+	if ( iAction == __XNET_PROXY_ACTION_READY ) {
+		if ( pStream->pProxyState->iRecvLen > 0 ) {
+			pCarry = __xnetStreamAllocTempChain(pStream);
+			if ( !pCarry || !xrtNetChainAppendCopy(pCarry, pStream->pProxyState->aRecv, pStream->pProxyState->iRecvLen) ) {
+				__xnetStreamFreeTempChain(pCarry);
+				iAction = __XNET_PROXY_ACTION_ERROR;
+			}
+		}
+		if ( iAction == __XNET_PROXY_ACTION_READY ) {
+			__xnetStreamClearProxyState(pStream);
+			if ( pStream->pTls ) {
+				if ( !__xnetStreamDriveTlsHandshake(pStream) ) {
+					__xnetStreamFreeTempChain(pCarry);
+					return false;
+				}
+				if ( pCarry ) {
+					__xnetStreamHandleRecvEvent(pStream, pCarry);
+				}
+			} else {
+				__xnetStreamEmitOpen(pStream);
+				if ( pCarry ) {
+					__xnetStreamHandleRecvEvent(pStream, pCarry);
+				} else if ( !pStream->bClosing && __xnetSocketIsValid(pStream->hSocket) && !pStream->bRecvArmed ) {
+					(void)__xnetStreamArmRecvWatch(pStream);
+				}
+			}
+			return true;
+		}
+	}
+	if ( iAction == __XNET_PROXY_ACTION_ERROR ) {
+		__xnetStreamFreeTempChain(pCarry);
+		if ( pStream->pEvents && pStream->pEvents->OnError ) {
+			pStream->pEvents->OnError(__xnetStreamOwner(pStream), pStream, -1);
+		}
+		xrtNetStreamClose(pStream, XNET_CLOSE_F_ABORT);
+		return false;
+	}
+	return true;
+}
 static uint32 __xnetStreamBuildSendSpans(const xnetstream* pStream, xnetspan* pOut, uint32 iMaxCount)
 {
 	if ( !pStream || !pOut || iMaxCount == 0 ) return 0;
@@ -37110,6 +37780,7 @@ static bool __xnetStreamDriveTlsHandshake(xnetstream* pStream)
 	xnet_result iRes = XRT_NET_AGAIN;
 	uint32 iSpin = 0;
 	if ( !pStream || !pStream->pTls || !__xnetSocketIsValid(pStream->hSocket) ) return false;
+	if ( pStream->pProxyState ) return true;
 	#ifdef DEBUG_TRACE
 		printf("    [XNET_TLS] drive stream=%llu server=%d queued=%u ready=%d\n",
 			(unsigned long long)pStream->iId,
@@ -37186,6 +37857,7 @@ static bool __xnetStreamAppendTlsPlainRef(xnetstream* pStream, const xnetbufref*
 static void __xnetStreamEmitOpen(xnetstream* pStream)
 {
 	if ( !pStream || (pStream->iState & __XNET_STREAM_STATE_OPEN_EMITTED) != 0 ) return;
+	__xnetStreamCancelOpenTimer(pStream);
 	pStream->iState |= __XNET_STREAM_STATE_OPEN_EMITTED;
 	if ( pStream->pEvents && pStream->pEvents->OnOpen ) {
 		pStream->pEvents->OnOpen(__xnetStreamOwner(pStream), pStream);
@@ -37278,11 +37950,26 @@ static void __xnetStreamFinalizeSocketClose(xnetstream* pStream)
 static void __xnetStreamFinishClose(xnetstream* pStream, xnet_result iReason)
 {
 	if ( !pStream ) return;
+	__xnetStreamCancelOpenTimer(pStream);
+	__xnetStreamClearProxyState(pStream);
 	__xnetStreamFinalizeSocketClose(pStream);
 	__xnetStreamNotifySyncReadable(pStream, iReason);
 	__xnetStreamNotifySyncDrain(pStream, iReason);
 	__xnetStreamDetachTls(pStream);
 	__xnetStreamEmitClose(pStream, iReason);
+}
+static void __xnetStreamHandleOpenTimer(xnetstream* pStream)
+{
+	if ( !pStream ) return;
+	if ( __xnetAtomicCompareExchange32(&pStream->iOpenTimerState, 0, 1) != 1 ) return;
+	if ( (pStream->iState & (__XNET_STREAM_STATE_OPEN_EMITTED | __XNET_STREAM_STATE_CLOSE_EMITTED)) != 0 ) return;
+	pStream->bClosing = true;
+	pStream->iFlags = XNET_CLOSE_F_ABORT;
+	xrtNetChainClear(&pStream->tRxChain);
+	xrtNetChainClear(&pStream->tSendQ.tQueue);
+	pStream->tSendQ.iQueuedBytes = 0;
+	pStream->tSendQ.bHighWaterHit = false;
+	__xnetStreamFinishClose(pStream, XRT_NET_TIMEOUT);
 }
 static void __xnetStreamBeginGracefulCloseWait(xnetstream* pStream)
 {
@@ -37352,6 +38039,50 @@ static void __xnetStreamHandleRecvEvent(xnetstream* pStream, xnetchain* pChain)
 		__xnetStreamFreeTempChain(pChain);
 		return;
 	}
+	if ( pStream->pProxyState ) {
+		xnetspan arrSpan[16];
+		uint32 iSpanCount = xrtNetChainGetSpans(pChain, arrSpan, 16);
+		for ( uint32 i = 0; i < iSpanCount; ++i ) {
+			xnetchain* pRemainder = NULL;
+			if ( arrSpan[i].iLen == 0 ) continue;
+			if ( !pStream->pProxyState ) {
+				pRemainder = __xnetStreamAllocTempChain(pStream);
+				if ( !pRemainder || !xrtNetChainAppendCopy(pRemainder, arrSpan[i].pData, arrSpan[i].iLen) ) {
+					__xnetStreamFreeTempChain(pRemainder);
+					if ( pStream->pEvents && pStream->pEvents->OnError ) {
+						pStream->pEvents->OnError(__xnetStreamOwner(pStream), pStream, -1);
+					}
+					__xnetStreamFreeTempChain(pChain);
+					xrtNetStreamClose(pStream, XNET_CLOSE_F_ABORT);
+					return;
+				}
+				for ( uint32 j = i + 1u; j < iSpanCount; ++j ) {
+					if ( arrSpan[j].iLen == 0 ) continue;
+					if ( !xrtNetChainAppendCopy(pRemainder, arrSpan[j].pData, arrSpan[j].iLen) ) {
+						__xnetStreamFreeTempChain(pRemainder);
+						if ( pStream->pEvents && pStream->pEvents->OnError ) {
+							pStream->pEvents->OnError(__xnetStreamOwner(pStream), pStream, -1);
+						}
+						__xnetStreamFreeTempChain(pChain);
+						xrtNetStreamClose(pStream, XNET_CLOSE_F_ABORT);
+						return;
+					}
+				}
+				__xnetStreamFreeTempChain(pChain);
+				__xnetStreamHandleRecvEvent(pStream, pRemainder);
+				return;
+			}
+			if ( !__xnetStreamDriveProxyState(pStream, arrSpan[i].pData, arrSpan[i].iLen) ) {
+				__xnetStreamFreeTempChain(pChain);
+				return;
+			}
+		}
+		__xnetStreamFreeTempChain(pChain);
+		if ( pStream->pProxyState && !pStream->bClosing && __xnetSocketIsValid(pStream->hSocket) && !pStream->bRecvArmed ) {
+			(void)__xnetStreamArmRecvWatch(pStream);
+		}
+		return;
+	}
 	if ( pStream->iRecvLimit > 0 && xrtNetChainBytes(&pStream->tRxChain) + xrtNetChainBytes(pChain) > pStream->iRecvLimit ) {
 		if ( pStream->pEvents && pStream->pEvents->OnError ) {
 			pStream->pEvents->OnError(__xnetStreamOwner(pStream), pStream, -1);
@@ -37403,6 +38134,17 @@ static void __xnetStreamHandleSendEvent(xnetstream* pStream, const xnetportevent
 				(unsigned long long)pStream->iId, pEvent->iBytes, pStream->tSendQ.iQueuedBytes, (int)pEvent->iStatus);
 		}
 	#endif
+	if ( pStream->pProxyState ) {
+		if ( pEvent->iBytes > 0 ) {
+			(void)__xnetStreamCompleteWrite(pStream, pEvent->iBytes);
+		}
+		if ( !pStream->bClosing && pStream->tSendQ.iQueuedBytes > 0 ) {
+			__xnetStreamKickWrite(pStream);
+		} else if ( !pStream->bClosing && __xnetSocketIsValid(pStream->hSocket) && !pStream->bRecvArmed ) {
+			(void)__xnetStreamArmRecvWatch(pStream);
+		}
+		return;
+	}
 	if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) {
 		if ( pEvent->iBytes > 0 ) {
 			(void)__xnetStreamCompleteWrite(pStream, pEvent->iBytes);
@@ -37476,7 +38218,9 @@ static void __xnetStreamAsyncTask(xnetworker* pWorker, ptr pArg)
 			if ( pStream && !pStream->bReadPaused && !pStream->bClosing &&
 				xrtNetChainBytes(&pStream->tRxChain) == 0 &&
 				__xnetSocketIsValid(pStream->hSocket) && !pStream->bRecvArmed ) {
-				if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) {
+				if ( pStream->pProxyState ) {
+					(void)__xnetStreamArmRecvWatch(pStream);
+				} else if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) {
 					(void)__xnetStreamDriveTlsHandshake(pStream);
 				} else {
 					(void)__xnetStreamArmRecvWatch(pStream);
@@ -37955,6 +38699,7 @@ XXAPI void xrtNetStreamDestroy(xnetstream* pStream)
 	xrtNetChainClear(&pStream->tSendQ.tQueue);
 	__xnetStreamFinalizeSocketClose(pStream);
 	__xnetStreamDetachTls(pStream);
+	__xnetStreamDetachProxy(pStream);
 	XNET_FREE(pStream);
 }
 XXAPI xnet_result xrtNetStreamConnect(xnetstream* pStream, const xnetconnectconfig* pCfg)
@@ -37962,35 +38707,70 @@ XXAPI xnet_result xrtNetStreamConnect(xnetstream* pStream, const xnetconnectconf
 	struct sockaddr_storage tStorage;
 	socklen_t iAddrLen = 0;
 	xsocket hSocket;
+	const char* sConnectHost;
+	uint16 iConnectPort;
 	if ( !pStream || !pStream->pEngine || !pStream->pEngine->bRunning ) return XRT_NET_ERROR;
 	__xnetStreamApplyDefaults(pStream, pCfg, NULL);
 	if ( __xnetSocketIsValid(pStream->hSocket) ) return XRT_NET_ERROR;
-	if ( pCfg && pCfg->sHost && pCfg->sHost[0] ) {
+	if ( pCfg && pCfg->pProxy ) {
+		if ( !pCfg->sHost || !pCfg->sHost[0] || pCfg->iPort == 0 ) return XRT_NET_ERROR;
+		pStream->pProxy = xrtNetProxyAddRef(pCfg->pProxy);
+		if ( !pStream->pProxy ) return XRT_NET_ERROR;
+		pStream->pProxyState = __xnetProxyStateCreate(pStream->pProxy, pCfg->sHost, pCfg->iPort);
+		if ( !pStream->pProxyState ) {
+			__xnetStreamDetachProxy(pStream);
+			return XRT_NET_ERROR;
+		}
+		sConnectHost = pStream->pProxy->tConfig.sHost;
+		iConnectPort = pStream->pProxy->tConfig.iPort;
+	} else {
+		sConnectHost = pCfg ? pCfg->sHost : NULL;
+		iConnectPort = pCfg ? pCfg->iPort : 0;
+	}
+	if ( sConnectHost && sConnectHost[0] ) {
 		xnetaddr tAddr;
 		memset(&tAddr, 0, sizeof(tAddr));
-		tAddr.iPort = pCfg->iPort;
-		if ( xrtNetResolve(pCfg->sHost, &tAddr) == XRT_NET_OK ) {
-			pStream->tRemoteAddr = tAddr;
+		tAddr.iPort = iConnectPort;
+		if ( xrtNetResolve(sConnectHost, &tAddr) != XRT_NET_OK ) {
+			__xnetStreamDetachProxy(pStream);
+			return XRT_NET_ERROR;
 		}
+		pStream->tRemoteAddr = tAddr;
 	}
-	if ( !__xnetAddrToSockAddr(&pStream->tRemoteAddr, &tStorage, &iAddrLen) ) return XRT_NET_ERROR;
+	if ( !__xnetAddrToSockAddr(&pStream->tRemoteAddr, &tStorage, &iAddrLen) ) {
+		__xnetStreamDetachProxy(pStream);
+		return XRT_NET_ERROR;
+	}
 	hSocket = __xnetSocketCreateStream(pStream->tRemoteAddr.iFamily);
-	if ( !__xnetSocketIsValid(hSocket) ) return XRT_NET_ERROR;
+	if ( !__xnetSocketIsValid(hSocket) ) {
+		__xnetStreamDetachProxy(pStream);
+		return XRT_NET_ERROR;
+	}
 	(void)__xnetSocketApplyConnectFlags(hSocket, pCfg ? pCfg->iFlags : XNET_CONNECT_F_NONE);
 	if ( !__xnetStreamUseNativePortOps(pStream) ) {
 		__xnetStreamSetError("mainline stream connect requires a native xnet backend.");
 		__xnetSocketCloseHandle(&hSocket);
+		__xnetStreamDetachProxy(pStream);
 		return XRT_NET_ERROR;
 	}
 	pStream->hSocket = hSocket;
 	(void)__xnetSocketSetNonBlock(pStream->hSocket, false);
 	if ( !__xnetStreamAttachTls(pStream, pCfg ? pCfg->pTlsConfig : NULL, false) ) {
 		__xnetSocketCloseHandle(&pStream->hSocket);
+		__xnetStreamDetachProxy(pStream);
+		return XRT_NET_ERROR;
+	}
+	if ( pStream->iConnectTimeoutMs > 0 && !__xnetStreamArmOpenTimer(pStream, pStream->iConnectTimeoutMs) ) {
+		__xnetStreamDetachTls(pStream);
+		__xnetSocketCloseHandle(&pStream->hSocket);
+		__xnetStreamDetachProxy(pStream);
 		return XRT_NET_ERROR;
 	}
 	if ( !__xnetStreamSubmitOpenEvent(pStream, XNET_PORT_OP_CONNECT) ) {
+		__xnetStreamCancelOpenTimer(pStream);
 		__xnetStreamDetachTls(pStream);
 		__xnetSocketCloseHandle(&pStream->hSocket);
+		__xnetStreamDetachProxy(pStream);
 		return XRT_NET_ERROR;
 	}
 	return XRT_NET_OK;
@@ -38042,6 +38822,7 @@ XXAPI xnet_result xrtNetStreamSend(xnetstream* pStream, const void* pData, size_
 {
 	if ( !pStream || !pStream->pEngine || !pStream->pEngine->bRunning || !pData || iLen == 0 ) return XRT_NET_ERROR;
 	if ( pStream->bClosing || (pStream->iState & __XNET_STREAM_STATE_CLOSE_EMITTED) != 0 ) return XRT_NET_CLOSED;
+	if ( __xnetStreamHasPreOpenGate(pStream) ) return XRT_NET_AGAIN;
 	if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) return XRT_NET_AGAIN;
 	if ( __xnetSocketIsValid(pStream->hSocket) ) {
 		if ( __xnetEngineIsCurrentWorker(pStream->pWorker) ) {
@@ -38063,6 +38844,7 @@ XXAPI xnet_result xrtNetStreamSendVec(xnetstream* pStream, const xnetspan* pVec,
 {
 	if ( !pStream || !pStream->pEngine || !pStream->pEngine->bRunning || !pVec || iCount == 0 ) return XRT_NET_ERROR;
 	if ( pStream->bClosing || (pStream->iState & __XNET_STREAM_STATE_CLOSE_EMITTED) != 0 ) return XRT_NET_CLOSED;
+	if ( __xnetStreamHasPreOpenGate(pStream) ) return XRT_NET_AGAIN;
 	if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) return XRT_NET_AGAIN;
 	if ( __xnetSocketIsValid(pStream->hSocket) ) {
 		if ( __xnetEngineIsCurrentWorker(pStream->pWorker) ) {
@@ -38084,6 +38866,7 @@ XXAPI xnet_result xrtNetStreamSendRef(xnetstream* pStream, const xnetbufref* pRe
 {
 	if ( !pStream || !pStream->pEngine || !pStream->pEngine->bRunning || !pRef ) return XRT_NET_ERROR;
 	if ( pStream->bClosing || (pStream->iState & __XNET_STREAM_STATE_CLOSE_EMITTED) != 0 ) return XRT_NET_CLOSED;
+	if ( __xnetStreamHasPreOpenGate(pStream) ) return XRT_NET_AGAIN;
 	if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) return XRT_NET_AGAIN;
 	if ( __xnetSocketIsValid(pStream->hSocket) ) {
 		if ( __xnetEngineIsCurrentWorker(pStream->pWorker) ) {
@@ -38119,7 +38902,9 @@ XXAPI void xrtNetStreamResumeRead(xnetstream* pStream)
 		}
 	}
 	if ( !pStream->bClosing && __xnetSocketIsValid(pStream->hSocket) && !pStream->bRecvArmed ) {
-		if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) {
+		if ( pStream->pProxyState ) {
+			(void)__xnetStreamArmRecvWatch(pStream);
+		} else if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) {
 			(void)__xnetStreamDriveTlsHandshake(pStream);
 		} else {
 			(void)__xnetStreamArmRecvWatch(pStream);
@@ -38181,7 +38966,9 @@ static void __xnetStreamOnPortEvents(xnetworker* pWorker, const xnetportevent* p
 						(void)__xnetSocketUpdateLocalAddr(pStream->hSocket, &pStream->tLocalAddr);
 						(void)__xnetSocketUpdateRemoteAddr(pStream->hSocket, &pStream->tRemoteAddr);
 					}
-					if ( pStream->pTls ) {
+					if ( pStream->pProxyState ) {
+						(void)__xnetStreamDriveProxyState(pStream, NULL, 0u);
+					} else if ( pStream->pTls ) {
 						(void)__xnetStreamDriveTlsHandshake(pStream);
 					} else {
 						__xnetStreamEmitOpen(pStream);
@@ -38225,6 +39012,8 @@ static void __xnetStreamOnPortEvents(xnetworker* pWorker, const xnetportevent* p
 						pStream->pEvents->OnError(__xnetStreamOwner(pStream), pStream, -1);
 					}
 					xrtNetStreamClose(pStream, XNET_CLOSE_F_ABORT);
+				} else if ( pStream->pProxyState ) {
+					(void)__xnetStreamArmRecvWatch(pStream);
 				} else if ( pStream->pTls && !__xnetStreamTlsReady(pStream) ) {
 					(void)__xnetStreamDriveTlsHandshake(pStream);
 				} else if ( !pStream->bReadPaused ) {
@@ -38232,6 +39021,12 @@ static void __xnetStreamOnPortEvents(xnetworker* pWorker, const xnetportevent* p
 				}
 			}
 			__xnetStreamReleaseAsyncHold(pStream);
+		} else if ( pEvent->iType == XNET_PORT_EVENT_TIMER ) {
+			if ( pEvent->iOpId != __XNET_ENGINE_TIMER_PULSE_ID ) {
+				xnetstream* pStream = (xnetstream*)(uintptr_t)pEvent->iOpId;
+				__xnetStreamHandleOpenTimer(pStream);
+				__xnetStreamReleaseAsyncHold(pStream);
+			}
 		} else if ( pEvent->iType == XNET_PORT_EVENT_ERROR ) {
 			xnetstream* pStream = (xnetstream*)pEvent->pUserData;
 			if ( pStream && pStream->pEvents && pStream->pEvents->OnError ) {
@@ -43345,6 +44140,7 @@ typedef struct {
 	size_t iBodyLen;
 	uint32 iTimeoutMs;
 	bool bVerifyPeer;
+	xnetproxy* pProxy;
 } xhttprequest;
 typedef struct {
 	uint32 iStatusCode;
@@ -43382,6 +44178,7 @@ typedef struct __xhttp_conn {
 	uint16 iPort;
 	bool bHttps;
 	bool bVerifyPeer;
+	xnetproxy* pProxy;
 	bool bOpen;
 	bool bIdle;
 	int iLastSysErr;
@@ -43531,6 +44328,7 @@ static bool __xhttpConnMatchesReq(const __xhttp_conn* pConn, xnetengine* pEngine
 	if ( pConn->iPort != pReq->tURL.iPort ) return false;
 	if ( pConn->bHttps != pReq->tURL.bHttps ) return false;
 	if ( pConn->bVerifyPeer != pReq->bVerifyPeer ) return false;
+	if ( pConn->pProxy != pReq->pProxy ) return false;
 	if ( strcmp(pConn->sHost, pReq->tURL.sHost) != 0 ) return false;
 	if ( !pConn->bOpen || pConn->pStream == NULL || pConn->pTx != NULL ) return false;
 	return true;
@@ -43628,6 +44426,10 @@ static void __xhttpRequestUnitInternal(xhttprequest* pReq)
 		pReq->pBody = NULL;
 	}
 	pReq->iBodyLen = 0;
+	if ( pReq->pProxy ) {
+		xrtNetProxyRelease(pReq->pProxy);
+		pReq->pProxy = NULL;
+	}
 }
 XXAPI void xrtHttpRequestUnit(xhttprequest* pReq)
 {
@@ -43733,6 +44535,7 @@ static bool __xhttpRequestClone(xhttprequest* pDst, const xhttprequest* pSrc)
 	pDst->iHeaderCount = pSrc->iHeaderCount;
 	pDst->iTimeoutMs = pSrc->iTimeoutMs;
 	pDst->bVerifyPeer = pSrc->bVerifyPeer;
+	pDst->pProxy = pSrc->pProxy ? xrtNetProxyAddRef(pSrc->pProxy) : NULL;
 	if ( pSrc->pBody && pSrc->iBodyLen > 0 ) {
 		pDst->pBody = (char*)XNET_ALLOC(pSrc->iBodyLen);
 		if ( !pDst->pBody ) {
@@ -43900,6 +44703,10 @@ static void __xhttpConnCleanupTask(xnetworker* pWorker, ptr pArg)
 	if ( pConn->pStream ) {
 		xrtNetStreamDestroy(pConn->pStream);
 		pConn->pStream = NULL;
+	}
+	if ( pConn->pProxy ) {
+		xrtNetProxyRelease(pConn->pProxy);
+		pConn->pProxy = NULL;
 	}
 	XNET_FREE(pConn);
 }
@@ -44094,9 +44901,14 @@ XXAPI xnetfuture* xrtHttpExecuteAsync(xnetengine* pEngine, const xhttprequest* p
 		pConn->iPort = pTx->tReq.tURL.iPort;
 		pConn->bHttps = pTx->tReq.tURL.bHttps;
 		pConn->bVerifyPeer = pTx->tReq.bVerifyPeer;
+		pConn->pProxy = pTx->tReq.pProxy ? xrtNetProxyAddRef(pTx->tReq.pProxy) : NULL;
 		pConn->pStream = xrtNetStreamCreate(pResolvedEngine, __xhttpClientEvents(), pConn);
 		if ( !pConn->pStream ) {
 			(void)__xnetFutureResolve(pFuture, XRT_NET_ERROR, NULL);
+			if ( pConn->pProxy ) {
+				xrtNetProxyRelease(pConn->pProxy);
+				pConn->pProxy = NULL;
+			}
 			XNET_FREE(pConn);
 			__xhttpTxRelease(pTx);
 			return pFuture;
@@ -44111,6 +44923,7 @@ XXAPI xnetfuture* xrtHttpExecuteAsync(xnetengine* pEngine, const xhttprequest* p
 		tConnCfg.iPort = pTx->tReq.tURL.iPort;
 		tConnCfg.iConnectTimeoutMs = pTx->tReq.iTimeoutMs;
 		tConnCfg.iRecvLimit = 1024u * 1024u;
+		tConnCfg.pProxy = pConn->pProxy;
 		if ( pTx->tReq.tURL.bHttps ) {
 			memset(&pConn->tTlsCfg, 0, sizeof(pConn->tTlsCfg));
 			pConn->tTlsCfg.sHostName = pTx->tReq.tURL.sHost;
@@ -44124,6 +44937,10 @@ XXAPI xnetfuture* xrtHttpExecuteAsync(xnetengine* pEngine, const xhttprequest* p
 			pConn->pTx = NULL;
 			pTx->pConn = NULL;
 			pTx->pStream = NULL;
+			if ( pConn->pProxy ) {
+				xrtNetProxyRelease(pConn->pProxy);
+				pConn->pProxy = NULL;
+			}
 			XNET_FREE(pConn);
 			__xhttpTxRelease(pTx);
 			return pFuture;
@@ -44952,6 +45769,7 @@ typedef struct {
 	uint32 iConnectTimeoutMs;
 	uint32 iRecvLimit;
 	bool bVerifyPeer;
+	xnetproxy* pProxy;
 } xwsclientconfig;
 typedef struct {
 	xnetaddr tBindAddr;
@@ -46135,6 +46953,9 @@ XXAPI xwsclient* xrtWsClientCreate(xnetengine* pEngine, const xwsclientconfig* p
 	pClient->pEngine = pEngine;
 	if ( pCfg ) pClient->tConfig = *pCfg;
 	else xrtWsClientConfigInit(&pClient->tConfig);
+	if ( pClient->tConfig.pProxy ) {
+		pClient->tConfig.pProxy = xrtNetProxyAddRef(pClient->tConfig.pProxy);
+	}
 	if ( pEvents ) pClient->tEvents = *pEvents;
 	pClient->pUserData = pUserData;
 	return pClient;
@@ -46151,6 +46972,7 @@ XXAPI xnet_result xrtWsClientStart(xwsclient* pClient)
 	tConnCfg.iPort = pClient->tURL.iPort;
 	tConnCfg.iConnectTimeoutMs = pClient->tConfig.iConnectTimeoutMs;
 	tConnCfg.iRecvLimit = pClient->tConfig.iRecvLimit;
+	tConnCfg.pProxy = pClient->tConfig.pProxy;
 	if ( pClient->tURL.bSecure ) {
 		memset(&pClient->tTlsCfg, 0, sizeof(pClient->tTlsCfg));
 		pClient->tTlsCfg.sHostName = pClient->tURL.sHost;
@@ -46178,6 +47000,10 @@ XXAPI void xrtWsClientDestroy(xwsclient* pClient)
 {
 	if ( !pClient ) return;
 	xrtWsClientStop(pClient);
+	if ( pClient->tConfig.pProxy ) {
+		xrtNetProxyRelease(pClient->tConfig.pProxy);
+		pClient->tConfig.pProxy = NULL;
+	}
 	XNET_FREE(pClient);
 }
 XXAPI bool xrtWsClientIsOpen(const xwsclient* pClient)
@@ -50118,28 +50944,93 @@ XXAPI void xrtListWalk(xlist objList, List_EachProc procEach, ptr pArg)
 
 /* 
  * regex.h - 正则表达式引擎实现
- * 基于 bbre 0.0.2 (https://github.com/max-nurzia/bbre)
+ * 基于 bbre 0.0.2 (https://github.com/mnurzia/bbre)
  * MIT License - Copyright (c) 2024 Max Nurzia
- * 
- * 注意：此文件包含 bbre 的完整实现代码
- * 头文件声明位于 xrt.h 中
- * 
- * 依赖说明：
- *   此文件通过 xrt.h 间接引用以下标准库头文件：
- *   <assert.h>, <limits.h>, <stdarg.h>, <stdlib.h>, <string.h>
- *   因此不需要在此处重复包含
  */
-// 条件编译保护 - 如果禁用了 regex 模块，则跳过整个实现
 #ifndef XRT_NO_REGEX
-// 假设 xrt.h 已经被包含，提供了所有必要的标准库头文件
-// 如果没有被包含，则需要以下头文件：
-#if !defined(_STDIO_H) && !defined(_STDLIB_H)
-  #include <assert.h>
-  #include <limits.h>
-  #include <stdarg.h>
-  #include <stdlib.h>
-  #include <string.h>
-#endif
+/*
+ * 内部 ABI 前导定义：
+ * 当前 xrt.h 已接管公开 regex API，但原始 bbre 实现文件仍依赖
+ * bbre 的公共类型与常量名，因此这里保留一份最小前导定义供实现使用。
+ */
+#define BBRE_ERR_MEM   (-1)
+#define BBRE_ERR_PARSE (-2)
+#define BBRE_ERR_LIMIT (-3)
+typedef void *(*bbre_alloc_cb)(void *user, void *ptr, size_t prev, size_t next);
+typedef struct bbre_alloc {
+  void *user;
+  bbre_alloc_cb cb;
+} bbre_alloc;
+typedef enum bbre_flags {
+  BBRE_FLAG_INSENSITIVE = 1,
+  BBRE_FLAG_MULTILINE = 2,
+  BBRE_FLAG_DOTNEWLINE = 4,
+  BBRE_FLAG_UNGREEDY = 8
+} bbre_flags;
+typedef struct bbre_builder bbre_builder;
+typedef struct bbre bbre;
+typedef struct bbre_set_builder bbre_set_builder;
+typedef struct bbre_set bbre_set;
+typedef struct bbre_span {
+  size_t begin;
+  size_t end;
+} bbre_span;
+int bbre_builder_init(
+    bbre_builder **pbuild, const char *pat, size_t pat_size,
+    const bbre_alloc *alloc);
+void bbre_builder_destroy(bbre_builder *build);
+void bbre_builder_flags(bbre_builder *build, bbre_flags flags);
+bbre *bbre_init_pattern(const char *pat_nt);
+int bbre_init(bbre **preg, const bbre_builder *build, const bbre_alloc *alloc);
+void bbre_destroy(bbre *reg);
+const char *bbre_get_err_msg(const bbre *reg);
+size_t bbre_get_err_pos(const bbre *reg);
+int bbre_is_match(bbre *reg, const char *text, size_t text_size);
+int bbre_find(
+    bbre *reg, const char *text, size_t text_size, bbre_span *out_bounds);
+int bbre_captures(
+    bbre *reg, const char *text, size_t text_size, bbre_span *out_captures,
+    unsigned int num_captures);
+int bbre_which_captures(
+    bbre *reg, const char *text, size_t text_size, bbre_span *out_captures,
+    unsigned int *out_captures_did_match, unsigned int out_captures_size);
+int bbre_is_match_at(
+    bbre *reg, const char *text, size_t text_size, size_t pos);
+int bbre_find_at(
+    bbre *reg, const char *text, size_t text_size, size_t pos,
+    bbre_span *out_bounds);
+int bbre_captures_at(
+    bbre *reg, const char *text, size_t text_size, size_t pos,
+    bbre_span *out_captures, unsigned int num_captures);
+int bbre_which_captures_at(
+    bbre *reg, const char *text, size_t text_size, size_t pos,
+    bbre_span *out_captures, unsigned int *out_captures_did_match,
+    unsigned int out_captures_size);
+unsigned int bbre_capture_count(const bbre *reg);
+const char *bbre_capture_name(
+    const bbre *reg, unsigned int capture_idx, size_t *out_name_size);
+int bbre_set_builder_init(bbre_set_builder **pbuild, const bbre_alloc *alloc);
+void bbre_set_builder_destroy(bbre_set_builder *build);
+int bbre_set_builder_add(bbre_set_builder *build, const bbre *reg);
+bbre_set *bbre_set_init_patterns(const char *const *pats_nt, size_t num_pats);
+int bbre_set_init(
+    bbre_set **pset, const bbre_set_builder *build, const bbre_alloc *alloc);
+void bbre_set_destroy(bbre_set *set);
+const char *bbre_set_get_err_msg(const bbre_set *set);
+size_t bbre_set_get_err_pos(const bbre_set *set);
+int bbre_set_is_match(bbre_set *set, const char *text, size_t text_size);
+int bbre_set_matches(
+    bbre_set *set, const char *text, size_t text_size, unsigned int *out_idxs,
+    unsigned int out_idxs_size, unsigned int *out_num_idxs);
+int bbre_set_is_match_at(
+    bbre_set *set, const char *text, size_t text_size, size_t pos);
+int bbre_set_matches_at(
+    bbre_set *set, const char *text, size_t text_size, size_t pos,
+    unsigned int *out_idxs, unsigned int out_idxs_size,
+    unsigned int *out_num_idxs);
+int bbre_clone(bbre **pout, const bbre *reg, const bbre_alloc *alloc);
+int bbre_set_clone(
+    bbre_set **pout, const bbre_set *set, const bbre_alloc *alloc);
 #ifdef BBRE_CONFIG_HEADER_FILE
   #include BBRE_CONFIG_HEADER_FILE
 #endif
@@ -51543,7 +52434,7 @@ bbre_parse(bbre *r, const bbre_byte *ts, size_t tsz, bbre_flags start_flags)
         }
         if ((err = bbre_buf_push(&r->alloc, &r->group_names, name))) {
           /* clean up allocated name, preserves atomicity */
-          bbre_alloci(&r->alloc, name.name, name.name_size, 0);
+          bbre_alloci(&r->alloc, name.name, name.name_size + 1, 0);
           goto error;
         }
       }
@@ -54406,7 +55297,7 @@ void bbre_destroy(bbre *r)
   bbre_buf_destroy(&r->alloc, (void **)&r->ast);
   for (i = 0; i < bbre_buf_size(r->group_names); i++)
     bbre_alloci(
-        &r->alloc, r->group_names[i].name, r->group_names[i].name_size, 0);
+        &r->alloc, r->group_names[i].name, r->group_names[i].name_size + 1, 0);
   bbre_buf_destroy(&r->alloc, &r->group_names);
   bbre_buf_destroy(&r->alloc, &r->op_stk),
       bbre_buf_destroy(&r->alloc, &r->comp_stk);
@@ -54606,12 +55497,39 @@ int bbre_set_matches_at(
   return bbre_set_match_internal(
       set, s, n, pos, out_idxs, out_idxs_size, out_num_idxs);
 }
+static int bbre_group_names_clone(bbre *out, const bbre *in)
+{
+  int err = 0;
+  size_t i;
+  for (i = 0; i < bbre_buf_size(in->group_names); i++) {
+    const bbre_group_name *src_name = &in->group_names[i];
+    bbre_group_name dst_name;
+    dst_name.name = NULL;
+    dst_name.name_size = src_name->name_size;
+    if (src_name->name) {
+      dst_name.name = bbre_alloci(&out->alloc, NULL, 0, dst_name.name_size + 1);
+      if (!dst_name.name) {
+        err = BBRE_ERR_MEM;
+        goto error;
+      }
+      memcpy(dst_name.name, src_name->name, dst_name.name_size + 1);
+    }
+    if ((err = bbre_buf_push(&out->alloc, &out->group_names, dst_name))) {
+      bbre_alloci(&out->alloc, dst_name.name, dst_name.name_size + 1, 0);
+      goto error;
+    }
+  }
+error:
+  return err;
+}
 int bbre_clone(bbre **pout, const bbre *reg, const bbre_alloc *alloc)
 {
   int err = 0;
   if ((err = bbre_init_internal(pout, alloc)))
     goto error;
   if ((err = bbre_prog_clone(&(*pout)->prog, &reg->prog)))
+    goto error;
+  if ((err = bbre_group_names_clone(*pout, reg)))
     goto error;
 error:
   return err;
@@ -54627,8 +55545,6 @@ int bbre_set_clone(
 error:
   return err;
 }
-static const char *const bbre_version_str;
-const char *bbre_version(void) { return bbre_version_str; }
 /* Below is a UTF-8 decoder implemented as a compact DFA. This was heavily
  * inspired by Bjoern Hoehrmann's ubiquitous "Flexible and Economical UTF-8
  * Decoder" (https://bjoern.hoehrmann.de/utf-8/decoder/dfa/). I chose to write
@@ -55624,9 +56540,6 @@ static int bbre_builtin_cc_perl(
   return bbre_builtin_cc_make(
       r, name, name_len, bbre_builtin_ccs_perl, out_hdl);
 }
-/*{ Generated by `versioner.py` */
-static const char *const bbre_version_str = "0.0.2";
-/*} Generated by `versioner.py` */
 #ifdef BBRE_DEBUG_UTILS
 /* Inject a header file after everything. This is used during development for
  * tools that need access to ABI-unstable internal structures. */
@@ -64028,6 +64941,99 @@ XXAPI void xrtUnit()
 	}
 	__xrtRuntimeUnlock();
 }
+#ifndef XRT_NO_REGEX
+static const bbre_alloc* __xrtRegexGetAlloc(const xregexalloc* pAlloc, bbre_alloc* pOut)
+{
+	if ( (pAlloc == NULL) || (pAlloc->procAlloc == NULL) ) {
+		return NULL;
+	}
+	pOut->user = pAlloc->pUserData;
+	pOut->cb = (bbre_alloc_cb)pAlloc->procAlloc;
+	return pOut;
+}
+XXAPI xregex* xrtRegexCreate(const char* sPatternNt)
+{
+	return (xregex*)bbre_init_pattern(sPatternNt);
+}
+XXAPI int xrtRegexCreateFromBuilder(xregex** ppRegex, const xregexbuilder* pBuilder, const xregexalloc* pAlloc)
+{
+	bbre_alloc tAlloc;
+	return bbre_init((bbre**)ppRegex, (const bbre_builder*)pBuilder, __xrtRegexGetAlloc(pAlloc, &tAlloc));
+}
+XXAPI void xrtRegexDestroy(xregex* pRegex)
+{
+	bbre_destroy((bbre*)pRegex);
+}
+XXAPI int xrtRegexIsMatch(xregex* pRegex, const char* sText, size_t iTextSize)
+{
+	return bbre_is_match((bbre*)pRegex, sText, iTextSize);
+}
+XXAPI int xrtRegexFind(xregex* pRegex, const char* sText, size_t iTextSize, xregexspan* pOutSpan)
+{
+	return bbre_find((bbre*)pRegex, sText, iTextSize, (bbre_span*)pOutSpan);
+}
+XXAPI int xrtRegexCaptures(xregex* pRegex, const char* sText, size_t iTextSize, xregexspan* pOutCaptures, uint32 iCaptureCount)
+{
+	return bbre_captures((bbre*)pRegex, sText, iTextSize, (bbre_span*)pOutCaptures, (unsigned int)iCaptureCount);
+}
+XXAPI int xrtRegexBuilderCreate(xregexbuilder** ppBuilder, const char* sPattern, size_t iPatternSize, const xregexalloc* pAlloc)
+{
+	bbre_alloc tAlloc;
+	return bbre_builder_init((bbre_builder**)ppBuilder, sPattern, iPatternSize, __xrtRegexGetAlloc(pAlloc, &tAlloc));
+}
+XXAPI void xrtRegexBuilderDestroy(xregexbuilder* pBuilder)
+{
+	bbre_builder_destroy((bbre_builder*)pBuilder);
+}
+XXAPI void xrtRegexBuilderSetFlags(xregexbuilder* pBuilder, xregexflags iFlags)
+{
+	bbre_builder_flags((bbre_builder*)pBuilder, (bbre_flags)iFlags);
+}
+XXAPI int xrtRegexClone(xregex** ppOut, const xregex* pRegex, const xregexalloc* pAlloc)
+{
+	bbre_alloc tAlloc;
+	return bbre_clone((bbre**)ppOut, (const bbre*)pRegex, __xrtRegexGetAlloc(pAlloc, &tAlloc));
+}
+XXAPI int xrtRegexSetBuilderCreate(xregexsetbuilder** ppBuilder, const xregexalloc* pAlloc)
+{
+	bbre_alloc tAlloc;
+	return bbre_set_builder_init((bbre_set_builder**)ppBuilder, __xrtRegexGetAlloc(pAlloc, &tAlloc));
+}
+XXAPI void xrtRegexSetBuilderDestroy(xregexsetbuilder* pBuilder)
+{
+	bbre_set_builder_destroy((bbre_set_builder*)pBuilder);
+}
+XXAPI int xrtRegexSetBuilderAdd(xregexsetbuilder* pBuilder, const xregex* pRegex)
+{
+	return bbre_set_builder_add((bbre_set_builder*)pBuilder, (const bbre*)pRegex);
+}
+XXAPI xregexset* xrtRegexSetCreate(const char* const* arrPatternsNt, size_t iPatternCount)
+{
+	return (xregexset*)bbre_set_init_patterns(arrPatternsNt, iPatternCount);
+}
+XXAPI int xrtRegexSetCreateFromBuilder(xregexset** ppSet, const xregexsetbuilder* pBuilder, const xregexalloc* pAlloc)
+{
+	bbre_alloc tAlloc;
+	return bbre_set_init((bbre_set**)ppSet, (const bbre_set_builder*)pBuilder, __xrtRegexGetAlloc(pAlloc, &tAlloc));
+}
+XXAPI void xrtRegexSetDestroy(xregexset* pSet)
+{
+	bbre_set_destroy((bbre_set*)pSet);
+}
+XXAPI int xrtRegexSetIsMatch(xregexset* pSet, const char* sText, size_t iTextSize)
+{
+	return bbre_set_is_match((bbre_set*)pSet, sText, iTextSize);
+}
+XXAPI int xrtRegexSetMatches(xregexset* pSet, const char* sText, size_t iTextSize, uint32* pOutIndexes, uint32 iMaxIndexes, uint32* pOutIndexCount)
+{
+	return bbre_set_matches((bbre_set*)pSet, sText, iTextSize, (unsigned int*)pOutIndexes, (unsigned int)iMaxIndexes, (unsigned int*)pOutIndexCount);
+}
+XXAPI int xrtRegexSetClone(xregexset** ppOut, const xregexset* pSet, const xregexalloc* pAlloc)
+{
+	bbre_alloc tAlloc;
+	return bbre_set_clone((bbre_set**)ppOut, (const bbre_set*)pSet, __xrtRegexGetAlloc(pAlloc, &tAlloc));
+}
+#endif
 #ifdef DBUILD_DLL
 	
 	

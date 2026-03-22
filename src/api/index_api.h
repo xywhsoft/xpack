@@ -110,8 +110,6 @@ XPKAPI int xpkIndexGetInfo(xpkObject objXpk, int64_t iFileIndex, xpkFileInfoInde
 
 XPKAPI int xpkIndexAddFile(xpkObject objXpk, int64_t iFileIndex, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
-	void* pData;
-	uint64_t iSize;
 	xpkEntry objEntry;
 	int iRet;
 
@@ -137,20 +135,9 @@ XPKAPI int xpkIndexAddFile(xpkObject objXpk, int64_t iFileIndex, const char* sSr
 	}
 	procXpkClearError(objXpk);
 
-	pData = NULL;
-	iSize = 0;
-	iRet = procXpkLoadFileData(objXpk, sSrcPath, &pData, &iSize);
-	if ( iRet != XPK_OK ) {
-		return iRet;
-	}
-
 	memset(&objEntry, 0, sizeof(objEntry));
 	objEntry.iFileIndex = iFileIndex;
-	iRet = procXpkAddDataEntry(objXpk, &objEntry, pData, iSize, pOpt, NULL);
-	if ( pData != NULL ) {
-		xrtFree(pData);
-	}
-	return iRet;
+	return procXpkAddFileEntry(objXpk, &objEntry, sSrcPath, pOpt, NULL);
 }
 
 XPKAPI int xpkIndexAddData(xpkObject objXpk, int64_t iFileIndex, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)

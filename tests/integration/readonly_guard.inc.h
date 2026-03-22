@@ -220,7 +220,11 @@
 		return (iRetCall != XPK_ERR_PARAM) ? 934 : 935;
 	}
 	xpkFreeInternal(sPathKey);
+#ifdef _WIN32
 	sPathKey = procXpkPathSuffixDupText(sPathReadonlyAlt, ".replace.bak\\temp.xpk");
+#else
+	sPathKey = procXpkPathSuffixDupText(sPathReadonlyAlt, ".replace.bak/temp.xpk");
+#endif
 	if ( sPathKey == NULL ) {
 		xpkClose(objXpk);
 		return 936;
@@ -328,6 +332,30 @@
 	if ( iCheckRet != 0 ) {
 		return (iCheckRet == 1) ? 572 : 573;
 	}
+	procTestDeletePathFamily(sPathPkgCore);
+	memset(&objOpt, 0, sizeof(objOpt));
+	objOpt.createIfMissing = TRUE;
+	objXpk = xpkOpen(sPathPkgCore, &objOpt);
+	if ( objXpk == NULL ) {
+		return 942;
+	}
+	if ( xpkSetInfoExtSize(objXpk, sizeof(arrInfoExtCoreSet)) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 943;
+	}
+	if ( xpkAddData(objXpk, sDataCore, sizeof(sDataCore), NULL, &iPosRet) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 944;
+	}
+	if ( xpkSetInfoExt(objXpk, 1, arrInfoExtCoreSet, sizeof(arrInfoExtCoreSet)) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 945;
+	}
+	if ( xpkSave(objXpk) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 946;
+	}
+	xpkClose(objXpk);
 	memset(&objOpt, 0, sizeof(objOpt));
 	objOpt.readonly = TRUE;
 	objXpk = xpkOpen(sPathPkgCore, &objOpt);
@@ -345,9 +373,9 @@
 		return (iRetCall != XPK_ERR_STATE) ? 581 : 582;
 	}
 	iRetCall = xpkSetInfoExtSize(objXpk, 8);
-	if ( !procTestExpectCallError(iRetCall, XPK_ERR_STATE, objXpk, XPK_ERR_STATE, sXpkErrorPackTypeMismatch) ) {
+	if ( !procTestExpectCallError(iRetCall, XPK_ERR_READONLY, objXpk, XPK_ERR_READONLY, sXpkErrorReadonly) ) {
 		xpkClose(objXpk);
-		return (iRetCall != XPK_ERR_STATE) ? 677 : 678;
+		return (iRetCall != XPK_ERR_READONLY) ? 677 : 678;
 	}
 	iRetCall = xpkSetInfoExt(objXpk, 0, arrInfoExtCoreRead, sizeof(arrInfoExtCoreRead));
 	if ( !procTestExpectCallError(iRetCall, XPK_ERR_PARAM, objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam) ) {
@@ -384,6 +412,27 @@
 	if ( !procTestExpectCallError(iRetCall, XPK_ERR_STATE, objXpk, XPK_ERR_STATE, sXpkErrorPackTypeMismatch) ) {
 		xpkClose(objXpk);
 		return (iRetCall != XPK_ERR_STATE) ? 663 : 664;
+	}
+	xpkClose(objXpk);
+
+	procTestDeletePathFamily(sPathPkgIndex);
+	memset(&objOpt, 0, sizeof(objOpt));
+	objOpt.createIfMissing = TRUE;
+	objXpk = xpkOpen(sPathPkgIndex, &objOpt);
+	if ( objXpk == NULL ) {
+		return 947;
+	}
+	if ( xpkSetPackType(objXpk, XPK_PACK_INDEX) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 948;
+	}
+	if ( xpkIndexAddData(objXpk, 1001, sDataIndex, sizeof(sDataIndex), NULL) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 949;
+	}
+	if ( xpkSave(objXpk) != XPK_OK ) {
+		xpkClose(objXpk);
+		return 950;
 	}
 	xpkClose(objXpk);
 

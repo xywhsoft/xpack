@@ -5,12 +5,14 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 {
 	xfile hFile;
 	uint8_t* pHeadBuf;
+	xpkMappedFile objMap;
 	xpkHead objHead;
 	void* pMetaComp;
 	void* pEntryComp;
 	void* pMetaRaw;
 	void* pEntryRaw;
 	uint64_t iEntryRawSize;
+	uint64_t iMapSize;
 	uint64_t iTailPos;
 	uint32_t iLooseVolumeCount;
 	int iRet;
@@ -110,23 +112,45 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	procXpkMarkAppliedLayout(objXpk);
 	procXpkMarkClean(objXpk);
 
-	if ( objHead.metaCompSize > 0 ) {
-		pMetaComp = NULL;
-		pMetaRaw = NULL;
-		iRet = procXpkReadAtAlloc(objXpk, hFile, objHead.dataOffset, objHead.metaCompSize, &pMetaComp);
+	memset(&objMap, 0, sizeof(objMap));
+	iMapSize = 0;
+	if ( !objHead.volumeMode && ((objHead.metaCompSize > 0) || (objHead.infoCompSize > 0)) ) {
+		iMapSize = xrtGetEOF(hFile);
+		iRet = procXpkMapFileReadOnly(objXpk, hFile, iMapSize, &objMap);
 		if ( iRet != XPK_OK ) {
 			xrtClose(hFile);
 			return iRet;
 		}
+	}
 
-		iRet = procXpkCodecDecode(objXpk, (uint8_t)objHead.metaComp, pMetaComp, objHead.metaCompSize, objHead.metaRawSize, &pMetaRaw);
-		xrtFree(pMetaComp);
+	if ( objHead.metaCompSize > 0 ) {
+		pMetaComp = NULL;
+		pMetaRaw = NULL;
+		if ( objMap.pView != NULL ) {
+			if ( objHead.dataOffset > iMapSize || objHead.metaCompSize > (iMapSize - objHead.dataOffset) ) {
+				procXpkUnmapFile(&objMap);
+				xrtClose(hFile);
+				return procXpkSetError(objXpk, XPK_ERR_FORMAT, sXpkErrorBadFormat);
+			}
+			iRet = procXpkCodecDecode(objXpk, (uint8_t)objHead.metaComp, (const uint8_t*)objMap.pView + objHead.dataOffset, objHead.metaCompSize, objHead.metaRawSize, &pMetaRaw);
+		} else {
+			iRet = procXpkReadAtAlloc(objXpk, hFile, objHead.dataOffset, objHead.metaCompSize, &pMetaComp);
+			if ( iRet != XPK_OK ) {
+				procXpkUnmapFile(&objMap);
+				xrtClose(hFile);
+				return iRet;
+			}
+			iRet = procXpkCodecDecode(objXpk, (uint8_t)objHead.metaComp, pMetaComp, objHead.metaCompSize, objHead.metaRawSize, &pMetaRaw);
+			xrtFree(pMetaComp);
+		}
 		if ( iRet != XPK_OK ) {
+			procXpkUnmapFile(&objMap);
 			xrtClose(hFile);
 			return iRet;
 		}
 		if ( xpkHash32Internal(pMetaRaw, objHead.metaRawSize) != objHead.metaHash ) {
 			xpkFreeInternal(pMetaRaw);
+			procXpkUnmapFile(&objMap);
 			xrtClose(hFile);
 			return procXpkSetError(objXpk, XPK_ERR_HASH, sXpkErrorHashMismatch);
 		}
@@ -138,20 +162,33 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	if ( objHead.infoCompSize > 0 ) {
 		pEntryComp = NULL;
 		pEntryRaw = NULL;
-		iRet = procXpkReadAtAlloc(objXpk, hFile, objHead.dataOffset + objHead.metaCompSize, objHead.infoCompSize, &pEntryComp);
-		if ( iRet != XPK_OK ) {
-			xrtClose(hFile);
-			return iRet;
-		}
+		if ( objMap.pView != NULL ) {
+			iTailPos = objHead.dataOffset + objHead.metaCompSize;
+			if ( iTailPos > iMapSize || objHead.infoCompSize > (iMapSize - iTailPos) ) {
+				procXpkUnmapFile(&objMap);
+				xrtClose(hFile);
+				return procXpkSetError(objXpk, XPK_ERR_FORMAT, sXpkErrorBadFormat);
+			}
+			iRet = procXpkCodecDecode(objXpk, (uint8_t)objHead.infoComp, (const uint8_t*)objMap.pView + iTailPos, objHead.infoCompSize, (uint32_t)iEntryRawSize, &pEntryRaw);
+		} else {
+			iRet = procXpkReadAtAlloc(objXpk, hFile, objHead.dataOffset + objHead.metaCompSize, objHead.infoCompSize, &pEntryComp);
+			if ( iRet != XPK_OK ) {
+				procXpkUnmapFile(&objMap);
+				xrtClose(hFile);
+				return iRet;
+			}
 
-		iRet = procXpkCodecDecode(objXpk, (uint8_t)objHead.infoComp, pEntryComp, objHead.infoCompSize, (uint32_t)iEntryRawSize, &pEntryRaw);
-		xrtFree(pEntryComp);
+			iRet = procXpkCodecDecode(objXpk, (uint8_t)objHead.infoComp, pEntryComp, objHead.infoCompSize, (uint32_t)iEntryRawSize, &pEntryRaw);
+			xrtFree(pEntryComp);
+		}
 		if ( iRet != XPK_OK ) {
+			procXpkUnmapFile(&objMap);
 			xrtClose(hFile);
 			return iRet;
 		}
 		if ( xpkHash32Internal(pEntryRaw, iEntryRawSize) != objHead.infoHash ) {
 			xpkFreeInternal(pEntryRaw);
+			procXpkUnmapFile(&objMap);
 			xrtClose(hFile);
 			return procXpkSetError(objXpk, XPK_ERR_HASH, sXpkErrorHashMismatch);
 		}
@@ -159,11 +196,13 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		iRet = procXpkDecodeEntryTable(objXpk, pEntryRaw, (uint32_t)iEntryRawSize);
 		xpkFreeInternal(pEntryRaw);
 		if ( iRet != XPK_OK ) {
+			procXpkUnmapFile(&objMap);
 			xrtClose(hFile);
 			return iRet;
 		}
 	}
 
+	procXpkUnmapFile(&objMap);
 	xrtClose(hFile);
 	procXpkClearError(objXpk);
 	return XPK_OK;

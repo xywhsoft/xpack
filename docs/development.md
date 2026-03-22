@@ -126,6 +126,18 @@ build_GCC_TEST_x64.bat
 release\x64\xpack_test.exe
 ```
 
+Windows 压测入口：
+
+```bat
+build_GCC_STRESS_x64.bat
+```
+
+默认会先重建 `release\x64\xpack_test.exe`，再运行 `5` 轮 `integration/stress/direct`，并把输出写到：
+
+```text
+release\x64\xpack_stress.log
+```
+
 头文件生成：
 
 ```bat
@@ -145,6 +157,7 @@ xpack.h
 ```text
 build.sh
 build_test.sh
+build_stress.sh
 ```
 
 ## 5. 推荐开发流程
@@ -195,15 +208,20 @@ Windows 下当前顺序回归已经覆盖这些主链路：
 5. `unit/index_path`
 6. `integration`
 7. `integration/build_volume`
-8. `integration/solid_readonly`
+8. `integration/stress`
+9. `integration/solid_readonly`
+10. `unit/index_path/direct`
+11. `integration/build_volume/direct`
+12. `integration/stress/direct`
+13. `integration/solid_readonly/direct`
 
 ## 7. 当前明确边界
 
 目前实现和测试在 Windows 下已经比较稳定，但仍有这些边界：
 
-1. Linux 侧还没有正式回归。
+1. Debian 13 侧已经完成正式主回归，当前已实测通过 `./build_test.sh`、`release/x64/xpack_test integration/build_volume`、`release/x64/xpack_test integration/solid_readonly` 与 `release/x64/xpack_test all`。
 2. 接近 `4GB` 分卷上限和更大逻辑文件还缺真实压力验证。
-3. 当前文件定位已经支持 `4GB+`，`xpkReadToFile` 对普通未压缩条目也已支持分块直导出，但单文件数据块、整块编解码和 `solid` 整流仍然受当前 block 模型限制。
+3. 当前文件定位已经支持 `4GB+`，`xpkOpen()` 在非分卷包上也已支持直接映射压缩 `Meta / Entry Table` 尾段再解码；`xpkReadToFile` 对普通未压缩条目、buffered 的未压缩条目、普通 `LZ4 / LZ4HC / ZSTD / LZMA2` 条目，以及 `solid` 单文件导出都已接通专用路径，非分卷普通 `STORE` 条目与 `solid + STORE` 条目的单文件 `verify / verifyAll` 现在也都已支持映射式路径，普通非 `solid` 压缩条目的 `xpkReadToMemory / xpkVerify / xpkVerifyAll` 也已经接通“映射压缩块 -> 直接解码”路径；对压缩 `solid`，`LZ4 / LZ4HC / ZSTD / LZMA2` 的单文件 `ReadToMemory / Verify / ReadToFile` 已经改成只保留目标切片，不再先展开整条 solid 原始流，`verifyAll` 也已经降到按条目切片校验，而“压缩 `solid` 作为源 -> build 到普通包 / 重新 build 到 solid 包”这两条主路径，也已经去掉了整条 `pSolidSrc` 原始流的额外内存副本。`xpkAddFile / xpkUpdateFile` 的 `STORE + immediate` 已经在 `Core / Index / Path` 三层接通直写文件路径，`LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + file` 现在也都已改成“源文件分块写入临时 raw 或临时压缩文件，再择优写入包尾或写入队列”的路径，不再依赖整块源文件映射；其中 `LZ4 / LZ4HC + immediate/buffered + data` 已经改成“临时文件可写映射直接生成压缩块，再写入包尾或精确读回写入队列”，`ZSTD / LZMA2 + immediate/buffered + data` 也都已经接通“内存分块流式压缩到临时文件，再写入包尾或精确读回写入队列”的路径，不再额外保留整块压缩输出缓冲。目标 `solid` 为 `STORE / LZ4 / LZ4HC / ZSTD / LZMA2` 的 `build` 现在也已经改成“逐条目写临时 raw 文件，再直接写包体或流式压缩到临时文件后写入包体”的路径，不再需要整块 `pSolidRaw`，其中 `ZSTD / LZMA2` 目标也都不再需要整块压缩输出缓冲；同时当前 `0-15` 压缩级别映射下，旧的通用 `solid` 整流 fallback 已经清理掉，公开支持路径都会直接落到这些专用分支。`Core / Index / Path` 的 `AddFile / UpdateFile` 也都已覆盖“超大源文件 -> block-limit 拒绝且旧状态保持不变”的回归，`xpkBuild` 对普通非 `solid` 条目也已支持直接搬运现成压缩块，`normal -> solid + STORE` 在源条目本来就是 `STORE` 时也会优先直搬运原始块，`solid + STORE -> normal` 现在也已支持直接按切片搬运原始块；在满足“已是 `solid`、无删除洞、压缩级别不变”时，`solid` build 也会直接搬原始压缩块，但单文件数据块和整块编解码本身仍然受当前 block 模型限制。
 4. 测试体系虽然已经完成结构拆分，但仍然是“单测试程序中的顺序大回归”。
 5. 统一 helper 层已经成型，但坏包夹具和更多断言场景还可以继续收敛。
 
@@ -213,4 +231,13 @@ Windows 下当前顺序回归已经覆盖这些主链路：
 
 1. 继续扩展 `tests/test_helpers.h`，把重复夹具和断言继续收口。
 2. 继续补 API 使用示例、构建差异说明和验证说明。
-3. 等 Windows 侧完全收口后，再开始 Linux 和大文件边界验证。
+3. 在 Windows 与 Linux 主回归都已经跑通的基础上，继续补 Linux 压测和更大文件边界验证。
+## 9. 2026-03-20 补充
+
+1. 单卷包下，`STORE + immediate` 的 `xpkAddFile / xpkUpdateFile` 现在已经支持超大源文件分块直写到包尾，再对包内范围计算 hash，不再依赖整文件映射源文件。
+2. 这条能力已经覆盖 `Core / Index / Path` 三层公开 API；超大单卷 `STORE + immediate` 的 `AddFile / UpdateFile / Verify / VerifyAll / ReadToFile` 都已有 Windows 回归保护。
+3. 当前真正还没流式化的主边界，已经进一步收敛到“单文件数据块与整块编解码本身仍然主要依赖当前 block 模型”，而公开支持的 `solid` 压缩级别路径已经不再保留旧的通用整流 fallback。
+## 10. 2026-03-21 补充
+
+1. 单卷包下，`Core / Index / Path` 三层的超大 `STORE + immediate` `AddFile / UpdateFile` 现在都已经有成功路径回归。
+2. 这些回归不只验证写入成功，还会继续验证 `Verify / VerifyAll / ReadToFile` 的结果一致性。

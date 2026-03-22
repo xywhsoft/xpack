@@ -61,6 +61,8 @@ tests/xpack_test_main.c
 3. `tests/unit/path_lookup_guard.inc.h`
 4. `tests/unit/path_linux.inc.h`
 
+其中 `index_mode.inc.h` 与 `path_win32.inc.h` 现在也覆盖了 `STORE + immediate + AddFile / UpdateFile` 的包装层回归，以及超大源文件在 `block-limit`、目的包路径 `IO_OPEN` 等边界下的错误优先级，用来验证 `Core / Index / Path` 三层都会命中新接入的文件直写路径，并在失败时保住旧数据。
+
 ### 3.4 integration
 
 用于验证 `save / build / reopen / rollback / volume / solid` 这类跨模块主链路：
@@ -76,9 +78,9 @@ tests/xpack_test_main.c
 其中 `tests/integration/volume_mode.inc.h` 当前还覆盖：
 
 1. 基于新版 `xrt` 的 `64-bit seek`、超过 `4GB` 的文件定位，以及 `INT64_MAX` 以上 seek 保护回归
-2. 超过 `4GB` 的大逻辑偏移分卷原始读写
+2. 超过 `4GB` 的大逻辑偏移分卷原始读写，以及分卷 `store` 大条目的分块直导出
 3. 大尾段 `save rollback` 的临时文件回滚路径
-4. 大结果导出的分块写路径、普通未压缩条目的分块直导出路径，以及超大单文件源输入的 block-limit 边界
+4. 大结果导出的分块写路径、普通未压缩条目和 buffered 未压缩条目的分块直导出路径、普通 `LZ4 / LZ4HC / ZSTD / LZMA2` 条目的专用 `ReadToFile` 路径、非分卷普通压缩条目的映射式 `read / verify / verifyAll` 路径、非分卷包 `Meta / Entry Table` 尾段的映射式打开路径、非分卷大 `STORE` 与 `solid + STORE` 条目的映射式 `verify` 路径、`solid` 条目的直接切片导出路径、压缩 `solid` 下 `LZ4 / LZ4HC / ZSTD / LZMA2` 的单文件切片式 `ReadToMemory / Verify / ReadToFile` 路径、压缩 `solid` 下 `LZ4 / LZ4HC / ZSTD / LZMA2` 的按条目切片式 `verifyAll` 路径、压缩 `solid` 作为源时去掉整条 `pSolidSrc` 原始流副本的 `build` 路径、目标 `solid` 为 `STORE / LZ4 / LZ4HC / ZSTD / LZMA2` 时“临时 raw 文件 -> 直接写包体或流式压缩 -> 写包体”的低峰值 `build` 路径、并确认当前 `0-15` 映射下公开 `solid` 路径不再落回旧的通用整流 fallback、普通非 `solid` 条目的 `xpkBuild` 直搬运路径、`normal -> solid + STORE` 时源 `STORE` 条目的原始块直搬运路径、`solid + STORE -> normal` 时源切片的原始块直搬运路径、`LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + file` 的流式文件输入路径、`LZ4 / LZ4HC + immediate/buffered + data` 的临时文件映射低峰值写入路径、`ZSTD / LZMA2 + immediate/buffered + data` 的临时压缩文件低峰值写入路径、`Index / Path` 包装层对 buffered 压缩 data 的持久化路径、`3MB+` 级 buffered `LZ4 / ZSTD` 与 `1MB+` 级 buffered `LZMA2` 大内存数据回归、`2MB+ / 3MB+` 级 `solid ZSTD -> solid LZMA2` 大数据 `build / verifyAll / readToFile` 回归，以及一条 12 文件多轮 `save -> reopen -> solid build -> recompress build -> unsolid build -> volume build` 的 Windows 中压测回归、5 轮 `reopen -> verify -> mode switch -> build -> verify` 的循环稳定性回归，再加一条带 `update / rename / remove / solid / unsolid / volume / reopen` 的多阶段集成压测，还有保守条件下 `solid` build 的原始压缩块直搬运路径，以及超大单文件源输入在 `AddFile / UpdateFile` 上的 `block-limit` 边界
 
 ## 4. 当前 helper
 
@@ -156,7 +158,12 @@ release\x64\xpack_test.exe
 5. `unit/index_path`
 6. `integration`
 7. `integration/build_volume`
-8. `integration/solid_readonly`
+8. `integration/stress`
+9. `integration/solid_readonly`
+10. `unit/index_path/direct`
+11. `integration/build_volume/direct`
+12. `integration/stress/direct`
+13. `integration/solid_readonly/direct`
 
 也可以通过环境变量传入：
 
@@ -174,6 +181,28 @@ release\x64\xpack_test.exe
 3. `integration/build_volume` 会跑 `smoke + unit + integration/build_volume`。
 4. `integration/solid_readonly` 会跑 `smoke + unit + integration/build_volume + integration/solid_readonly`。
 5. `integration` 等价于当前完整回归。
+6. `integration/stress` 会跑 `smoke + unit + integration/build_volume`，并把 `integration/build_volume` 整轮重复 `5` 次。
+7. 以 `/direct` 结尾的过滤值只执行当前阶段本体，不再自动带上前置阶段。
+
+### 7.4 Windows 压测脚本
+
+如果需要做一轮独立的 Windows 压测，可以直接运行：
+
+```bat
+build_GCC_STRESS_x64.bat
+```
+
+默认行为是：
+
+1. 先执行 `build_GCC_TEST_x64.bat`
+2. 再运行 `5` 轮 `integration/stress/direct`
+3. 把完整输出记录到 `release\x64\xpack_stress.log`
+
+也可以手工指定轮数或过滤值：
+
+```bat
+build_GCC_STRESS_x64.bat 3 integration/stress/direct
+```
 
 ## 8. Windows 验证清单
 
@@ -200,9 +229,9 @@ release\x64\xpack_test.exe
 当前测试体系已经完成结构拆分，但仍保留这些边界：
 
 1. 仍然是顺序大回归，不支持按用例粒度过滤执行。
-2. Linux 侧还没有正式进入回归。
+2. Linux 侧已经完成 Debian 13 主回归，但还没有做正式压测。
 3. 超大文件和接近 `4GB` 分卷上限还缺压力测试。
-4. 文件定位已覆盖 `4GB+`，普通未压缩条目导出也已支持分块直通，但单块编解码、单文件数据块和 `solid` 整流仍然是当前实现边界。
+4. 文件定位已覆盖 `4GB+`，普通未压缩条目和 buffered 未压缩条目导出也已支持分块直通，非分卷普通压缩条目的 `read / verify / verifyAll` 与非分卷包 `Meta / Entry Table` 打开也已接通映射式路径，非分卷普通 `STORE` 条目与 `solid + STORE` 条目的单文件 `verify / verifyAll` 也已支持映射式路径，压缩 `solid` 下 `LZ4 / LZ4HC / ZSTD / LZMA2` 的单文件 `ReadToMemory / Verify / ReadToFile` 与 `verifyAll` 也已改成按目标切片路径，`LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + file` 也已经改成流式文件输入，`LZ4 / LZ4HC + immediate/buffered + data` 已改成“临时文件可写映射直接生成压缩块，再写入包尾或精确读回写入队列”，`ZSTD / LZMA2 + immediate/buffered + data` 也已改成“内存分块流式压缩到临时文件，再写入包尾或精确读回写入队列”，目标 `solid` 为 `STORE / LZ4 / LZ4HC / ZSTD / LZMA2` 时的 `build` 也已改成“临时 raw 文件 -> 直接写包体或流式压缩 -> 写包体”，并且当前公开支持的 `solid` 压缩级别路径已经不再保留旧的通用整流 fallback；`AddFile / UpdateFile` 在 `Core / Index / Path` 三层的超大源文件拒绝边界也已覆盖，普通非 solid 条目的 `xpkBuild` 也已支持直搬运现成压缩块，`solid + STORE -> normal` 的原始切片直搬运也已补齐，但单块编解码和单文件数据块本身仍然是当前实现边界。
 5. helper 层已经成型，但目录夹具、坏包夹具和更多断言场景仍可以继续收口。
 
 ## 10. 后续建议
@@ -211,4 +240,18 @@ release\x64\xpack_test.exe
 
 1. 扩展 `tests/test_helpers.h`，补路径占位、坏包样本和目录夹具 helper。
 2. 继续压缩重复错误断言样板。
-3. 在这套结构稳定后，再开始 Linux 和大文件边界验证。
+3. 在这套结构稳定后，继续补 Linux 压测和更大文件边界验证。
+## 11. 2026-03-20 新增回归
+
+1. `tests/smoke/core_mode.inc.h`
+普通单卷包下，超大 `STORE + immediate` 的 `xpkUpdateFile` 现在会验证成功写入、`xpkVerify / xpkVerifyAll` 成功，以及 `xpkReadToFile` 导出后的目标文件大小正确。
+2. `tests/unit/index_mode.inc.h`
+`Index` 模式下，超大单卷 `STORE + immediate` 的 `xpkIndexUpdateFile` 已改成成功路径回归，并验证 `ReadToFile` 导出大小。
+3. `tests/unit/path_win32.inc.h`
+`Win32 Path` 模式下，超大单卷 `STORE + immediate` 的 `xpkPathAddFile / xpkPathUpdateFile` 已改成成功路径回归，并验证 `PathReadToFile` 导出大小。
+## 12. 2026-03-21 补充
+
+1. `tests/smoke/core_mode.inc.h`
+现在同时覆盖 `Core` 下超大单卷 `STORE + immediate` 的 `xpkAddFile` 与 `xpkUpdateFile` 成功路径。
+2. `tests/unit/index_mode.inc.h`
+现在同时覆盖 `Index` 下超大单卷 `STORE + immediate` 的 `xpkIndexAddFile` 与 `xpkIndexUpdateFile` 成功路径。

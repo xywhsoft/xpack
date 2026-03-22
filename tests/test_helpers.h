@@ -1,7 +1,7 @@
 static bool procTestWriteBinaryFile(const char* sPathFile, const void* pData, size_t iSize)
 {
 	xfile hFile;
-	long iWriteRet;
+	int iWriteRet;
 
 	if ( sPathFile == NULL ) {
 		return FALSE;
@@ -16,11 +16,15 @@ static bool procTestWriteBinaryFile(const char* sPathFile, const void* pData, si
 	}
 
 	if ( iSize > 0 ) {
-		iWriteRet = xrtWrite(hFile, (str)pData, iSize);
+		iWriteRet = xrtPut(hFile, (ptr)pData, iSize);
 		if ( (iWriteRet < 0) || ((size_t)iWriteRet != iSize) ) {
 			xrtClose(hFile);
 			return FALSE;
 		}
+	}
+	if ( !xrtSetEOF(hFile) ) {
+		xrtClose(hFile);
+		return FALSE;
 	}
 
 	xrtClose(hFile);
@@ -31,6 +35,7 @@ static bool procTestWriteBinaryFile(const char* sPathFile, const void* pData, si
 static bool procTestCreateSparseFileSize(const char* sPathFile, uint64_t iSize)
 {
 	xfile hFile;
+	size_t iPos;
 
 	if ( sPathFile == NULL ) {
 		return FALSE;
@@ -40,9 +45,21 @@ static bool procTestCreateSparseFileSize(const char* sPathFile, uint64_t iSize)
 	if ( hFile == NULL ) {
 		return FALSE;
 	}
+	if ( iSize == 0 ) {
+		if ( !xrtSetEOF(hFile) ) {
+			xrtClose(hFile);
+			return FALSE;
+		}
+		xrtClose(hFile);
+		return TRUE;
+	}
 
-	xrtSeek(hFile, (int64)iSize, XRT_SEEK_SET);
-	if ( xrtTell(hFile) != iSize ) {
+	iPos = xrtSeek(hFile, (int64)(iSize - 1), XRT_SEEK_SET);
+	if ( iPos < (iSize - 1) ) {
+		xrtClose(hFile);
+		return FALSE;
+	}
+	if ( xrtPut(hFile, (ptr)"\0", 1) != 1 ) {
 		xrtClose(hFile);
 		return FALSE;
 	}
@@ -53,6 +70,25 @@ static bool procTestCreateSparseFileSize(const char* sPathFile, uint64_t iSize)
 
 	xrtClose(hFile);
 	return TRUE;
+}
+
+static bool procTestFileSizeEquals(const char* sPathFile, uint64_t iSize)
+{
+	xfile hFile;
+	uint64_t iFileSize;
+
+	if ( sPathFile == NULL ) {
+		return FALSE;
+	}
+
+	hFile = xrtOpen((str)sPathFile, TRUE, XRT_CP_BINARY);
+	if ( hFile == NULL ) {
+		return FALSE;
+	}
+
+	iFileSize = xrtGetEOF(hFile);
+	xrtClose(hFile);
+	return (iFileSize == iSize) ? TRUE : FALSE;
 }
 
 
@@ -92,12 +128,31 @@ static bool procTestCreateDirOccupy(const char* sPathDir)
 
 static void procTestDeletePathFamily(const char* sPathBase)
 {
+	char* sPathVolume;
+	uint32_t iVolume;
+	uint32_t iMissCount;
+
 	if ( sPathBase == NULL ) {
 		return;
 	}
 
 	remove(sPathBase);
 	(void)procXpkDeleteVolumeFilesText(NULL, sPathBase, 0);
+	(void)procXpkDeleteVolumeFilesContiguousText(NULL, sPathBase, 1);
+	iMissCount = 0;
+	for ( iVolume = 1; iVolume < 4096u && iMissCount < 32u; iVolume++ ) {
+		sPathVolume = procXpkVolumePathDupText(sPathBase, iVolume);
+		if ( sPathVolume == NULL ) {
+			break;
+		}
+		if ( xrtFileExists((str)sPathVolume) ) {
+			(void)xrtFileDelete((str)sPathVolume);
+			iMissCount = 0;
+		} else {
+			iMissCount++;
+		}
+		xpkFreeInternal(sPathVolume);
+	}
 	(void)procXpkScanLooseVolumeFilesText(NULL, sPathBase, TRUE, NULL);
 	if ( xrtDirExists((str)sPathBase) ) {
 		(void)xrtDirDelete((str)sPathBase);
@@ -124,14 +179,25 @@ static bool procTestFileContentEquals(const char* sPathFile, const void* pData, 
 		return FALSE;
 	}
 
-	pReadData = xrtRead(hFile, iSize, &iReadRet);
+	pReadData = NULL;
+	iReadRet = 0;
+	if ( iSize > 0 ) {
+		pReadData = xpkAllocInternal(iSize);
+		if ( pReadData == NULL ) {
+			xrtClose(hFile);
+			return FALSE;
+		}
+		iReadRet = xrtGetBuffer(hFile, pReadData, iSize);
+	}
 	xrtClose(hFile);
-	if ( pReadData == NULL ) {
+	if ( (iSize > 0) && (pReadData == NULL) ) {
 		return FALSE;
 	}
 
 	bMatch = (iReadRet == iSize) && (memcmp(pReadData, pData, iSize) == 0);
-	xrtFree(pReadData);
+	if ( pReadData != NULL ) {
+		xpkFreeInternal(pReadData);
+	}
 	return bMatch;
 }
 

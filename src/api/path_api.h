@@ -83,8 +83,6 @@ XPKAPI int xpkPathGetInfo(xpkObject objXpk, const char* sPackagePath, xpkFileInf
 
 XPKAPI int xpkPathAddFile(xpkObject objXpk, const char* sPackagePath, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
-	void* pData;
-	uint64_t iSize;
 	xpkEntry objEntry;
 	char* sPathText;
 	int iRet;
@@ -114,29 +112,16 @@ XPKAPI int xpkPathAddFile(xpkObject objXpk, const char* sPackagePath, const char
 	}
 	procXpkClearError(objXpk);
 
-	pData = NULL;
-	iSize = 0;
-	iRet = procXpkLoadFileData(objXpk, sSrcPath, &pData, &iSize);
-	if ( iRet != XPK_OK ) {
-		return iRet;
-	}
-
 	memset(&objEntry, 0, sizeof(objEntry));
 	sPathText = procXpkDupPathStoredText(objXpk, sPackagePath);
 	objEntry.sPath = sPathText;
 	if ( objEntry.sPath == NULL ) {
-		if ( pData != NULL ) {
-			xrtFree(pData);
-		}
 		return xpkLastError(objXpk);
 	}
 
-	iRet = procXpkAddDataEntry(objXpk, &objEntry, pData, iSize, pOpt, NULL);
+	iRet = procXpkAddFileEntry(objXpk, &objEntry, sSrcPath, pOpt, NULL);
 	if ( objEntry.sPath != NULL ) {
 		xpkFreeInternal(objEntry.sPath);
-	}
-	if ( pData != NULL ) {
-		xrtFree(pData);
 	}
 	return iRet;
 }

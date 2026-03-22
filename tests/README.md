@@ -44,6 +44,14 @@ build_GCC_TEST_x64.bat
 release\x64\xpack_test.exe
 ```
 
+如果要直接做一轮 Windows 压测，可以运行：
+
+```bat
+build_GCC_STRESS_x64.bat
+```
+
+默认会重建测试程序，执行 `5` 轮 `integration/stress/direct`，并把日志写到 `release\x64\xpack_stress.log`。
+
 当前稳定可用的过滤值有：
 
 ```bat
@@ -51,9 +59,14 @@ release\x64\xpack_test.exe smoke
 release\x64\xpack_test.exe smoke/open_core
 release\x64\xpack_test.exe unit
 release\x64\xpack_test.exe unit/index_path
+release\x64\xpack_test.exe unit/index_path/direct
 release\x64\xpack_test.exe integration
 release\x64\xpack_test.exe integration/build_volume
+release\x64\xpack_test.exe integration/build_volume/direct
+release\x64\xpack_test.exe integration/stress
+release\x64\xpack_test.exe integration/stress/direct
 release\x64\xpack_test.exe integration/solid_readonly
+release\x64\xpack_test.exe integration/solid_readonly/direct
 ```
 
 也可以通过：
@@ -83,7 +96,7 @@ release\x64\xpack_test.exe
 
 1. 测试程序仍然是单个顺序回归，不是多进程或按用例粒度运行。
 2. 当前过滤入口采用阶段式累进执行，不是完全隔离的独立子测试进程。
-3. Linux 回归和超大文件压力测试还未正式开始。
+3. Debian 13 主回归已经完成，剩余主要是 Linux 压测和超大文件压力测试。
 
 ## 6. 配套文档
 
@@ -93,3 +106,14 @@ release\x64\xpack_test.exe
    功能到测试文件的覆盖索引。
 3. `docs/development.md`
    工程结构、构建方式和开发流程说明。
+
+## 7. direct Filters
+
+`/direct` 结尾的过滤值只执行当前阶段本体，不会自动附带前置阶段。
+
+```bat
+release\x64\xpack_test.exe unit/index_path/direct
+release\x64\xpack_test.exe integration/build_volume/direct
+release\x64\xpack_test.exe integration/stress/direct
+release\x64\xpack_test.exe integration/solid_readonly/direct
+```

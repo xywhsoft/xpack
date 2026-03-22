@@ -204,7 +204,7 @@ static inline int procXpkCaptureRollbackTailToFile(xpkObject objXpk, uint64_t iO
 			return iRet;
 		}
 
-		iWrite = xrtWrite(hFile, (str)pChunk, iChunk);
+		iWrite = xrtPut(hFile, (ptr)pChunk, iChunk);
 		xpkFreeInternal(pChunk);
 		if ( iWrite != iChunk ) {
 			xrtClose(hFile);
@@ -254,17 +254,20 @@ static inline int procXpkRestoreRollbackTailFromFile(xpkObject objXpk, const xpk
 	iOffsetCur = pRollback->iDataOffset;
 	while ( iRemain > 0 ) {
 		iChunk = (uint32_t)((iRemain > XPK_SAVE_ROLLBACK_CHUNK_SIZE) ? XPK_SAVE_ROLLBACK_CHUNK_SIZE : iRemain);
-		pChunk = xrtRead(hFile, iChunk, &iRead);
-		if ( pChunk == NULL || iRead != iChunk ) {
-			if ( pChunk != NULL ) {
-				xrtFree(pChunk);
-			}
+		pChunk = xpkAllocInternal(iChunk);
+		if ( pChunk == NULL ) {
+			xrtClose(hFile);
+			return procXpkSetError(objXpk, XPK_ERR_MEMORY, sXpkErrorOutOfMemory);
+		}
+		iRead = xrtGetBuffer(hFile, pChunk, iChunk);
+		if ( iRead != iChunk ) {
+			xpkFreeInternal(pChunk);
 			xrtClose(hFile);
 			return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoRead);
 		}
 
 		iRet = procXpkWriteAt(objXpk, NULL, iOffsetCur, pChunk, iChunk);
-		xrtFree(pChunk);
+		xpkFreeInternal(pChunk);
 		if ( iRet != XPK_OK ) {
 			xrtClose(hFile);
 			return iRet;
@@ -295,12 +298,14 @@ static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* 
 		return XPK_OK;
 	}
 
-	iLogicalSize = objXpk->iFileSize;
+	iLogicalSize = 0;
 	if ( procXpkAppliedVolumeMode(objXpk) ) {
 		iRet = procXpkCalcLogicalFileSize(objXpk, &objXpk->objHead, &iLogicalSize);
 		if ( iRet != XPK_OK ) {
 			return iRet;
 		}
+	} else {
+		iLogicalSize = (uint64_t)xrtFileGetSize((str)objXpk->sPathPackage);
 	}
 	pRollback->iLogicalSize = iLogicalSize;
 	pRollback->iDataOffset = objXpk->objHead.dataOffset;
