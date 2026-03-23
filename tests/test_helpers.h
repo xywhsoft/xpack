@@ -1,3 +1,7 @@
+#ifdef __linux__
+#include <dirent.h>
+#endif
+
 static bool procTestWriteBinaryFile(const char* sPathFile, const void* pData, size_t iSize)
 {
 	xfile hFile;
@@ -89,6 +93,38 @@ static bool procTestFileSizeEquals(const char* sPathFile, uint64_t iSize)
 	iFileSize = xrtGetEOF(hFile);
 	xrtClose(hFile);
 	return (iFileSize == iSize) ? TRUE : FALSE;
+}
+
+
+static int procTestCountOpenFd(void)
+{
+#ifdef __linux__
+	DIR* hDir;
+	struct dirent* pItem;
+	int iCount;
+
+	hDir = opendir("/proc/self/fd");
+	if ( hDir == NULL ) {
+		return -1;
+	}
+
+	iCount = 0;
+	for ( ;; ) {
+		pItem = readdir(hDir);
+		if ( pItem == NULL ) {
+			break;
+		}
+		if ( strcmp(pItem->d_name, ".") == 0 || strcmp(pItem->d_name, "..") == 0 ) {
+			continue;
+		}
+		iCount++;
+	}
+
+	closedir(hDir);
+	return iCount;
+#else
+	return -1;
+#endif
 }
 
 

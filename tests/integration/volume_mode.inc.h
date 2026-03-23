@@ -1081,12 +1081,6 @@
 		return 999;
 	}
 	if ( xpkBuild(objXpk, NULL) != XPK_OK ) {
-		fprintf(
-			stderr,
-			"volume solid build failed: last=%d text=%s\n",
-			xpkLastError(objXpk),
-			xpkLastErrorMessage(objXpk) != NULL ? xpkLastErrorMessage(objXpk) : "(null)"
-		);
 		xpkClose(objXpk);
 		return 1000;
 	}

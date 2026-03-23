@@ -229,7 +229,7 @@ release\x64\xpack_test.exe
 当前测试体系已经完成结构拆分，但仍保留这些边界：
 
 1. 仍然是顺序大回归，不支持按用例粒度过滤执行。
-2. Linux 侧已经完成 Debian 13 主回归，但还没有做正式压测。
+2. Linux 侧已经完成 Debian 13 主回归，并且已经开始正式压测；当前已实测跑通到 `./build_stress.sh 2 all 10` 与 `./build_stress.sh 3 all 8`，同时 `xrtFileCopy()` 在 Linux 成功路径的 FD 泄漏也已修复，但还没有做更长时间的连续压测。
 3. 超大文件和接近 `4GB` 分卷上限还缺压力测试。
 4. 文件定位已覆盖 `4GB+`，普通未压缩条目和 buffered 未压缩条目导出也已支持分块直通，非分卷普通压缩条目的 `read / verify / verifyAll` 与非分卷包 `Meta / Entry Table` 打开也已接通映射式路径，非分卷普通 `STORE` 条目与 `solid + STORE` 条目的单文件 `verify / verifyAll` 也已支持映射式路径，压缩 `solid` 下 `LZ4 / LZ4HC / ZSTD / LZMA2` 的单文件 `ReadToMemory / Verify / ReadToFile` 与 `verifyAll` 也已改成按目标切片路径，`LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + file` 也已经改成流式文件输入，`LZ4 / LZ4HC + immediate/buffered + data` 已改成“临时文件可写映射直接生成压缩块，再写入包尾或精确读回写入队列”，`ZSTD / LZMA2 + immediate/buffered + data` 也已改成“内存分块流式压缩到临时文件，再写入包尾或精确读回写入队列”，目标 `solid` 为 `STORE / LZ4 / LZ4HC / ZSTD / LZMA2` 时的 `build` 也已改成“临时 raw 文件 -> 直接写包体或流式压缩 -> 写包体”，并且当前公开支持的 `solid` 压缩级别路径已经不再保留旧的通用整流 fallback；`AddFile / UpdateFile` 在 `Core / Index / Path` 三层的超大源文件拒绝边界也已覆盖，普通非 solid 条目的 `xpkBuild` 也已支持直搬运现成压缩块，`solid + STORE -> normal` 的原始切片直搬运也已补齐，但单块编解码和单文件数据块本身仍然是当前实现边界。
 5. helper 层已经成型，但目录夹具、坏包夹具和更多断言场景仍可以继续收口。

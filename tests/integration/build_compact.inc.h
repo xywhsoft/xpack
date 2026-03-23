@@ -262,7 +262,6 @@
 	procTestDeletePathFamily(sPathKey);
 	xpkFreeInternal(sPathKey);
 	xpkClose(objXpk);
-
 	sPathKey = procXpkPathSuffixDupText(sPathPkgBuild, ".buffered");
 	if ( sPathKey == NULL ) {
 		return 1003;
@@ -348,7 +347,6 @@
 	xpkClose(objXpk);
 	procTestDeletePathFamily(sPathKey);
 	xpkFreeInternal(sPathKey);
-
 	{
 		xpkObject objStress;
 		char* sPathStressPkg;
@@ -358,7 +356,6 @@
 		uint32_t iStressSize;
 		char sPathStressEntry[64];
 		char iStressFill;
-
 		sPathStressPkg = procXpkPathSuffixDupText(sPathPkgBuild, ".stress");
 		if ( sPathStressPkg == NULL ) {
 			return 2194;
@@ -796,7 +793,6 @@
 		xpkFreeInternal(pDataStress);
 		xpkFreeInternal(sPathStressPkg);
 	}
-
 	{
 		xpkObject objMutate;
 		char* sPathMutatePkg;
@@ -1137,7 +1133,6 @@
 		xpkFreeInternal(pDataMutate);
 		xpkFreeInternal(sPathMutatePkg);
 	}
-
 	objXpk = xpkOpen(sPathPkgBuild, NULL);
 	if ( objXpk == NULL ) {
 		return 93;

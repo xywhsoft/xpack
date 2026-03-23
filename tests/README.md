@@ -96,7 +96,7 @@ release\x64\xpack_test.exe
 
 1. 测试程序仍然是单个顺序回归，不是多进程或按用例粒度运行。
 2. 当前过滤入口采用阶段式累进执行，不是完全隔离的独立子测试进程。
-3. Debian 13 主回归已经完成，剩余主要是 Linux 压测和超大文件压力测试。
+3. Debian 13 主回归已经完成，Linux 压测也已开始并推进到 `./build_stress.sh 2 all 10` 与 `./build_stress.sh 3 all 8`，同时 `xrtFileCopy()` 在 Linux 成功路径的 FD 泄漏已经修复；剩余主要是更长时间的 Linux 连续压测和超大文件压力测试。
 
 ## 6. 配套文档
 

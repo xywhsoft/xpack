@@ -107,7 +107,7 @@ Linux 侧现在也已经补了同结构脚本：
 
 1. `build_stress.sh` 已经写好
 2. `bash -n build_stress.sh` 已通过
-3. Debian 13 主回归已经完成，下一步是 Linux 压测
+3. Debian 13 主回归已经完成，Linux 压测也已经开始并拿到了首批实测记录
 
 
 ## 6. 当前建议
@@ -166,6 +166,22 @@ build_GCC_STRESS_x64.bat 5 all 12
 
 最近一次这条命令的 `elapsed_seconds` 为 `1140`。
 
+Linux 侧截至当前版本，已经实际跑通：
+
+```sh
+./build_stress.sh 1 integration/stress/direct 2
+./build_stress.sh 1 all 2
+./build_stress.sh 1 all 3
+./build_stress.sh 2 all 3
+./build_stress.sh 2 all 5
+./build_stress.sh 2 all 8
+./build_stress.sh 2 all 10
+./build_stress.sh 3 all 6
+./build_stress.sh 3 all 8
+```
+
+这轮 Linux 压测期间还修复了一个真实稳定性问题：`xrtFileCopy()` 在 Linux 成功路径原先遗漏了 `close/free`，会导致 `xpkBuild()` 反复 replace/copy 时持续泄漏 FD；修复后，Debian 13 下的 `all 8` 与脚本化 stress 已重新跑绿。
+
 锁文件保护也已经验证过：
 
 1. 手工创建 `release\x64\xpack_stress.lock`
@@ -178,5 +194,5 @@ build_GCC_STRESS_x64.bat 5 all 12
 ## 8. 还没完成的事
 
 1. 还没有做更长时间的发布级连续压测记录
-2. 还没有在 Linux 下完成正式压测回归
+2. Linux 虽然已经开始正式压测，并已补上 `xrtFileCopy()` 的 FD 泄漏修复验证，但还没有做到更长时间的连续压测
 3. 单数据块与编解码本身仍然受当前 `block` 模型限制

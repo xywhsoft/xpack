@@ -24,8 +24,7 @@
 		xpkClose(objXpk);
 		return 156;
 	}
-	iRetCall = xpkSetSolidMode(objXpk, TRUE);
-	if ( iRetCall != XPK_OK ) {
+	if ( xpkSetSolidMode(objXpk, TRUE) != XPK_OK ) {
 		xpkClose(objXpk);
 		return 157;
 	}
@@ -169,9 +168,77 @@
 		xpkClose(objXpk);
 		return 188;
 	}
-	if ( xpkVerifyAll(objXpk) != XPK_OK ) {
+	iRetCall = xpkVerifyAll(objXpk);
+	if ( iRetCall != XPK_OK ) {
 		xpkClose(objXpk);
-		return 189;
+		if ( iRetCall == XPK_ERR_PARAM ) {
+			return 201;
+		}
+		if ( iRetCall == XPK_ERR_STATE ) {
+			return 202;
+		}
+		if ( iRetCall == XPK_ERR_MEMORY ) {
+			return 203;
+		}
+		if ( iRetCall == XPK_ERR_IO ) {
+			return 204;
+		}
+		if ( iRetCall == XPK_ERR_FORMAT ) {
+			return 205;
+		}
+		if ( iRetCall == XPK_ERR_HASH ) {
+			return 206;
+		}
+		if ( iRetCall == XPK_ERR_NOT_FOUND ) {
+			return 207;
+		}
+		if ( iRetCall == XPK_ERR_EXISTS ) {
+			return 208;
+		}
+		if ( iRetCall == XPK_ERR_SOLID_DATA_WRITE ) {
+			return 209;
+		}
+		if ( iRetCall == XPK_ERR_READONLY ) {
+			return 210;
+		}
+		if ( iRetCall == XPK_ERR_UNSUPPORTED ) {
+			return 211;
+		}
+		iRetCall = xpkLastError(objXpk);
+		if ( iRetCall == XPK_ERR_PARAM ) {
+			return 221;
+		}
+		if ( iRetCall == XPK_ERR_STATE ) {
+			return 222;
+		}
+		if ( iRetCall == XPK_ERR_MEMORY ) {
+			return 223;
+		}
+		if ( iRetCall == XPK_ERR_IO ) {
+			return 224;
+		}
+		if ( iRetCall == XPK_ERR_FORMAT ) {
+			return 225;
+		}
+		if ( iRetCall == XPK_ERR_HASH ) {
+			return 226;
+		}
+		if ( iRetCall == XPK_ERR_NOT_FOUND ) {
+			return 227;
+		}
+		if ( iRetCall == XPK_ERR_EXISTS ) {
+			return 228;
+		}
+		if ( iRetCall == XPK_ERR_SOLID_DATA_WRITE ) {
+			return 229;
+		}
+		if ( iRetCall == XPK_ERR_READONLY ) {
+			return 230;
+		}
+		if ( iRetCall == XPK_ERR_UNSUPPORTED ) {
+			return 231;
+		}
+		return 240;
 	}
 	if ( xpkSetFlag(objXpk, 1, XPK_FLAG_COMP_MASK, 14) != XPK_OK ) {
 		xpkClose(objXpk);
@@ -612,8 +679,8 @@
 	procTestDeletePathFamily(sPathPkgSolid);
 
 	procTestDeletePathFamily(sPathPkgSolid);
-	procTestDeletePathFamily(sPathPkgSolid);
 	procTestDeletePathFamily(sPathPkgSolidStore);
+	procTestDeletePathFamily(sPathFileExport);
 	memset(&objOpt, 0, sizeof(objOpt));
 	objOpt.createIfMissing = TRUE;
 	objXpk = xpkOpen(sPathPkgSolid, &objOpt);
@@ -696,7 +763,9 @@
 		return 1212;
 	}
 	xpkFree(pDataRead);
-	if ( xpkPathReadToFile(objXpk, "assets/single_comp.txt", sPathFileExport) != XPK_OK ) {
+	procTestDeletePathFamily(sPathFileExport);
+	iRetCall = xpkPathReadToFile(objXpk, "assets/single_comp.txt", sPathFileExport);
+	if ( iRetCall != XPK_OK ) {
 		xpkClose(objXpk);
 		return 1213;
 	}

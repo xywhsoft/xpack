@@ -78,7 +78,7 @@
 
 ## 8. 当前已知空白
 
-1. Linux 侧已经完成 Debian 13 主回归执行，但还没有做正式压测。
+1. Linux 侧已经完成 Debian 13 主回归执行，并且已经开始正式压测；当前已实测跑通到 `./build_stress.sh 2 all 10` 与 `./build_stress.sh 3 all 8`，同时 `xrtFileCopy()` 在 Linux 成功路径的 FD 泄漏也已修复，但还没有做更长时间的连续压测。
 2. 接近 `4GB` 分卷上限和更大逻辑文件还缺真实压力测试。
 3. 文件定位已覆盖 `4GB+`，普通未压缩条目和 buffered 未压缩条目导出也已支持分块直通，普通 `LZ4 / LZ4HC / ZSTD / LZMA2` 条目的 `ReadToFile` 也都已有专用路径，非分卷包 `Meta / Entry Table` 打开、普通非 `solid` 压缩条目的 `read / verify / verifyAll`、以及非分卷普通 `STORE` 条目与 `solid + STORE` 条目的单文件 `verify / verifyAll` 都已支持映射式路径，压缩 `solid` 下 `LZ4 / LZ4HC / ZSTD / LZMA2` 的单文件 `ReadToMemory / Verify / ReadToFile` 与 `verifyAll` 也已改成目标切片路径，`LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + file` 也已改成流式文件输入，`LZ4 / LZ4HC + immediate/buffered + data` 已改成“临时文件可写映射直接生成压缩块，再写入包尾或精确读回压缩块写入队列”，`ZSTD / LZMA2 + immediate/buffered + data` 也已改成“内存分块流式压缩到临时文件，再写入包尾或精确读回压缩块写入队列”，并已补上 `Index / Path` 包装层的 buffered 压缩 data 持久化回归、`3MB+` 级 buffered `LZ4 / ZSTD` 与 `1MB+` 级 buffered `LZMA2` 大内存数据回归，以及 `2MB+ / 3MB+` 级 `solid ZSTD -> solid LZMA2` 大数据 `build / verifyAll / readToFile` 回归、12 文件多轮 `save / reopen / solid build / recompress build / unsolid build / volume build` 的 Windows 中压测回归、额外 5 轮 `reopen / verify / mode switch / build` 的循环稳定性回归，以及一条带 `update / rename / remove / solid / unsolid / volume / reopen` 的多阶段集成压测；目标 `solid` 为 `STORE / LZ4 / LZ4HC / ZSTD / LZMA2` 时的 `build` 也已改成“临时 raw 文件 -> 直接写包体或流式压缩 -> 写包体”，并且当前 `0-15` 映射下公开 `solid` 路径已经不再保留旧的通用整流 fallback；`AddFile / UpdateFile` 的超大源文件拒绝边界也已覆盖到 `Core / Index / Path`，普通非 solid 条目的 `xpkBuild` 也已支持直搬运现成压缩块，`solid + STORE -> normal` 的切片直搬运也已覆盖，但单块编解码和单文件数据块本身仍然是当前实现边界。
 4. 当前仍是顺序大回归，没有按测试名粒度过滤执行的能力。

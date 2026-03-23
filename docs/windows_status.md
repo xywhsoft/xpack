@@ -87,14 +87,14 @@ build_GCC_STRESS_x64.bat
 
 1. 单文件数据块与整块编解码仍然受当前 block 模型限制
 2. Windows 下还没有做发布级长时间压力测试
-3. Linux 侧主回归已通过，但 Linux 压测还没有正式开始
+3. Linux 侧主回归已通过，Linux 压测也已经开始，并且 `xrtFileCopy()` 在 Linux 成功路径的 FD 泄漏已经修复，但还没有做更长时间的连续压测
 
 更具体地说：
 
 1. `LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + file` 的输入侧已经流式化，`LZ4 / LZ4HC / ZSTD / LZMA2 + immediate/buffered + data` 也都已去掉整块压缩输出堆缓冲或整块压缩输出堆副本，但单文件数据块本身与编解码输入大小仍然受当前 block 模型约束
 2. 当前 `0-15` 压缩级别映射下，公开支持的 `solid` 路径已经都落到专用低峰值分支，旧的通用整流 fallback 已经清理掉；剩下的限制主要还是单数据块和编解码本身，而不是额外的 `solid` 通用兜底路径
 3. Windows 下虽然功能回归已经很强，但还没有做足够长时间的发布级压力测试；当前已新增一条 12 文件多轮 `save / reopen / solid build / recompress build / unsolid build / volume build` 的中压测回归、额外 5 轮 `reopen / verify / mode switch / build` 的循环稳定性回归、一条带 `update / rename / remove / solid / unsolid / volume / reopen` 的多阶段集成压测，并额外提供了 `build_GCC_STRESS_x64.bat` 作为独立压测入口；截至当前版本，已实测跑通 `build_GCC_STRESS_x64.bat 3 all 6`、`build_GCC_STRESS_x64.bat 2 all 8`、`build_GCC_STRESS_x64.bat 3 all 10` 与 `build_GCC_STRESS_x64.bat 5 all 12`，并且压测脚本已支持时间戳日志、latest 副本、history 记录和耗时摘要
-4. Linux 侧已经完成 Debian 13 主回归，剩余工作主要是 Linux 压测与更大压力边界验证
+4. Linux 侧已经完成 Debian 13 主回归，并已跑通 `./build_stress.sh 1 integration/stress/direct 2`、`./build_stress.sh 1 all 2`、`./build_stress.sh 1 all 3`、`./build_stress.sh 2 all 3`、`./build_stress.sh 2 all 5`、`./build_stress.sh 2 all 8`、`./build_stress.sh 2 all 10`、`./build_stress.sh 3 all 6` 与 `./build_stress.sh 3 all 8`；这轮还修复了 `xrtFileCopy()` 在 Linux 成功路径遗漏 `close/free` 导致的 FD 泄漏，剩余工作主要是更长时间的 Linux 连续压测与更大压力边界验证
 
 
 ## 5. 后续建议

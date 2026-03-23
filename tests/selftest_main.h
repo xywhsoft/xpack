@@ -577,6 +577,8 @@ int main(int argc, char** argv)
 
 	/* integration: solid / layout / readonly / internal state guards */
 	if ( bRunSolidReadonly ) {
+		procTestDeletePathFamily(sPathPkgSolid);
+		procTestDeletePathFamily(sPathPkgSolidStore);
 #include "integration/selftest_solid_readonly.inc.h"
 	}
 
