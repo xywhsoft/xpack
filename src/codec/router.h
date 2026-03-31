@@ -1,11 +1,3 @@
-#ifndef XPK_CODEC_ROUTER_H
-#define XPK_CODEC_ROUTER_H
-
-typedef struct xpkCompMap {
-	uint32_t iAlgorithm;
-	int iNativeLevel;
-} xpkCompMap;
-
 static const xpkCompMap arrXpkCompTable[16] = {
 	{ XPK_ALG_STORE, 0 },
 	{ XPK_ALG_LZ4, 1 },
@@ -279,5 +271,3 @@ static inline int procXpkCodecDecode(xpkObject objXpk, uint8_t iLevel, const voi
 	*pBufRet = pBuf;
 	return XPK_OK;
 }
-
-#endif

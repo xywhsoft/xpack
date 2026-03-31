@@ -1,6 +1,3 @@
-#ifndef XPK_SERVICE_EACH_H
-#define XPK_SERVICE_EACH_H
-
 static inline void procXpkFillInfoCore(const xpkEntry* pEntry, xpkFileInfo* pInfoRet)
 {
 	memset(pInfoRet, 0, sizeof(*pInfoRet));
@@ -155,5 +152,3 @@ static inline int procXpkEachWalk(xpkObject objXpk, const char* sPattern, xpkEac
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

@@ -1,6 +1,3 @@
-#ifndef XPK_API_PACKAGE_API_H
-#define XPK_API_PACKAGE_API_H
-
 static inline int procXpkEnsurePackageMutable(xpkObject objXpk)
 {
 	int iRet;
@@ -424,5 +421,3 @@ XPKAPI int xpkMetaClear(xpkObject objXpk)
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

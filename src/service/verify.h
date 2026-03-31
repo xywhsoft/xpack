@@ -1,6 +1,3 @@
-#ifndef XPK_SERVICE_VERIFY_H
-#define XPK_SERVICE_VERIFY_H
-
 static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint64_t iSize, uint32_t* pHashRet)
 {
 	xpkMappedFile objMap;
@@ -105,11 +102,6 @@ static inline int procXpkVerifySolidEntry(xpkObject objXpk, xpkEntry* pEntry)
 
 	return procXpkSetError(objXpk, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
-
-static inline int procXpkVerifyStoredEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile);
-static inline int procXpkVerifyStoredEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap);
-static inline int procXpkVerifyDecodedEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile);
-static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap);
 
 static inline int procXpkVerifyStoredEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
@@ -771,5 +763,3 @@ static inline int procXpkStatCurrent(xpkObject objXpk, xpkStat* pStatRet)
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

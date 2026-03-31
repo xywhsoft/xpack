@@ -1,6 +1,3 @@
-#ifndef XPK_STORAGE_FILEIO_H
-#define XPK_STORAGE_FILEIO_H
-
 #include <stdio.h>
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <dirent.h>
@@ -8,16 +5,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
-
-typedef struct xpkMappedFile {
-	const void* pView;
-	uint64_t iSize;
-#if defined(_WIN32) || defined(_WIN64)
-	HANDLE hMap;
-#else
-	void* pMap;
-#endif
-} xpkMappedFile;
 
 static inline void procXpkUnmapFile(xpkMappedFile* pMap)
 {
@@ -198,16 +185,6 @@ static inline char* procXpkPathSuffixDupText(const char* sPathBase, const char* 
 	memcpy(sPathRet + iSizeBase, sSuffix, iSizeSuffix + 1);
 	return sPathRet;
 }
-
-typedef struct xpkLooseVolumeScan {
-	xpkObject objXpk;
-	const char* sNameBase;
-	size_t iNameSize;
-	uint32_t iStartVolume;
-	uint32_t iCount;
-	int bDelete;
-	int iError;
-} xpkLooseVolumeScan;
 
 static inline int procXpkLooseVolumeMatchName(const xpkLooseVolumeScan* pScan, const char* sName, uint32_t* pVolumeRet)
 {
@@ -1459,5 +1436,3 @@ static inline int procXpkSetEOFAt(xpkObject objXpk, xfile hFile, uint64_t iOffse
 	xrtClose(hFile);
 	return procXpkDeleteVolumeFilesText(objXpk, objXpk->sPathPackage, iVolumeLast + 1);
 }
-
-#endif

@@ -1,6 +1,3 @@
-#ifndef XPK_API_INDEX_API_H
-#define XPK_API_INDEX_API_H
-
 static inline xpkEntry* procXpkLookupIndexEntry(xpkObject objXpk, int64_t iFileIndex)
 {
 	uint32_t iPos;
@@ -304,5 +301,3 @@ XPKAPI int xpkIndexSetFlag(xpkObject objXpk, int64_t iFileIndex, uint32_t iMask,
 	}
 	return xpkSetFlag(objXpk, iPos, iMask, iValue);
 }
-
-#endif

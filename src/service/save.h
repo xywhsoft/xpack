@@ -1,30 +1,3 @@
-#ifndef XPK_SERVICE_SAVE_H
-#define XPK_SERVICE_SAVE_H
-
-typedef struct xpkFlushSnapshot {
-	uint32_t iPos;
-	uint32_t iFlag;
-	uint64_t iDataOffset;
-	uint64_t iDataSize;
-	uint64_t iFileSize;
-} xpkFlushSnapshot;
-
-typedef struct xpkSaveRollback {
-	int bFileExisted;
-	int bHeadValid;
-	int bTailInFile;
-	int bKeepTailFile;
-	uint64_t iLogicalSize;
-	uint64_t iDataOffset;
-	uint64_t iTailSize;
-	uint8_t sHeadBuf[XPK_HEAD_SIZE];
-	void* pTailData;
-	char* sTailPath;
-} xpkSaveRollback;
-
-#define XPK_SAVE_ROLLBACK_MEM_LIMIT		(8u * 1024u * 1024u)
-#define XPK_SAVE_ROLLBACK_CHUNK_SIZE	(8u * 1024u * 1024u)
-
 static inline xpkFlushSnapshot* procXpkCaptureFlushSnapshots(xpkObject objXpk, uint32_t* pCountRet)
 {
 	xpkFlushSnapshot* arrSnapshot;
@@ -693,5 +666,3 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

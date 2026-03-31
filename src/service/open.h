@@ -1,6 +1,3 @@
-#ifndef XPK_SERVICE_OPEN_H
-#define XPK_SERVICE_OPEN_H
-
 static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOpt)
 {
 	xfile hFile;
@@ -207,5 +204,3 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

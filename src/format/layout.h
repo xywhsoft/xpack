@@ -1,6 +1,3 @@
-#ifndef XPK_FORMAT_LAYOUT_H
-#define XPK_FORMAT_LAYOUT_H
-
 static inline void procXpkWrite32LE(uint8_t* pBuf, uint32_t iValue)
 {
 	pBuf[0] = (uint8_t)(iValue & 0xFFu);
@@ -320,5 +317,3 @@ static inline int procXpkDecodeEntryTable(xpkObject objXpk, const void* pData, u
 
 	return XPK_OK;
 }
-
-#endif

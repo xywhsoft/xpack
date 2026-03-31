@@ -1,34 +1,3 @@
-#ifndef XPK_SERVICE_WRITE_H
-#define XPK_SERVICE_WRITE_H
-
-typedef struct xpkWriteNode {
-	uint32_t iPos;
-	uint8_t iLevel;
-	uint8_t reserved0[3];
-	uint32_t iCompSize;
-	uint64_t iRawSize;
-	void* pCompData;
-} xpkWriteNode;
-
-struct xpkWriteQueue {
-	xarray_struct arrNode;
-};
-
-#define XPK_WRITE_FILE_CHUNK_SIZE (8u * 1024u * 1024u)
-#define XPK_CODEC_STREAM_CHUNK_SIZE (256u * 1024u)
-
-static inline uint8_t procXpkSolidStoredCompLevel(xpkObject objXpk);
-static inline int procXpkCalcSolidRawSize(xpkObject objXpk, uint64_t* pSizeRet);
-static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint64_t iSize, uint32_t* pHashRet);
-static inline int procXpkCopyDecodedLz4BlockToFile(xpkObject objXpk, uint8_t iLevel, const void* pCompData, uint32_t iCompSize, uint64_t iRawSize, const char* sPathFile);
-static inline int procXpkWriteImmediateStoreFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath);
-static inline int procXpkWriteImmediateLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
-static inline int procXpkWriteImmediateZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
-static inline int procXpkWriteImmediateLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
-static inline int procXpkWriteBufferedLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
-static inline int procXpkWriteBufferedZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
-static inline int procXpkWriteBufferedLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
-
 static inline int procXpkWriteAtChunkedPackage(xpkObject objXpk, xfile hFile, uint64_t iOffset, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -2372,25 +2341,6 @@ lblCleanup:
 	}
 	return iRet;
 }
-
-typedef struct xpkWriteLzmaSeqIn {
-	ISeqInStream vt;
-	xfile hFile;
-	uint64_t iRemain;
-} xpkWriteLzmaSeqIn;
-
-typedef struct xpkWriteLzmaSeqOut {
-	ISeqOutStream vt;
-	xfile hFile;
-	uint64_t iSize;
-} xpkWriteLzmaSeqOut;
-
-typedef struct xpkWriteLzmaMemIn {
-	ISeqInStream vt;
-	const uint8_t* pData;
-	uint64_t iSize;
-	uint64_t iPos;
-} xpkWriteLzmaMemIn;
 
 static inline SRes procXpkWriteLzmaSeqInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
@@ -5790,5 +5740,3 @@ static inline int procXpkFlushQueuedWrites(xpkObject objXpk, xfile hFile)
 
 	return XPK_OK;
 }
-
-#endif

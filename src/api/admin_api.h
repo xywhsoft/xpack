@@ -1,6 +1,3 @@
-#ifndef XPK_API_ADMIN_API_H
-#define XPK_API_ADMIN_API_H
-
 XPKAPI int xpkEach(xpkObject objXpk, xpkEachProc procEach, void* pArg)
 {
 	if ( objXpk == NULL ) {
@@ -83,5 +80,3 @@ XPKAPI const char* xpkLastErrorMessage(xpkObject objXpk)
 	}
 	return objXpk->err.sText;
 }
-
-#endif

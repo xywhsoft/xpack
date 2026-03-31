@@ -1,6 +1,3 @@
-#ifndef XPK_SERVICE_CORE_H
-#define XPK_SERVICE_CORE_H
-
 #include <ctype.h>
 
 static const char sXpkErrorInvalidObject[] = "invalid xpk object";
@@ -376,8 +373,6 @@ static inline char* procXpkDupPathKeyChecked(xpkObject objXpk, const char* sPath
 	return sKey;
 }
 
-static inline int procXpkValidateEntryCountState(xpkObject objXpk);
-
 static inline xpkEntry* procXpkLookupPathEntry(xpkObject objXpk, const char* sPath)
 {
 	char* sKey;
@@ -560,8 +555,6 @@ static inline int procXpkGetPublicEntryByPos(xpkObject objXpk, uint32_t iPos, xp
 	}
 	return XPK_OK;
 }
-
-static inline int procXpkValidateLiveEntryLookup(xpkObject objXpk, const xpkEntry* pEntry);
 
 static inline uint32_t procXpkVisibleEntryCount(xpkObject objXpk)
 {
@@ -993,5 +986,3 @@ static inline void procXpkUnitObject(xpkObject objXpk)
 	xrtListUnit(&objXpk->lstEntry);
 	xrtDictUnit(&objXpk->tblEntry);
 }
-
-#endif

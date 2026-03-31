@@ -1,6 +1,3 @@
-#ifndef XPK_API_PATH_API_H
-#define XPK_API_PATH_API_H
-
 XPKAPI int xpkPathExists(xpkObject objXpk, const char* sPackagePath)
 {
 	xpkEntry* pEntry;
@@ -435,5 +432,3 @@ XPKAPI int xpkPathSetAttr(xpkObject objXpk, const char* sPackagePath, uint32_t i
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

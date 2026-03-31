@@ -1,4 +1,6 @@
 #define XRT_IMPLEMENTATION
+#include "../lib/xrt.h"
+
 #define XPACK_IMPLEMENTATION
 #include "xpack.h"
 

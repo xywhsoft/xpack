@@ -1,6 +1,3 @@
-#ifndef XPK_SERVICE_BUILD_H
-#define XPK_SERVICE_BUILD_H
-
 static inline int procXpkPathTextEqualFs(const char* sPathA, const char* sPathB)
 {
 	if ( sPathA == NULL || sPathB == NULL ) {
@@ -815,8 +812,6 @@ lblCleanup:
 	return iRet;
 }
 
-static inline int procXpkBuildAppendEntryOnly(xpkObject objDst, const xpkEntry* pEntrySrc, uint64_t iDataOffset, uint64_t iDataSize, uint64_t iFileSize);
-
 static inline int procXpkBuildWritePlainFileChunked(xpkObject objDst, xfile hFile, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -845,18 +840,6 @@ static inline int procXpkBuildWritePlainFileChunked(xpkObject objDst, xfile hFil
 
 	return XPK_OK;
 }
-
-typedef struct xpkBuildLzmaSeqIn {
-	ISeqInStream vt;
-	xfile hFile;
-	uint64_t iRemain;
-} xpkBuildLzmaSeqIn;
-
-typedef struct xpkBuildLzmaSeqOut {
-	ISeqOutStream vt;
-	xfile hFile;
-	uint64_t iSize;
-} xpkBuildLzmaSeqOut;
 
 static inline SRes procXpkBuildLzmaSeqInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
@@ -3837,5 +3820,3 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif

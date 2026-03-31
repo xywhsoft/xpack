@@ -1,6 +1,3 @@
-#ifndef XPK_API_DEFAULT_API_H
-#define XPK_API_DEFAULT_API_H
-
 static inline int procXpkRemoveUnsavedEntry(xpkObject objXpk, uint32_t iPos)
 {
 	xpkEntry* pEntry;
@@ -827,5 +824,3 @@ XPKAPI int xpkSetFlag(xpkObject objXpk, uint32_t iPos, uint32_t iMask, uint32_t 
 	procXpkClearError(objXpk);
 	return XPK_OK;
 }
-
-#endif
