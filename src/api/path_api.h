@@ -1,3 +1,10 @@
+/*
+	xPack 路径 API 实现
+
+	负责按包内路径访问条目的增删改查与属性操作。
+*/
+
+// 按路径检查条目是否存在
 XPKAPI int xpkPathExists(xpkObject objXpk, const char* sPackagePath)
 {
 	xpkEntry* pEntry;
@@ -29,6 +36,7 @@ XPKAPI int xpkPathExists(xpkObject objXpk, const char* sPackagePath)
 	return TRUE;
 }
 
+// 按路径获取条目信息
 XPKAPI int xpkPathGetInfo(xpkObject objXpk, const char* sPackagePath, xpkFileInfoPath* pInfoRet)
 {
 	xpkEntry* pEntry;
@@ -78,6 +86,7 @@ XPKAPI int xpkPathGetInfo(xpkObject objXpk, const char* sPackagePath, xpkFileInf
 	return XPK_OK;
 }
 
+// 按路径添加文件条目
 XPKAPI int xpkPathAddFile(xpkObject objXpk, const char* sPackagePath, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -123,6 +132,7 @@ XPKAPI int xpkPathAddFile(xpkObject objXpk, const char* sPackagePath, const char
 	return iRet;
 }
 
+// 按路径添加内存数据条目
 XPKAPI int xpkPathAddData(xpkObject objXpk, const char* sPackagePath, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -168,6 +178,7 @@ XPKAPI int xpkPathAddData(xpkObject objXpk, const char* sPackagePath, const void
 	return iRet;
 }
 
+// 按路径读取条目到文件
 XPKAPI int xpkPathReadToFile(xpkObject objXpk, const char* sPackagePath, const char* sDstPath)
 {
 	xpkEntry* pEntry;
@@ -197,6 +208,7 @@ XPKAPI int xpkPathReadToFile(xpkObject objXpk, const char* sPackagePath, const c
 	return xpkReadToFile(objXpk, pEntry->iPos, sDstPath);
 }
 
+// 按路径读取条目到内存
 XPKAPI void* xpkPathReadToMemory(xpkObject objXpk, const char* sPackagePath, uint64_t* pSizeRet)
 {
 	xpkEntry* pEntry;
@@ -229,6 +241,7 @@ XPKAPI void* xpkPathReadToMemory(xpkObject objXpk, const char* sPackagePath, uin
 	return xpkReadToMemory(objXpk, pEntry->iPos, pSizeRet);
 }
 
+// 按路径更新文件条目
 XPKAPI int xpkPathUpdateFile(xpkObject objXpk, const char* sPackagePath, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -262,6 +275,7 @@ XPKAPI int xpkPathUpdateFile(xpkObject objXpk, const char* sPackagePath, const c
 	return xpkUpdateFile(objXpk, pEntry->iPos, sSrcPath, pOpt);
 }
 
+// 按路径更新内存数据条目
 XPKAPI int xpkPathUpdateData(xpkObject objXpk, const char* sPackagePath, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -295,6 +309,7 @@ XPKAPI int xpkPathUpdateData(xpkObject objXpk, const char* sPackagePath, const v
 	return xpkUpdateData(objXpk, pEntry->iPos, pData, iSize, pOpt);
 }
 
+// 按路径重命名条目
 XPKAPI int xpkPathRename(xpkObject objXpk, const char* sPathOld, const char* sPathNew)
 {
 	xpkEntry* pEntry;
@@ -368,6 +383,7 @@ XPKAPI int xpkPathRename(xpkObject objXpk, const char* sPathOld, const char* sPa
 	return XPK_OK;
 }
 
+// 按路径移除条目
 XPKAPI int xpkPathRemove(xpkObject objXpk, const char* sPackagePath)
 {
 	xpkEntry* pEntry;
@@ -398,6 +414,7 @@ XPKAPI int xpkPathRemove(xpkObject objXpk, const char* sPackagePath)
 	return xpkRemove(objXpk, pEntry->iPos);
 }
 
+// 按路径设置平台属性
 XPKAPI int xpkPathSetAttr(xpkObject objXpk, const char* sPackagePath, uint32_t iPlatformAttr)
 {
 	xpkEntry* pEntry;

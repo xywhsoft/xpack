@@ -82,20 +82,32 @@
 
 /* ===== File: xpack.h ===== */
 
+/*
+	xPack 公开头文件
+
+	负责声明 xPack 的公开常量、数据结构与 API，
+	同时在 XPACK_BUILD_CORE 模式下暴露内部实现共享的核心声明。
+*/
+
 #ifndef XPACK_H
 #define XPACK_H
 
 #include <stdint.h>
 
+
+// 统一时间类型，和 xrt 的 xtime 保持兼容
 #ifndef XPK_XTIME_DEFINED
 #define XPK_XTIME_DEFINED
 typedef int64_t xtime;
 #endif
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+
+// 动态库导出宏
 #if defined(_WIN32) || defined(_WIN64)
 	#if defined(XPK_BUILD_DLL)
 		#define XPKAPI __declspec(dllexport)
@@ -108,6 +120,8 @@ extern "C" {
 	#define XPKAPI
 #endif
 
+
+// 文件头与布局常量
 #define XPK_FILE_HEAD        0x116B7078u
 #define XPK_HEAD_SIZE        64u
 #define XPK_VOLUME_MIN       0x00010000u
@@ -115,23 +129,33 @@ extern "C" {
 #define XPK_PATH_BYTES       260u
 #define XPK_PATH_ENTRY_SIZE  320u
 
+
+// 文件类型标记
 #define XPK_TYPE_CORE        0u
 #define XPK_TYPE_INDEX       1u
 #define XPK_TYPE_LINUX       2u
 #define XPK_TYPE_WIN32       3u
 
+
+// 压缩算法标记
 #define XPK_ALG_STORE        0u
 #define XPK_ALG_LZ4          1u
 #define XPK_ALG_LZ4HC        2u
 #define XPK_ALG_ZSTD         3u
 #define XPK_ALG_LZMA2        4u
 
+
+// 条目标记掩码
 #define XPK_FLAG_COMP_MASK     0x0000000Fu
 #define XPK_FLAG_TYPE_MASK     0x000000F0u
 #define XPK_FLAG_DELETED_MASK  0x00000100u
 
+
+// 包对象句柄
 typedef struct xpkStruct* xpkObject;
 
+
+// 包类型
 typedef enum xpkPackType {
 	XPK_PACK_CORE = 0,
 	XPK_PACK_INDEX = 1,
@@ -139,11 +163,15 @@ typedef enum xpkPackType {
 	XPK_PACK_WIN32 = 3
 } xpkPackType;
 
+
+// 写入策略
 typedef enum xpkWritePolicy {
 	XPK_WRITE_BUFFERED = 0,
 	XPK_WRITE_IMMEDIATE = 1
 } xpkWritePolicy;
 
+
+// 错误码
 typedef enum xpkErrorCode {
 	XPK_OK = 0,
 	XPK_ERR_PARAM = -1,
@@ -159,189 +187,357 @@ typedef enum xpkErrorCode {
 	XPK_ERR_UNSUPPORTED = -11
 } xpkErrorCode;
 
+
+// 打开选项
 typedef struct xpkOpenOptions {
-	uint8_t readonly;
-	uint8_t createIfMissing;
-	uint8_t bufferedDefault;
-	uint8_t reserved0;
+	uint8_t readonly;         // 是否按只读模式打开
+	uint8_t createIfMissing;  // 目标不存在时是否创建空包
+	uint8_t bufferedDefault;  // 默认写入策略是否使用缓冲模式
+	uint8_t reserved0;        // 保留字段
 } xpkOpenOptions;
 
+
+// 写入选项
 typedef struct xpkWriteOptions {
-	uint8_t compLevel;
-	uint8_t writePolicy;
-	uint8_t fileType;
-	uint8_t reserved0;
+	uint8_t compLevel;    // 压缩级别
+	uint8_t writePolicy;  // 写入策略
+	uint8_t fileType;     // 条目类型
+	uint8_t reserved0;    // 保留字段
 } xpkWriteOptions;
 
+
+// 重构选项
 typedef struct xpkBuildOptions {
-	const char* tempPath;
-	uint8_t replaceOriginal;
-	uint8_t reserved0[7];
+	const char* tempPath;      // 临时输出路径
+	uint8_t replaceOriginal;   // 是否替换原始包
+	uint8_t reserved0[7];      // 保留字段
 } xpkBuildOptions;
 
+
+// 包统计信息
 typedef struct xpkStat {
-	uint32_t fileCount;
-	uint64_t liveDataBytes;
-	uint64_t holeBytes;
-	uint64_t metaBytes;
-	uint64_t entryTableBytes;
+	uint32_t fileCount;       // 可见条目数量
+	uint64_t liveDataBytes;   // 有效数据大小
+	uint64_t holeBytes;       // 空洞大小
+	uint64_t metaBytes;       // 元数据大小
+	uint64_t entryTableBytes; // 条目表大小
 } xpkStat;
 
+
+// 对齐到磁盘布局的包头结构
 #pragma pack(push, 1)
 typedef struct {
-	uint32_t fileHead;
-	uint32_t fileCount;
+	uint32_t fileHead;       // 包魔数
+	uint32_t fileCount;      // 条目数量
 
-	uint32_t packType    : 2;
-	uint32_t defComp     : 4;
-	uint32_t metaComp    : 4;
-	uint32_t infoComp    : 4;
-	uint32_t infoExtSize : 18;
+	uint32_t packType    : 2;   // 包类型
+	uint32_t defComp     : 4;   // 默认数据压缩级别
+	uint32_t metaComp    : 4;   // 元数据压缩级别
+	uint32_t infoComp    : 4;   // 条目表压缩级别
+	uint32_t infoExtSize : 18;  // Core 扩展信息大小
 
-	uint32_t solidMode   : 1;
-	uint32_t volumeMode  : 1;
-	uint32_t reserved1   : 30;
+	uint32_t solidMode   : 1;   // 是否启用 solid 布局
+	uint32_t volumeMode  : 1;   // 是否启用分卷布局
+	uint32_t reserved1   : 30;  // 预留位
 
-	uint64_t dataOffset;
-	uint32_t volumeSize;
+	uint64_t dataOffset;     // 数据区起始逻辑偏移
+	uint32_t volumeSize;     // 分卷大小
 
-	uint32_t metaRawSize;
-	uint32_t metaCompSize;
-	uint32_t metaHash;
+	uint32_t metaRawSize;    // 元数据原始大小
+	uint32_t metaCompSize;   // 元数据压缩后大小
+	uint32_t metaHash;       // 元数据哈希
 
-	uint32_t infoCompSize;
-	uint32_t infoHash;
+	uint32_t infoCompSize;   // 条目表压缩后大小
+	uint32_t infoHash;       // 条目表哈希
 
-	xtime createTime;
-	xtime changeTime;
+	xtime createTime;        // 创建时间
+	xtime changeTime;        // 最后修改时间
 } xpkHead;
 
+
+// Core 模式下的基础条目信息
 typedef struct {
-	uint32_t flag;
-	uint32_t fileHash;
-	uint64_t dataOffset;
-	uint64_t dataSize;
-	uint64_t fileSize;
+	uint32_t flag;          // 条目标记
+	uint32_t fileHash;      // 文件内容哈希
+	uint64_t dataOffset;    // 数据偏移
+	uint64_t dataSize;      // 存储大小
+	uint64_t fileSize;      // 原始大小
 } xpkFileInfo;
 
+
+// Index 模式下的条目信息
 typedef struct {
-	uint32_t flag;
-	uint32_t fileHash;
-	uint64_t dataOffset;
-	uint64_t dataSize;
-	uint64_t fileSize;
-	int64_t fileIndex;
+	uint32_t flag;          // 条目标记
+	uint32_t fileHash;      // 文件内容哈希
+	uint64_t dataOffset;    // 数据偏移
+	uint64_t dataSize;      // 存储大小
+	uint64_t fileSize;      // 原始大小
+	int64_t fileIndex;      // 逻辑索引号
 } xpkFileInfoIndex;
 
+
+// Path 模式下的条目信息
 typedef struct {
-	uint32_t flag;
-	uint32_t fileHash;
-	uint64_t dataOffset;
-	uint64_t dataSize;
-	uint64_t fileSize;
-	char pathBytes[XPK_PATH_BYTES];
-	uint32_t platformAttr;
-	uint64_t createTime;
-	uint64_t modifyTime;
-	uint64_t accessTime;
+	uint32_t flag;                     // 条目标记
+	uint32_t fileHash;                 // 文件内容哈希
+	uint64_t dataOffset;               // 数据偏移
+	uint64_t dataSize;                 // 存储大小
+	uint64_t fileSize;                 // 原始大小
+	char pathBytes[XPK_PATH_BYTES];    // 包内路径
+	uint32_t platformAttr;             // 平台属性
+	uint64_t createTime;               // 创建时间
+	uint64_t modifyTime;               // 修改时间
+	uint64_t accessTime;               // 访问时间
 } xpkFileInfoPath;
 #pragma pack(pop)
 
+
+// 布局静态断言
 typedef char xpkStaticAssertHeadSize[(sizeof(xpkHead) == XPK_HEAD_SIZE) ? 1 : -1];
 typedef char xpkStaticAssertFileInfoSize[(sizeof(xpkFileInfo) == 32u) ? 1 : -1];
 typedef char xpkStaticAssertFileInfoIndexSize[(sizeof(xpkFileInfoIndex) == 40u) ? 1 : -1];
 typedef char xpkStaticAssertFileInfoPathSize[(sizeof(xpkFileInfoPath) == XPK_PATH_ENTRY_SIZE) ? 1 : -1];
 
+
+// 遍历回调
 typedef int (*xpkEachProc)(xpkObject xpk, uint32_t pos, const void* info, void* userData);
 
+
+// 包对象管理
+// 打开包并创建运行时对象
 XPKAPI xpkObject xpkOpen(const char* packagePath, const xpkOpenOptions* options);
+
+// 关闭包对象并释放运行时资源
 XPKAPI int xpkClose(xpkObject xpk);
+
+// 将当前脏状态保存回包文件
 XPKAPI int xpkSave(xpkObject xpk);
+
+// 按目标布局重构包文件
 XPKAPI int xpkBuild(xpkObject xpk, const xpkBuildOptions* options);
 
+
+// 包级配置
+// 获取当前包类型
 XPKAPI int xpkGetPackType(xpkObject xpk, xpkPackType* outType);
+
+// 设置当前包类型
 XPKAPI int xpkSetPackType(xpkObject xpk, xpkPackType type);
+
+// 获取默认数据压缩级别
 XPKAPI int xpkGetDefaultComp(xpkObject xpk, uint8_t* outLevel);
+
+// 设置默认数据压缩级别
 XPKAPI int xpkSetDefaultComp(xpkObject xpk, uint8_t level);
+
+// 获取元数据压缩级别
 XPKAPI int xpkGetMetaComp(xpkObject xpk, uint8_t* outLevel);
+
+// 设置元数据压缩级别
 XPKAPI int xpkSetMetaComp(xpkObject xpk, uint8_t level);
+
+// 获取条目表压缩级别
 XPKAPI int xpkGetInfoComp(xpkObject xpk, uint8_t* outLevel);
+
+// 设置条目表压缩级别
 XPKAPI int xpkSetInfoComp(xpkObject xpk, uint8_t level);
+
+// 获取条目信息扩展大小
 XPKAPI int xpkGetInfoExtSize(xpkObject xpk, uint32_t* outSize);
+
+// 设置条目信息扩展大小
 XPKAPI int xpkSetInfoExtSize(xpkObject xpk, uint32_t size);
+
+// 获取分卷大小
 XPKAPI int xpkGetVolumeSize(xpkObject xpk, uint32_t* outSize);
+
+// 设置分卷大小
 XPKAPI int xpkSetVolumeSize(xpkObject xpk, uint32_t size);
+
+// 获取 Solid 模式开关
 XPKAPI int xpkGetSolidMode(xpkObject xpk, int* outEnabled);
+
+// 设置 Solid 模式开关
 XPKAPI int xpkSetSolidMode(xpkObject xpk, int enabled);
 
+
+// 包元数据
+// 获取包元数据缓冲
 XPKAPI void* xpkMetaGet(xpkObject xpk, uint32_t* outSize);
+
+// 设置包元数据缓冲
 XPKAPI int xpkMetaSet(xpkObject xpk, const void* data, uint32_t size, uint8_t compLevel);
+
+// 清空包元数据
 XPKAPI int xpkMetaClear(xpkObject xpk);
 
+
+// 按位置访问条目
+// 获取可见条目数量
 XPKAPI uint32_t xpkCount(xpkObject xpk);
+
+// 获取指定位置的基础条目信息
 XPKAPI int xpkGetInfo(xpkObject xpk, uint32_t pos, xpkFileInfo* outInfo);
+
+// 获取指定位置的扩展信息
 XPKAPI int xpkGetInfoExt(xpkObject xpk, uint32_t pos, void* outData, uint32_t size);
+
+// 设置指定位置的扩展信息
 XPKAPI int xpkSetInfoExt(xpkObject xpk, uint32_t pos, const void* data, uint32_t size);
+
+// 在指定位置添加文件条目
 XPKAPI int xpkAddFile(xpkObject xpk, const char* srcPath, const xpkWriteOptions* options, uint32_t* outPos);
+
+// 在指定位置添加内存数据条目
 XPKAPI int xpkAddData(xpkObject xpk, const void* data, uint64_t size, const xpkWriteOptions* options, uint32_t* outPos);
+
+// 将指定位置条目导出到文件
 XPKAPI int xpkReadToFile(xpkObject xpk, uint32_t pos, const char* dstPath);
+
+// 将指定位置条目读入内存
 XPKAPI void* xpkReadToMemory(xpkObject xpk, uint32_t pos, uint64_t* outSize);
+
+// 用文件内容更新指定位置条目
 XPKAPI int xpkUpdateFile(xpkObject xpk, uint32_t pos, const char* srcPath, const xpkWriteOptions* options);
+
+// 用内存数据更新指定位置条目
 XPKAPI int xpkUpdateData(xpkObject xpk, uint32_t pos, const void* data, uint64_t size, const xpkWriteOptions* options);
+
+// 移除指定位置条目
 XPKAPI int xpkRemove(xpkObject xpk, uint32_t pos);
+
+// 修改指定位置条目标记
 XPKAPI int xpkSetFlag(xpkObject xpk, uint32_t pos, uint32_t mask, uint32_t value);
 
+
+// 按索引访问条目
+// 通过 fileIndex 查找条目位置
 XPKAPI int xpkIndexFind(xpkObject xpk, int64_t fileIndex, uint32_t* outPos);
+
+// 通过 fileIndex 获取条目信息
 XPKAPI int xpkIndexGetInfo(xpkObject xpk, int64_t fileIndex, xpkFileInfoIndex* outInfo);
+
+// 通过 fileIndex 添加文件条目
 XPKAPI int xpkIndexAddFile(xpkObject xpk, int64_t fileIndex, const char* srcPath, const xpkWriteOptions* options);
+
+// 通过 fileIndex 添加内存数据条目
 XPKAPI int xpkIndexAddData(xpkObject xpk, int64_t fileIndex, const void* data, uint64_t size, const xpkWriteOptions* options);
+
+// 通过 fileIndex 导出条目到文件
 XPKAPI int xpkIndexReadToFile(xpkObject xpk, int64_t fileIndex, const char* dstPath);
+
+// 通过 fileIndex 读取条目到内存
 XPKAPI void* xpkIndexReadToMemory(xpkObject xpk, int64_t fileIndex, uint64_t* outSize);
+
+// 通过 fileIndex 更新文件条目
 XPKAPI int xpkIndexUpdateFile(xpkObject xpk, int64_t fileIndex, const char* srcPath, const xpkWriteOptions* options);
+
+// 通过 fileIndex 更新内存数据条目
 XPKAPI int xpkIndexUpdateData(xpkObject xpk, int64_t fileIndex, const void* data, uint64_t size, const xpkWriteOptions* options);
+
+// 通过 fileIndex 移除条目
 XPKAPI int xpkIndexRemove(xpkObject xpk, int64_t fileIndex);
+
+// 通过 fileIndex 修改条目标记
 XPKAPI int xpkIndexSetFlag(xpkObject xpk, int64_t fileIndex, uint32_t mask, uint32_t value);
 
+
+// 按路径访问条目
+// 判断包内路径是否存在
 XPKAPI int xpkPathExists(xpkObject xpk, const char* packagePath);
+
+// 获取包内路径对应的条目信息
 XPKAPI int xpkPathGetInfo(xpkObject xpk, const char* packagePath, xpkFileInfoPath* outInfo);
+
+// 按包内路径添加文件条目
 XPKAPI int xpkPathAddFile(xpkObject xpk, const char* packagePath, const char* srcPath, const xpkWriteOptions* options);
+
+// 按包内路径添加内存数据条目
 XPKAPI int xpkPathAddData(xpkObject xpk, const char* packagePath, const void* data, uint64_t size, const xpkWriteOptions* options);
+
+// 按包内路径导出条目到文件
 XPKAPI int xpkPathReadToFile(xpkObject xpk, const char* packagePath, const char* dstPath);
+
+// 按包内路径读取条目到内存
 XPKAPI void* xpkPathReadToMemory(xpkObject xpk, const char* packagePath, uint64_t* outSize);
+
+// 按包内路径更新文件条目
 XPKAPI int xpkPathUpdateFile(xpkObject xpk, const char* packagePath, const char* srcPath, const xpkWriteOptions* options);
+
+// 按包内路径更新内存数据条目
 XPKAPI int xpkPathUpdateData(xpkObject xpk, const char* packagePath, const void* data, uint64_t size, const xpkWriteOptions* options);
+
+// 重命名包内路径
 XPKAPI int xpkPathRename(xpkObject xpk, const char* oldPath, const char* newPath);
+
+// 按包内路径移除条目
 XPKAPI int xpkPathRemove(xpkObject xpk, const char* packagePath);
+
+// 按包内路径设置平台属性
 XPKAPI int xpkPathSetAttr(xpkObject xpk, const char* packagePath, uint32_t platformAttr);
 
+
+// 遍历与筛选
+// 遍历全部可见条目
 XPKAPI int xpkEach(xpkObject xpk, xpkEachProc proc, void* userData);
+
+// 按模式遍历匹配条目
 XPKAPI int xpkEachMatch(xpkObject xpk, const char* pattern, xpkEachProc proc, void* userData);
 
+
+// 校验、统计与基础工具
+// 校验单个条目内容
 XPKAPI int xpkVerify(xpkObject xpk, uint32_t pos);
+
+// 校验全部条目内容
 XPKAPI int xpkVerifyAll(xpkObject xpk);
+
+// 获取当前包统计信息
 XPKAPI int xpkStatGet(xpkObject xpk, xpkStat* outStat);
+
+// 释放 xPack 分配的返回内存
 XPKAPI void xpkFree(void* ptr);
+
+// 计算 32 位哈希值
 XPKAPI uint32_t xpkHash32(const void* data, uint64_t size);
 
+
+// 错误状态
+// 获取最后错误码
 XPKAPI xpkErrorCode xpkLastError(xpkObject xpk);
+
+// 获取最后错误文本
 XPKAPI const char* xpkLastErrorMessage(xpkObject xpk);
+
 
 #ifdef __cplusplus
 }
 #endif
 
+
 #if defined(XPACK_BUILD_CORE)
 
-/* xPack core declarations require xrt + codec headers to be included first. */
+/*
+	xPack 内部共享声明
 
+	该部分只在实现编译单元中可见，
+	要求在包含前先准备好 xrt 与压缩库头文件。
+*/
+
+
+// 错误文本缓存大小
 #define XPK_ERROR_TEXT_CAP 256
 
+
+// 未使用参数标记
 #if defined(__GNUC__) || defined(__clang__)
 	#define XPK_UNUSED __attribute__((unused))
 #else
 	#define XPK_UNUSED
 #endif
 
+
+// 内部布局常量
 enum {
 	XPK_INTERNAL_ERROR_TEXT_CAP = XPK_ERROR_TEXT_CAP,
 	XPK_ENTRY_BASE_SIZE = 32,
@@ -349,66 +545,76 @@ enum {
 	XPK_INFO_EXT_PATH = 288
 };
 
+
+// 内部前置声明
 typedef struct xpkErrorState xpkErrorState;
 typedef struct xpkEntry xpkEntry;
 typedef struct xpkStorage xpkStorage;
 typedef struct xpkWriteQueue xpkWriteQueue;
 
+
+// 错误状态
 struct xpkErrorState {
-	int iCode;
-	char sText[XPK_ERROR_TEXT_CAP];
+	int iCode;                      // 错误码
+	char sText[XPK_ERROR_TEXT_CAP]; // 错误文本
 };
 
+
+// 运行时条目对象
 struct xpkEntry {
-	uint32_t iPos;
-	uint32_t iFlag;
-	uint32_t iFileHash;
-	uint64_t iDataOffset;
-	uint64_t iDataSize;
-	uint64_t iFileSize;
-	uint8_t bStored;
+	uint32_t iPos;              // 条目位置
+	uint32_t iFlag;             // 条目标记
+	uint32_t iFileHash;         // 文件哈希
+	uint64_t iDataOffset;       // 数据偏移
+	uint64_t iDataSize;         // 存储大小
+	uint64_t iFileSize;         // 原始大小
+	uint8_t bStored;            // 是否为原样存储
 
-	int64_t iFileIndex;
+	int64_t iFileIndex;         // Index 模式下的索引号
 
-	void* pInfoExt;
-	char* sPath;
-	uint32_t iPlatformAttr;
-	uint64_t tCreateTime;
-	uint64_t tModifyTime;
-	uint64_t tAccessTime;
+	void* pInfoExt;             // Core 模式扩展信息
+	char* sPath;                // Path 模式路径
+	uint32_t iPlatformAttr;     // 平台属性
+	uint64_t tCreateTime;       // 创建时间
+	uint64_t tModifyTime;       // 修改时间
+	uint64_t tAccessTime;       // 访问时间
 };
 
+
+// 运行时包对象
 struct xpkStruct {
-	xpkHead objHead;
+	xpkHead objHead;                // 当前包头快照
 
-	uint8_t bReadonly;
-	uint8_t bBufferedDefault;
-	uint8_t bDirtyHead;
-	uint8_t bDirtyPackageMeta;
-	uint8_t bDirtyEntryTable;
-	uint8_t bDirtyData;
-	uint8_t bSolidApplied;
-	uint8_t bVolumeApplied;
-	uint16_t reserved0;
-	uint32_t iVolumeSizeApplied;
+	uint8_t bReadonly;              // 是否只读
+	uint8_t bBufferedDefault;       // 默认是否缓冲写入
+	uint8_t bDirtyHead;             // 包头是否脏
+	uint8_t bDirtyPackageMeta;      // 元数据是否脏
+	uint8_t bDirtyEntryTable;       // 条目表是否脏
+	uint8_t bDirtyData;             // 数据区是否脏
+	uint8_t bSolidApplied;          // 已应用的 solid 布局
+	uint8_t bVolumeApplied;         // 已应用的分卷布局
+	uint16_t reserved0;             // 保留字段
+	uint32_t iVolumeSizeApplied;    // 已应用的分卷大小
 
-	uint64_t iAppendPos;
-	uint64_t iFileSize;
+	uint64_t iAppendPos;            // 当前追加写入位置
+	uint64_t iFileSize;             // 当前逻辑文件大小
 
-	char* sPathPackage;
-	void* pPackageMeta;
-	uint32_t iPackageMetaSize;
+	char* sPathPackage;             // 包路径
+	void* pPackageMeta;             // 包元数据缓冲
+	uint32_t iPackageMetaSize;      // 包元数据大小
 
-	xarray_struct arrEntry;
-	xlist_struct lstEntry;
-	xdict_struct tblEntry;
-	uint32_t iEntryCount;
+	xarray_struct arrEntry;         // 条目数组
+	xlist_struct lstEntry;          // 条目链表
+	xdict_struct tblEntry;          // 路径查找表
+	uint32_t iEntryCount;           // 条目数量
 
-	xpkWriteQueue* pWriteQueue;
-	xpkStorage* pStorage;
-	xpkErrorState err;
+	xpkWriteQueue* pWriteQueue;     // 延迟写入队列
+	xpkStorage* pStorage;           // 存储适配层
+	xpkErrorState err;              // 对象级错误状态
 };
 
+
+// 脏位标记
 typedef enum xpkDirtyBits {
 	XPK_DIRTY_NONE = 0,
 	XPK_DIRTY_HEAD = 1 << 0,
@@ -417,127 +623,207 @@ typedef enum xpkDirtyBits {
 	XPK_DIRTY_DATA = 1 << 3
 } xpkDirtyBits;
 
+
+// 压缩级别映射
 typedef struct xpkCompMap {
-	uint32_t iAlgorithm;
-	int iNativeLevel;
+	uint32_t iAlgorithm;  // 目标算法
+	int iNativeLevel;     // 对应原生级别
 } xpkCompMap;
 
+
+// 文件映射对象
 typedef struct xpkMappedFile {
-	const void* pView;
-	uint64_t iSize;
+	const void* pView;    // 映射视图
+	uint64_t iSize;       // 映射大小
 #if defined(_WIN32) || defined(_WIN64)
-	HANDLE hMap;
+	HANDLE hMap;          // Windows 映射句柄
 #else
-	void* pMap;
+	void* pMap;           // POSIX 映射句柄
 #endif
 } xpkMappedFile;
 
+
+// 松散分卷扫描上下文
 typedef struct xpkLooseVolumeScan {
-	xpkObject objXpk;
-	const char* sNameBase;
-	size_t iNameSize;
-	uint32_t iStartVolume;
-	uint32_t iCount;
-	int bDelete;
-	int iError;
+	xpkObject objXpk;         // 包对象
+	const char* sNameBase;    // 基础文件名
+	size_t iNameSize;         // 基础文件名长度
+	uint32_t iStartVolume;    // 起始分卷号
+	uint32_t iCount;          // 命中数量
+	int bDelete;              // 是否删除命中项
+	int iError;               // 扫描过程错误码
 } xpkLooseVolumeScan;
 
+
+// 延迟写入节点
 typedef struct xpkWriteNode {
-	uint32_t iPos;
-	uint8_t iLevel;
-	uint8_t reserved0[3];
-	uint32_t iCompSize;
-	uint64_t iRawSize;
-	void* pCompData;
+	uint32_t iPos;            // 条目位置
+	uint8_t iLevel;           // 压缩级别
+	uint8_t reserved0[3];     // 保留字段
+	uint32_t iCompSize;       // 压缩后大小
+	uint64_t iRawSize;        // 原始大小
+	void* pCompData;          // 压缩数据缓冲
 } xpkWriteNode;
 
+
+// 延迟写入队列
 struct xpkWriteQueue {
-	xarray_struct arrNode;
+	xarray_struct arrNode;    // 队列节点数组
 };
 
+
+// 文件写入分块大小
 #define XPK_WRITE_FILE_CHUNK_SIZE (8u * 1024u * 1024u)
+
+// 编解码流分块大小
 #define XPK_CODEC_STREAM_CHUNK_SIZE (256u * 1024u)
 
+
+// Flush 前的条目快照
 typedef struct xpkFlushSnapshot {
-	uint32_t iPos;
-	uint32_t iFlag;
-	uint64_t iDataOffset;
-	uint64_t iDataSize;
-	uint64_t iFileSize;
+	uint32_t iPos;            // 条目位置
+	uint32_t iFlag;           // 条目标记
+	uint64_t iDataOffset;     // 数据偏移
+	uint64_t iDataSize;       // 存储大小
+	uint64_t iFileSize;       // 原始大小
 } xpkFlushSnapshot;
 
+
+// 保存回滚上下文
 typedef struct xpkSaveRollback {
-	int bFileExisted;
-	int bHeadValid;
-	int bTailInFile;
-	int bKeepTailFile;
-	uint64_t iLogicalSize;
-	uint64_t iDataOffset;
-	uint64_t iTailSize;
-	uint8_t sHeadBuf[XPK_HEAD_SIZE];
-	void* pTailData;
-	char* sTailPath;
+	int bFileExisted;               // 保存前文件是否存在
+	int bHeadValid;                 // 是否捕获到有效包头
+	int bTailInFile;                // 尾段是否落到临时文件
+	int bKeepTailFile;              // 是否保留尾段文件
+	uint64_t iLogicalSize;          // 保存前逻辑大小
+	uint64_t iDataOffset;           // 保存前数据起点
+	uint64_t iTailSize;             // 尾段大小
+	uint8_t sHeadBuf[XPK_HEAD_SIZE]; // 保存前包头镜像
+	void* pTailData;                // 内存尾段缓冲
+	char* sTailPath;                // 临时尾段路径
 } xpkSaveRollback;
 
+
+// 回滚内存上限
 #define XPK_SAVE_ROLLBACK_MEM_LIMIT   (8u * 1024u * 1024u)
+
+// 回滚文件分块大小
 #define XPK_SAVE_ROLLBACK_CHUNK_SIZE  (8u * 1024u * 1024u)
 
+
+// 构建阶段用 LZMA 输入流
 typedef struct xpkBuildLzmaSeqIn {
-	ISeqInStream vt;
-	xfile hFile;
-	uint64_t iRemain;
+	ISeqInStream vt;   // LZMA 输入接口
+	xfile hFile;       // 源文件句柄
+	uint64_t iRemain;  // 剩余字节数
 } xpkBuildLzmaSeqIn;
 
+
+// 构建阶段用 LZMA 输出流
 typedef struct xpkBuildLzmaSeqOut {
-	ISeqOutStream vt;
-	xfile hFile;
-	uint64_t iSize;
+	ISeqOutStream vt;  // LZMA 输出接口
+	xfile hFile;       // 目标文件句柄
+	uint64_t iSize;    // 已写大小
 } xpkBuildLzmaSeqOut;
 
+
+// 写入阶段用 LZMA 输入流
 typedef struct xpkWriteLzmaSeqIn {
-	ISeqInStream vt;
-	xfile hFile;
-	uint64_t iRemain;
+	ISeqInStream vt;   // LZMA 输入接口
+	xfile hFile;       // 源文件句柄
+	uint64_t iRemain;  // 剩余字节数
 } xpkWriteLzmaSeqIn;
 
+
+// 写入阶段用 LZMA 输出流
 typedef struct xpkWriteLzmaSeqOut {
-	ISeqOutStream vt;
-	xfile hFile;
-	uint64_t iSize;
+	ISeqOutStream vt;  // LZMA 输出接口
+	xfile hFile;       // 目标文件句柄
+	uint64_t iSize;    // 已写大小
 } xpkWriteLzmaSeqOut;
 
+
+// 写入阶段用 LZMA 内存输入流
 typedef struct xpkWriteLzmaMemIn {
-	ISeqInStream vt;
-	const uint8_t* pData;
-	uint64_t iSize;
-	uint64_t iPos;
+	ISeqInStream vt;      // LZMA 输入接口
+	const uint8_t* pData; // 源数据缓冲
+	uint64_t iSize;       // 源数据大小
+	uint64_t iPos;        // 当前读取位置
 } xpkWriteLzmaMemIn;
 
+
+// 获取写入队列节点数量
 static inline int procXpkWriteQueueCount(xpkObject objXpk);
+
+// 释放写入队列
 static inline void procXpkUnitWriteQueue(xpkObject objXpk);
+
+// 标记对象为干净状态
 static inline void procXpkMarkClean(xpkObject objXpk);
+
+// 初始化默认包头
 static inline void procXpkInitHead(xpkObject objXpk);
+
+// 标记已应用布局
 static inline void procXpkMarkAppliedLayout(xpkObject objXpk);
+
+// 添加内存数据条目
 static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt, uint32_t* pPosRet);
+
+// 校验条目数量状态
 static inline int procXpkValidateEntryCountState(xpkObject objXpk);
+
+// 校验活动条目查找一致性
 static inline int procXpkValidateLiveEntryLookup(xpkObject objXpk, const xpkEntry* pEntry);
+
+// 仅追加构建后的条目描述
 static inline int procXpkBuildAppendEntryOnly(xpkObject objDst, const xpkEntry* pEntrySrc, uint64_t iDataOffset, uint64_t iDataSize, uint64_t iFileSize);
 
+
+// 获取 solid 原样存储级别
 static inline uint8_t procXpkSolidStoredCompLevel(xpkObject objXpk);
+
+// 计算 solid 原始数据大小
 static inline int procXpkCalcSolidRawSize(xpkObject objXpk, uint64_t* pSizeRet);
+
+// 计算映射文件范围哈希
 static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint64_t iSize, uint32_t* pHashRet);
+
+// 将 LZ4 解码块复制到文件
 static inline int procXpkCopyDecodedLz4BlockToFile(xpkObject objXpk, uint8_t iLevel, const void* pCompData, uint32_t iCompSize, uint64_t iRawSize, const char* sPathFile);
+
+// 立即写入原样文件
 static inline int procXpkWriteImmediateStoreFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath);
+
+// 立即写入 LZ4 数据
 static inline int procXpkWriteImmediateLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
+
+// 立即写入 ZSTD 数据
 static inline int procXpkWriteImmediateZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
+
+// 立即写入 LZMA2 数据
 static inline int procXpkWriteImmediateLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
+
+// 缓冲写入 LZ4 数据
 static inline int procXpkWriteBufferedLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
+
+// 缓冲写入 ZSTD 数据
 static inline int procXpkWriteBufferedZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
+
+// 缓冲写入 LZMA2 数据
 static inline int procXpkWriteBufferedLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel);
 
+
+// 基于文件句柄校验原样条目
 static inline int procXpkVerifyStoredEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile);
+
+// 基于映射校验原样条目
 static inline int procXpkVerifyStoredEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap);
+
+// 基于文件句柄校验解码条目
 static inline int procXpkVerifyDecodedEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile);
+
+// 基于映射校验解码条目
 static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap);
 
 #endif
@@ -549,11 +835,19 @@ static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pE
 
 /* ===== File: src/base/memory.h ===== */
 
+/*
+	xPack 内部内存适配模块
+
+	负责统一封装内部申请与释放接口。
+*/
+
+// 分配内部内存
 static inline void* xpkAllocInternal(size_t size)
 {
 	return xrtMalloc(size);
 }
 
+// 释放内部内存
 static inline void xpkFreeInternal(void* ptr)
 {
 	xrtFree(ptr);
@@ -562,6 +856,13 @@ static inline void xpkFreeInternal(void* ptr)
 
 /* ===== File: src/base/hash.h ===== */
 
+/*
+	xPack 内部哈希适配模块
+
+	负责统一封装数据哈希接口。
+*/
+
+// 计算内部 32 位哈希值
 static inline uint32_t xpkHash32Internal(const void* data, uint64_t size)
 {
 	return xrtHash32((ptr)data, (size_t)size);
@@ -570,6 +871,13 @@ static inline uint32_t xpkHash32Internal(const void* data, uint64_t size)
 
 /* ===== File: src/base/time.h ===== */
 
+/*
+	xPack 内部时间适配模块
+
+	负责统一封装当前时间获取接口。
+*/
+
+// 获取当前内部时间
 static inline xtime xpkNowInternal(void)
 {
 	return xrtNow();
@@ -577,6 +885,12 @@ static inline xtime xpkNowInternal(void)
 
 
 /* ===== File: src/service/core.h ===== */
+
+/*
+	xPack 核心基础服务模块
+
+	负责错误状态、路径归一化、条目管理、查找表维护与对象生命周期。
+*/
 
 #include <ctype.h>
 
@@ -615,6 +929,7 @@ static const char sXpkErrorBackupPathExists[] = "backup path is occupied";
 static const char sXpkErrorPackagePathExists[] = "package path is occupied";
 static XRT_TLS_STORAGE xpkErrorState g_objXpkErrorTls = { XPK_OK, { 0 } };
 
+// 设置线程错误状态
 static inline void procXpkSetThreadError(int iCode, const char* sText)
 {
 	size_t iSizeText;
@@ -633,6 +948,7 @@ static inline void procXpkSetThreadError(int iCode, const char* sText)
 	g_objXpkErrorTls.sText[iSizeText] = '\0';
 }
 
+// 清理错误状态
 static inline void procXpkClearError(xpkObject objXpk)
 {
 	procXpkSetThreadError(XPK_OK, NULL);
@@ -642,6 +958,7 @@ static inline void procXpkClearError(xpkObject objXpk)
 	}
 }
 
+// 设置错误状态
 static inline int procXpkSetError(xpkObject objXpk, int iCode, const char* sText)
 {
 	size_t iSizeText;
@@ -666,6 +983,7 @@ static inline int procXpkSetError(xpkObject objXpk, int iCode, const char* sText
 	return iCode;
 }
 
+// 返回参数错误
 static inline int procXpkReturnParamError(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -674,6 +992,7 @@ static inline int procXpkReturnParamError(xpkObject objXpk)
 	return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 }
 
+// 确保对象可写
 static inline int procXpkEnsureWritable(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -685,6 +1004,7 @@ static inline int procXpkEnsureWritable(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 在对象有效时设置参数错误
 static inline void procXpkSetParamErrorIfObject(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -693,6 +1013,7 @@ static inline void procXpkSetParamErrorIfObject(xpkObject objXpk)
 	procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 }
 
+// 复制指定长度文本
 static inline char* procXpkDupTextN(const char* sText, size_t iSizeText)
 {
 	char* sRet;
@@ -708,6 +1029,7 @@ static inline char* procXpkDupTextN(const char* sText, size_t iSizeText)
 	return sRet;
 }
 
+// 复制文本
 static inline char* procXpkDupText(const char* sText)
 {
 	if ( sText == NULL ) {
@@ -716,6 +1038,7 @@ static inline char* procXpkDupText(const char* sText)
 	return procXpkDupTextN(sText, strlen(sText));
 }
 
+// 判断 Core 信息扩展是否启用
 static inline int procXpkCoreInfoExtEnabled(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -727,6 +1050,7 @@ static inline int procXpkCoreInfoExtEnabled(xpkObject objXpk)
 	return (objXpk->objHead.infoExtSize > 0) ? TRUE : FALSE;
 }
 
+// 分配信息扩展缓冲
 static inline void* procXpkAllocInfoExt(xpkObject objXpk)
 {
 	void* pInfoExt;
@@ -743,6 +1067,7 @@ static inline void* procXpkAllocInfoExt(xpkObject objXpk)
 	return pInfoExt;
 }
 
+// 复制信息扩展缓冲
 static inline void* procXpkDupInfoExt(xpkObject objXpk, const void* pInfoExtSrc)
 {
 	void* pInfoExt;
@@ -761,6 +1086,7 @@ static inline void* procXpkDupInfoExt(xpkObject objXpk, const void* pInfoExtSrc)
 	return pInfoExt;
 }
 
+// 释放条目自有资源
 static inline void procXpkFreeEntryOwned(xpkEntry* pEntry)
 {
 	if ( pEntry == NULL ) {
@@ -776,6 +1102,7 @@ static inline void procXpkFreeEntryOwned(xpkEntry* pEntry)
 	}
 }
 
+// 判断路径是否忽略大小写
 static inline int procXpkPathIgnoreCase(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -784,6 +1111,7 @@ static inline int procXpkPathIgnoreCase(xpkObject objXpk)
 	return (objXpk->objHead.packType == XPK_PACK_WIN32) ? TRUE : FALSE;
 }
 
+// 判断字符是否为路径分隔符
 static inline int procXpkPathIsSep(xpkObject objXpk, char ch)
 {
 	if ( ch == '/' ) {
@@ -795,6 +1123,7 @@ static inline int procXpkPathIsSep(xpkObject objXpk, char ch)
 	return FALSE;
 }
 
+// 复制指定长度路径文本
 static inline char* procXpkDupPathTextN(xpkObject objXpk, const char* sPath, size_t iSizePath)
 {
 	size_t iPosDst;
@@ -856,6 +1185,7 @@ static inline char* procXpkDupPathTextN(xpkObject objXpk, const char* sPath, siz
 	return sText;
 }
 
+// 复制路径文本
 static inline char* procXpkDupPathText(xpkObject objXpk, const char* sPath)
 {
 	if ( sPath == NULL ) {
@@ -864,6 +1194,7 @@ static inline char* procXpkDupPathText(xpkObject objXpk, const char* sPath)
 	return procXpkDupPathTextN(objXpk, sPath, strlen(sPath));
 }
 
+// 复制路径原样文本
 static inline char* procXpkDupPathStoredText(xpkObject objXpk, const char* sPath)
 {
 	char* sPathRet;
@@ -893,6 +1224,7 @@ static inline char* procXpkDupPathStoredText(xpkObject objXpk, const char* sPath
 	return sPathRet;
 }
 
+// 校验原样路径文本
 static inline int procXpkValidateStoredPathText(xpkObject objXpk, const char* sPath)
 {
 	char* sPathDup;
@@ -911,6 +1243,7 @@ static inline int procXpkValidateStoredPathText(xpkObject objXpk, const char* sP
 	return XPK_OK;
 }
 
+// 复制路径键
 static inline char* procXpkDupPathKey(xpkObject objXpk, const char* sPath)
 {
 	size_t iPos;
@@ -932,6 +1265,7 @@ static inline char* procXpkDupPathKey(xpkObject objXpk, const char* sPath)
 	return sKey;
 }
 
+// 复制路径键已校验
 static inline char* procXpkDupPathKeyChecked(xpkObject objXpk, const char* sPath)
 {
 	size_t iPos;
@@ -953,6 +1287,7 @@ static inline char* procXpkDupPathKeyChecked(xpkObject objXpk, const char* sPath
 	return sKey;
 }
 
+// 查找路径条目
 static inline xpkEntry* procXpkLookupPathEntry(xpkObject objXpk, const char* sPath)
 {
 	char* sKey;
@@ -1059,6 +1394,7 @@ static inline xpkEntry* procXpkLookupPathEntry(xpkObject objXpk, const char* sPa
 	return pEntry;
 }
 
+// 信息扩展大小按包类型
 static inline uint32_t procXpkInfoExtSizeByPackType(xpkPackType iType)
 {
 	switch ( iType ) {
@@ -1074,21 +1410,25 @@ static inline uint32_t procXpkInfoExtSizeByPackType(xpkPackType iType)
 	}
 }
 
+// 条目步长
 static inline uint32_t procXpkEntryStride(const xpkHead* pHead)
 {
 	return XPK_ENTRY_BASE_SIZE + pHead->infoExtSize;
 }
 
+// 条目删除
 static inline int procXpkEntryDeleted(const xpkEntry* pEntry)
 {
 	return ((pEntry->iFlag & XPK_FLAG_DELETED_MASK) != 0) ? TRUE : FALSE;
 }
 
+// 条目表原始大小
 static inline uint64_t procXpkEntryTableRawSize(const xpkHead* pHead)
 {
 	return (uint64_t)pHead->fileCount * (uint64_t)procXpkEntryStride(pHead);
 }
 
+// 获取条目按位置
 static inline xpkEntry* procXpkGetEntryByPos(xpkObject objXpk, uint32_t iPos)
 {
 	if ( (objXpk == NULL) || (iPos == 0) ) {
@@ -1097,6 +1437,7 @@ static inline xpkEntry* procXpkGetEntryByPos(xpkObject objXpk, uint32_t iPos)
 	return (xpkEntry*)xrtArrayGet(&objXpk->arrEntry, iPos);
 }
 
+// 校验条目数量状态
 static inline int procXpkValidateEntryCountState(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1108,6 +1449,7 @@ static inline int procXpkValidateEntryCountState(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 获取公开条目按位置
 static inline int procXpkGetPublicEntryByPos(xpkObject objXpk, uint32_t iPos, xpkEntry** ppEntryRet)
 {
 	xpkEntry* pEntry;
@@ -1136,6 +1478,7 @@ static inline int procXpkGetPublicEntryByPos(xpkObject objXpk, uint32_t iPos, xp
 	return XPK_OK;
 }
 
+// 可见条目数量
 static inline uint32_t procXpkVisibleEntryCount(xpkObject objXpk)
 {
 	uint32_t iCount;
@@ -1163,6 +1506,7 @@ static inline uint32_t procXpkVisibleEntryCount(xpkObject objXpk)
 	return iCount;
 }
 
+// 可见条目数量严格
 static inline int procXpkVisibleEntryCountStrict(xpkObject objXpk, uint32_t* pCountRet)
 {
 	uint32_t iCount;
@@ -1207,6 +1551,7 @@ static inline int procXpkVisibleEntryCountStrict(xpkObject objXpk, uint32_t* pCo
 	return XPK_OK;
 }
 
+// 校验有效条目查找
 static inline int procXpkValidateLiveEntryLookup(xpkObject objXpk, const xpkEntry* pEntry)
 {
 	xpkEntry* pMap;
@@ -1250,6 +1595,7 @@ static inline int procXpkValidateLiveEntryLookup(xpkObject objXpk, const xpkEntr
 	return XPK_OK;
 }
 
+// 释放条目文本
 static inline void procXpkFreeEntryText(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -1265,6 +1611,7 @@ static inline void procXpkFreeEntryText(xpkObject objXpk)
 	}
 }
 
+// 重置查找
 static inline void procXpkResetLookup(xpkObject objXpk)
 {
 	xrtListUnit(&objXpk->lstEntry);
@@ -1274,6 +1621,7 @@ static inline void procXpkResetLookup(xpkObject objXpk)
 	xrtDictInit(&objXpk->tblEntry, sizeof(xpkEntry), XRT_OBJMODE_LOCAL);
 }
 
+// 重建查找
 static inline int procXpkRebuildLookup(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -1352,6 +1700,7 @@ static inline int procXpkRebuildLookup(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 重置条目
 static inline void procXpkResetEntries(xpkObject objXpk)
 {
 	procXpkFreeEntryText(objXpk);
@@ -1367,6 +1716,7 @@ static inline void procXpkResetEntries(xpkObject objXpk)
 	objXpk->iEntryCount = 0;
 }
 
+// 重置已加载状态
 static inline void procXpkResetLoadedState(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1387,6 +1737,7 @@ static inline void procXpkResetLoadedState(xpkObject objXpk)
 	procXpkClearError(objXpk);
 }
 
+// 追加条目自有
 static inline int procXpkAppendEntryOwned(xpkObject objXpk, xpkEntry* pEntrySrc)
 {
 	uint32_t iPos;
@@ -1412,6 +1763,7 @@ static inline int procXpkAppendEntryOwned(xpkObject objXpk, xpkEntry* pEntrySrc)
 	return XPK_OK;
 }
 
+// 标记对象为干净状态
 static inline void procXpkMarkClean(xpkObject objXpk)
 {
 	objXpk->bDirtyHead = FALSE;
@@ -1420,12 +1772,14 @@ static inline void procXpkMarkClean(xpkObject objXpk)
 	objXpk->bDirtyData = FALSE;
 }
 
+// 标记脏条目表
 static inline void procXpkMarkDirtyEntryTable(xpkObject objXpk)
 {
 	objXpk->bDirtyEntryTable = TRUE;
 	objXpk->bDirtyHead = TRUE;
 }
 
+// 初始化默认包头
 static inline void procXpkInitHead(xpkObject objXpk)
 {
 	xtime tNow;
@@ -1443,6 +1797,7 @@ static inline void procXpkInitHead(xpkObject objXpk)
 	objXpk->objHead.changeTime = tNow;
 }
 
+// 标记已应用布局
 static inline void procXpkMarkAppliedLayout(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1454,6 +1809,7 @@ static inline void procXpkMarkAppliedLayout(xpkObject objXpk)
 	objXpk->iVolumeSizeApplied = objXpk->objHead.volumeSize;
 }
 
+// 已应用分卷大小
 static inline uint32_t procXpkAppliedVolumeSize(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1462,6 +1818,7 @@ static inline uint32_t procXpkAppliedVolumeSize(xpkObject objXpk)
 	return objXpk->iVolumeSizeApplied;
 }
 
+// 已应用分卷模式
 static inline int procXpkAppliedVolumeMode(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1470,6 +1827,7 @@ static inline int procXpkAppliedVolumeMode(xpkObject objXpk)
 	return objXpk->bVolumeApplied ? TRUE : FALSE;
 }
 
+// 当前数据结束
 static inline uint64_t procXpkCurrentDataEnd(xpkObject objXpk)
 {
 	uint64_t iDataEnd;
@@ -1488,6 +1846,7 @@ static inline uint64_t procXpkCurrentDataEnd(xpkObject objXpk)
 	return iDataEnd;
 }
 
+// 判断分卷布局是否变化
 static inline int procXpkVolumeLayoutChanged(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1502,6 +1861,7 @@ static inline int procXpkVolumeLayoutChanged(xpkObject objXpk)
 	return FALSE;
 }
 
+// 判断 Solid 布局是否变化
 static inline int procXpkSolidLayoutChanged(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1510,6 +1870,7 @@ static inline int procXpkSolidLayoutChanged(xpkObject objXpk)
 	return (objXpk->bSolidApplied ? TRUE : FALSE) != (objXpk->objHead.solidMode ? TRUE : FALSE);
 }
 
+// 可采用目标布局
 static inline int procXpkCanAdoptTargetLayout(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1530,6 +1891,7 @@ static inline int procXpkCanAdoptTargetLayout(xpkObject objXpk)
 	return TRUE;
 }
 
+// 初始化对象
 static inline void procXpkInitObject(xpkObject objXpk, const xpkOpenOptions* pOpt)
 {
 	memset(objXpk, 0, sizeof(*objXpk));
@@ -1545,6 +1907,7 @@ static inline void procXpkInitObject(xpkObject objXpk, const xpkOpenOptions* pOp
 	procXpkClearError(objXpk);
 }
 
+// 释放对象
 static inline void procXpkUnitObject(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -1570,6 +1933,12 @@ static inline void procXpkUnitObject(xpkObject objXpk)
 
 /* ===== File: src/codec/router.h ===== */
 
+/*
+	xPack 编解码路由模块
+
+	负责压缩级别映射、编解码分派与压缩缓冲管理。
+*/
+
 static const xpkCompMap arrXpkCompTable[16] = {
 	{ XPK_ALG_STORE, 0 },
 	{ XPK_ALG_LZ4, 1 },
@@ -1589,16 +1958,19 @@ static const xpkCompMap arrXpkCompTable[16] = {
 	{ XPK_ALG_LZMA2, 9 }
 };
 
+// 将压缩级别映射为算法
 static inline uint32_t procXpkCompLevelToAlg(uint8_t iLevel)
 {
 	return arrXpkCompTable[iLevel & 0x0Fu].iAlgorithm;
 }
 
+// 将压缩级别映射为原生级别
 static inline int procXpkCompLevelToNative(uint8_t iLevel)
 {
 	return arrXpkCompTable[iLevel & 0x0Fu].iNativeLevel;
 }
 
+// 计算编解码输出上界
 static inline int procXpkCodecBound(xpkObject objXpk, uint8_t iLevel, uint32_t iRawSize, uint32_t* pSizeRet)
 {
 	uint64_t iBound64;
@@ -1638,6 +2010,7 @@ static inline int procXpkCodecBound(xpkObject objXpk, uint8_t iLevel, uint32_t i
 	return XPK_OK;
 }
 
+// 按原样策略复制压缩缓冲
 static inline int procXpkCodecStoreCopy(xpkObject objXpk, const void* pData, uint32_t iRawSize, void** pBufRet, uint32_t* pSizeRet, uint8_t* pLevelRet)
 {
 	void* pBuf;
@@ -1661,6 +2034,7 @@ static inline int procXpkCodecStoreCopy(xpkObject objXpk, const void* pData, uin
 	return XPK_OK;
 }
 
+// 执行数据编码
 static inline int procXpkCodecEncode(xpkObject objXpk, uint8_t iLevel, const void* pData, uint32_t iRawSize, void** pBufRet, uint32_t* pSizeRet, uint8_t* pLevelRet)
 {
 	uint32_t iBound;
@@ -1773,6 +2147,7 @@ static inline int procXpkCodecEncode(xpkObject objXpk, uint8_t iLevel, const voi
 	return XPK_OK;
 }
 
+// 执行数据解码
 static inline int procXpkCodecDecode(xpkObject objXpk, uint8_t iLevel, const void* pData, uint32_t iCompSize, uint32_t iRawSize, void** pBufRet)
 {
 	void* pBuf;
@@ -1847,6 +2222,12 @@ static inline int procXpkCodecDecode(xpkObject objXpk, uint8_t iLevel, const voi
 
 /* ===== File: src/storage/fileio.h ===== */
 
+/*
+	xPack 文件存储模块
+
+	负责文件映射、分卷扫描、随机读写与物理文件操作。
+*/
+
 #include <stdio.h>
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <dirent.h>
@@ -1855,6 +2236,7 @@ static inline int procXpkCodecDecode(xpkObject objXpk, uint8_t iLevel, const voi
 #include <unistd.h>
 #endif
 
+// 解除文件映射
 static inline void procXpkUnmapFile(xpkMappedFile* pMap)
 {
 	if ( pMap == NULL ) {
@@ -1880,6 +2262,7 @@ static inline void procXpkUnmapFile(xpkMappedFile* pMap)
 	pMap->iSize = 0;
 }
 
+// 建立只读文件映射
 static inline int procXpkMapFileReadOnly(xpkObject objXpk, xfile hFile, uint64_t iSize, xpkMappedFile* pMapRet)
 {
 	if ( pMapRet != NULL ) {
@@ -1924,6 +2307,7 @@ static inline int procXpkMapFileReadOnly(xpkObject objXpk, xfile hFile, uint64_t
 	return XPK_OK;
 }
 
+// 建立读写文件映射
 static inline int procXpkMapFileReadWrite(xpkObject objXpk, xfile hFile, uint64_t iSize, xpkMappedFile* pMapRet)
 {
 	size_t iPos;
@@ -1981,6 +2365,7 @@ static inline int procXpkMapFileReadWrite(xpkObject objXpk, xfile hFile, uint64_
 	return XPK_OK;
 }
 
+// 生成分卷路径文本
 static inline char* procXpkVolumePathDupText(const char* sPathPackage, uint32_t iVolume)
 {
 	char sSuffix[32];
@@ -2013,6 +2398,7 @@ static inline char* procXpkVolumePathDupText(const char* sPathPackage, uint32_t 
 	return sPathRet;
 }
 
+// 生成带后缀的路径文本
 static inline char* procXpkPathSuffixDupText(const char* sPathBase, const char* sSuffix)
 {
 	size_t iSizeBase;
@@ -2035,6 +2421,7 @@ static inline char* procXpkPathSuffixDupText(const char* sPathBase, const char* 
 	return sPathRet;
 }
 
+// 匹配松散分卷文件名
 static inline int procXpkLooseVolumeMatchName(const xpkLooseVolumeScan* pScan, const char* sName, uint32_t* pVolumeRet)
 {
 	const char* sDigit;
@@ -2078,6 +2465,7 @@ static inline int procXpkLooseVolumeMatchName(const xpkLooseVolumeScan* pScan, c
 	return TRUE;
 }
 
+// 拼接路径文本
 static inline char* procXpkPathJoinDupText(const char* sDirPath, const char* sName)
 {
 	size_t iSizeDir;
@@ -2112,6 +2500,7 @@ static inline char* procXpkPathJoinDupText(const char* sDirPath, const char* sNa
 	return sPathRet;
 }
 
+// 处理松散分卷条目
 static inline int procXpkHandleLooseVolumeEntry(xpkLooseVolumeScan* pScan, const char* sDirPath, const char* sName, int bDir)
 {
 	char* sPathEntry;
@@ -2147,6 +2536,7 @@ static inline int procXpkHandleLooseVolumeEntry(xpkLooseVolumeScan* pScan, const
 	return XPK_OK;
 }
 
+// 路径名称文本
 static inline const char* procXpkPathNameText(const char* sPath)
 {
 	const char* sName;
@@ -2164,6 +2554,7 @@ static inline const char* procXpkPathNameText(const char* sPath)
 	return sName;
 }
 
+// 路径目录复制文本
 static inline char* procXpkPathDirDupText(const char* sPath)
 {
 	const char* sSep;
@@ -2197,6 +2588,7 @@ static inline char* procXpkPathDirDupText(const char* sPath)
 	return sRet;
 }
 
+// 松散分卷扫描回调
 static inline int procXpkLooseVolumeScanProc(ptr sPath, size_t iSize, int bDir, ptr pData, ptr Param)
 {
 	xpkLooseVolumeScan* pScan;
@@ -2263,6 +2655,7 @@ static inline int procXpkLooseVolumeScanProc(ptr sPath, size_t iSize, int bDir, 
 	return FALSE;
 }
 
+// 扫描松散分卷文件从文本
 static inline int procXpkScanLooseVolumeFilesFromText(xpkObject objXpk, const char* sPathPackage, uint32_t iStartVolume, int bDelete, uint32_t* pCountRet)
 {
 	xpkLooseVolumeScan objScan;
@@ -2383,11 +2776,13 @@ static inline int procXpkScanLooseVolumeFilesFromText(xpkObject objXpk, const ch
 	return XPK_OK;
 }
 
+// 扫描松散分卷文件文本
 static inline int procXpkScanLooseVolumeFilesText(xpkObject objXpk, const char* sPathPackage, int bDelete, uint32_t* pCountRet)
 {
 	return procXpkScanLooseVolumeFilesFromText(objXpk, sPathPackage, 0, bDelete, pCountRet);
 }
 
+// 确保分卷路径未占用文本
 static inline int procXpkEnsureVolumePathUnusedText(xpkObject objXpk, const char* sPathPackage, const char* sErrorText)
 {
 	uint32_t iLooseVolumeCount;
@@ -2412,6 +2807,7 @@ static inline int procXpkEnsureVolumePathUnusedText(xpkObject objXpk, const char
 	return XPK_OK;
 }
 
+// 打开分卷文本
 static inline int procXpkOpenVolumeText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, int bReadonly, xfile* pFileRet)
 {
 	char* sPathVolume;
@@ -2437,6 +2833,7 @@ static inline int procXpkOpenVolumeText(xpkObject objXpk, const char* sPathPacka
 	return XPK_OK;
 }
 
+// 获取分卷物理大小文本
 static inline int procXpkGetVolumePhysicalSizeText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t* pSizeRet, int* pExistsRet)
 {
 	char* sPathVolume;
@@ -2478,6 +2875,7 @@ static inline int procXpkGetVolumePhysicalSizeText(xpkObject objXpk, const char*
 	return XPK_OK;
 }
 
+// 数量分卷文件文本
 static inline int procXpkCountVolumeFilesText(xpkObject objXpk, const char* sPathPackage, uint32_t* pCountRet)
 {
 	uint32_t iVolume;
@@ -2506,6 +2904,7 @@ static inline int procXpkCountVolumeFilesText(xpkObject objXpk, const char* sPat
 	return XPK_OK;
 }
 
+// 删除分卷文件文本
 static inline int procXpkDeleteVolumeFilesText(xpkObject objXpk, const char* sPathPackage, uint32_t iStartVolume)
 {
 	uint32_t iVolume;
@@ -2542,6 +2941,7 @@ static inline int procXpkDeleteVolumeFilesText(xpkObject objXpk, const char* sPa
 	return XPK_OK;
 }
 
+// 删除分卷文件连续文本
 static inline int procXpkDeleteVolumeFilesContiguousText(xpkObject objXpk, const char* sPathPackage, uint32_t iStartVolume)
 {
 	uint32_t iVolume;
@@ -2572,6 +2972,7 @@ static inline int procXpkDeleteVolumeFilesContiguousText(xpkObject objXpk, const
 	return XPK_OK;
 }
 
+// 删除分卷文件精确文本
 static inline int procXpkDeleteVolumeFilesExactText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolumeCount)
 {
 	uint32_t iVolume;
@@ -2598,6 +2999,7 @@ static inline int procXpkDeleteVolumeFilesExactText(xpkObject objXpk, const char
 	return XPK_OK;
 }
 
+// 转移分卷文件文本
 static inline int procXpkTransferVolumeFilesText(xpkObject objXpk, const char* sPathSrc, const char* sPathDst, int bMove, int bRewrite)
 {
 	uint32_t iVolumeCount;
@@ -2659,6 +3061,7 @@ static inline int procXpkTransferVolumeFilesText(xpkObject objXpk, const char* s
 	return XPK_OK;
 }
 
+// 移动分卷文件文本
 static inline int procXpkMoveVolumeFilesText(xpkObject objXpk, const char* sPathSrc, const char* sPathDst)
 {
 	uint32_t iVolumeCountSrc;
@@ -2735,6 +3138,7 @@ static inline int procXpkMoveVolumeFilesText(xpkObject objXpk, const char* sPath
 	return XPK_OK;
 }
 
+// 定位文件
 static inline int procXpkSeekFile(xpkObject objXpk, xfile hFile, uint64_t iOffset)
 {
 	size_t iPos;
@@ -2753,6 +3157,7 @@ static inline int procXpkSeekFile(xpkObject objXpk, xfile hFile, uint64_t iOffse
 	return XPK_OK;
 }
 
+// 计算逻辑文件大小
 static inline int procXpkCalcLogicalFileSize(xpkObject objXpk, const xpkHead* pHead, uint64_t* pSizeRet)
 {
 	uint32_t iVolume;
@@ -2796,6 +3201,7 @@ static inline int procXpkCalcLogicalFileSize(xpkObject objXpk, const xpkHead* pH
 	return XPK_OK;
 }
 
+// 读取分卷片段文本
 static inline int procXpkReadVolumePartText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t iOffsetVolume, void* pData, uint32_t iSize)
 {
 	char* sPathVolume;
@@ -2875,6 +3281,7 @@ static inline int procXpkReadVolumePartText(xpkObject objXpk, const char* sPathP
 	return XPK_OK;
 }
 
+// 写入分卷片段文本
 static inline int procXpkWriteVolumePartText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t iOffsetVolume, const void* pData, uint32_t iSize)
 {
 	char* sPathVolume;
@@ -2954,6 +3361,7 @@ static inline int procXpkWriteVolumePartText(xpkObject objXpk, const char* sPath
 	return XPK_OK;
 }
 
+// 原始读取
 static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData, uint32_t iSize)
 {
 	uint8_t* pCur;
@@ -2995,6 +3403,7 @@ static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData
 	return XPK_OK;
 }
 
+// 原始写入
 static inline int procXpkRawWrite(xpkObject objXpk, uint64_t iOffset, const void* pData, uint32_t iSize)
 {
 	const uint8_t* pCur;
@@ -3036,6 +3445,7 @@ static inline int procXpkRawWrite(xpkObject objXpk, uint64_t iOffset, const void
 	return XPK_OK;
 }
 
+// 读取按位置分配
 static inline int procXpkReadAtAlloc(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint32_t iSize, void** pDataRet)
 {
 	size_t iRead;
@@ -3107,6 +3517,7 @@ static inline int procXpkReadAtAlloc(xpkObject objXpk, xfile hFile, uint64_t iOf
 	return XPK_OK;
 }
 
+// 读取按位置缓冲
 static inline int procXpkReadAtBuffer(xpkObject objXpk, xfile hFile, uint64_t iOffset, void* pData, uint32_t iSize)
 {
 	size_t iRead;
@@ -3150,6 +3561,7 @@ static inline int procXpkReadAtBuffer(xpkObject objXpk, xfile hFile, uint64_t iO
 	return XPK_OK;
 }
 
+// 写入按位置
 static inline int procXpkWriteAt(xpkObject objXpk, xfile hFile, uint64_t iOffset, const void* pData, uint32_t iSize)
 {
 	size_t iWrite;
@@ -3196,6 +3608,7 @@ static inline int procXpkWriteAt(xpkObject objXpk, xfile hFile, uint64_t iOffset
 	return XPK_OK;
 }
 
+// 在指定位置设置文件 EOF
 static inline int procXpkSetEOFAt(xpkObject objXpk, xfile hFile, uint64_t iOffset)
 {
 	uint32_t iVolumeLast;
@@ -3289,6 +3702,13 @@ static inline int procXpkSetEOFAt(xpkObject objXpk, xfile hFile, uint64_t iOffse
 
 /* ===== File: src/format/layout.h ===== */
 
+/*
+	xPack 磁盘布局模块
+
+	负责包头与条目表的编解码、布局校验和默认布局初始化。
+*/
+
+// 写入 32 位小端值
 static inline void procXpkWrite32LE(uint8_t* pBuf, uint32_t iValue)
 {
 	pBuf[0] = (uint8_t)(iValue & 0xFFu);
@@ -3297,12 +3717,14 @@ static inline void procXpkWrite32LE(uint8_t* pBuf, uint32_t iValue)
 	pBuf[3] = (uint8_t)((iValue >> 24) & 0xFFu);
 }
 
+// 写入 64 位小端值
 static inline void procXpkWrite64LE(uint8_t* pBuf, uint64_t iValue)
 {
 	procXpkWrite32LE(pBuf, (uint32_t)(iValue & 0xFFFFFFFFu));
 	procXpkWrite32LE(pBuf + 4, (uint32_t)(iValue >> 32));
 }
 
+// 读取 32 位小端值
 static inline uint32_t procXpkRead32LE(const uint8_t* pBuf)
 {
 	return ((uint32_t)pBuf[0]) |
@@ -3311,12 +3733,14 @@ static inline uint32_t procXpkRead32LE(const uint8_t* pBuf)
 		((uint32_t)pBuf[3] << 24);
 }
 
+// 读取 64 位小端值
 static inline uint64_t procXpkRead64LE(const uint8_t* pBuf)
 {
 	return ((uint64_t)procXpkRead32LE(pBuf)) |
 		((uint64_t)procXpkRead32LE(pBuf + 4) << 32);
 }
 
+// 应用包类型默认布局
 static inline int procXpkApplyPackType(xpkObject objXpk, xpkPackType iType)
 {
 	uint32_t iInfoExtSize;
@@ -3331,6 +3755,7 @@ static inline int procXpkApplyPackType(xpkObject objXpk, xpkPackType iType)
 	return XPK_OK;
 }
 
+// 校验包头布局
 static inline int procXpkValidateHead(xpkObject objXpk, const xpkHead* pHead)
 {
 	uint32_t iInfoExtSize;
@@ -3370,6 +3795,7 @@ static inline int procXpkValidateHead(xpkObject objXpk, const xpkHead* pHead)
 	return XPK_OK;
 }
 
+// 编码包头
 static inline void procXpkEncodeHead(const xpkHead* pHead, uint8_t sBuf[XPK_HEAD_SIZE])
 {
 	uint32_t iFlags1;
@@ -3401,6 +3827,7 @@ static inline void procXpkEncodeHead(const xpkHead* pHead, uint8_t sBuf[XPK_HEAD
 	procXpkWrite64LE(sBuf + 56, (uint64_t)pHead->changeTime);
 }
 
+// 解码包头
 static inline void procXpkDecodeHead(const uint8_t sBuf[XPK_HEAD_SIZE], xpkHead* pHead)
 {
 	uint32_t iFlags1;
@@ -3431,6 +3858,7 @@ static inline void procXpkDecodeHead(const uint8_t sBuf[XPK_HEAD_SIZE], xpkHead*
 	pHead->changeTime = (xtime)procXpkRead64LE(sBuf + 56);
 }
 
+// 编码条目表
 static inline int procXpkEncodeEntryTable(xpkObject objXpk, void** pDataRet, uint32_t* pSizeRet)
 {
 	uint32_t iPos;
@@ -3519,6 +3947,7 @@ static inline int procXpkEncodeEntryTable(xpkObject objXpk, void** pDataRet, uin
 	return XPK_OK;
 }
 
+// 解码条目表
 static inline int procXpkDecodeEntryTable(xpkObject objXpk, const void* pData, uint32_t iSize)
 {
 	uint32_t iPos;
@@ -3612,6 +4041,13 @@ static inline int procXpkDecodeEntryTable(xpkObject objXpk, const void* pData, u
 
 /* ===== File: src/service/open.h ===== */
 
+/*
+	xPack 打开加载模块
+
+	负责读取包头、元数据、条目表并恢复运行时状态。
+*/
+
+// 加载并解析包文件
 static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOpt)
 {
 	xfile hFile;
@@ -3628,6 +4064,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	uint32_t iLooseVolumeCount;
 	int iRet;
 
+	// 先处理目录冲突、缺失新建和空文件这几种快速返回分支。
 	if ( xrtDirExists((str)objXpk->sPathPackage) ) {
 		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
 	}
@@ -3674,6 +4111,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		return procXpkSetError(objXpk, XPK_ERR_FORMAT, sXpkErrorBadHead);
 	}
 
+	// 读取包头并校验布局字段，确认后再恢复运行时状态。
 	iRet = procXpkReadAtAlloc(objXpk, hFile, 0, XPK_HEAD_SIZE, (void**)&pHeadBuf);
 	if ( iRet != XPK_OK ) {
 		xrtClose(hFile);
@@ -3723,6 +4161,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	procXpkMarkAppliedLayout(objXpk);
 	procXpkMarkClean(objXpk);
 
+	// 非分卷包优先走整文件映射，后续恢复元数据和条目表时能少一次额外拷贝。
 	memset(&objMap, 0, sizeof(objMap));
 	iMapSize = 0;
 	if ( !objHead.volumeMode && ((objHead.metaCompSize > 0) || (objHead.infoCompSize > 0)) ) {
@@ -3734,6 +4173,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		}
 	}
 
+	// 先恢复包元数据，保证后续对象状态与磁盘内容一致。
 	if ( objHead.metaCompSize > 0 ) {
 		pMetaComp = NULL;
 		pMetaRaw = NULL;
@@ -3770,6 +4210,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		objXpk->iPackageMetaSize = objHead.metaRawSize;
 	}
 
+	// 再恢复条目表，并重建条目数组与查找关系。
 	if ( objHead.infoCompSize > 0 ) {
 		pEntryComp = NULL;
 		pEntryRaw = NULL;
@@ -3813,6 +4254,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		}
 	}
 
+	// 统一收尾临时资源，并清空最后错误状态。
 	procXpkUnmapFile(&objMap);
 	xrtClose(hFile);
 	procXpkClearError(objXpk);
@@ -3822,6 +4264,13 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 
 /* ===== File: src/service/write.h ===== */
 
+/*
+	xPack 读写服务模块
+
+	负责条目读写、延迟写入队列、压缩路径与 solid 数据处理。
+*/
+
+// 按包偏移分块写入数据
 static inline int procXpkWriteAtChunkedPackage(xpkObject objXpk, xfile hFile, uint64_t iOffset, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -3852,6 +4301,7 @@ static inline int procXpkWriteAtChunkedPackage(xpkObject objXpk, xfile hFile, ui
 	return XPK_OK;
 }
 
+// 复制源文件内容到包文件
 static inline int procXpkCopySourceFileToPackage(xpkObject objXpk, xfile hFileSrc, xfile hFileDst, uint64_t iOffsetDst, uint64_t iSize)
 {
 	void* pChunk;
@@ -3901,6 +4351,7 @@ static inline int procXpkCopySourceFileToPackage(xpkObject objXpk, xfile hFileSr
 	return XPK_OK;
 }
 
+// 获取写入队列数量
 static inline int procXpkWriteQueueCount(xpkObject objXpk)
 {
 	if ( (objXpk == NULL) || (objXpk->pWriteQueue == NULL) ) {
@@ -3909,6 +4360,7 @@ static inline int procXpkWriteQueueCount(xpkObject objXpk)
 	return (int)objXpk->pWriteQueue->arrNode.Count;
 }
 
+// 初始化写入队列
 static inline int procXpkInitWriteQueue(xpkObject objXpk)
 {
 	if ( objXpk->pWriteQueue != NULL ) {
@@ -3925,6 +4377,7 @@ static inline int procXpkInitWriteQueue(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 释放写入队列
 static inline void procXpkUnitWriteQueue(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -3947,6 +4400,7 @@ static inline void procXpkUnitWriteQueue(xpkObject objXpk)
 	objXpk->pWriteQueue = NULL;
 }
 
+// 查找写入队列节点
 static inline xpkWriteNode* procXpkFindWriteNode(xpkObject objXpk, uint32_t iPos, uint32_t* pNodePosRet)
 {
 	uint32_t iNodePos;
@@ -3972,6 +4426,7 @@ static inline xpkWriteNode* procXpkFindWriteNode(xpkObject objXpk, uint32_t iPos
 	return NULL;
 }
 
+// 按节点位置移除延迟写入
 static inline void procXpkRemoveQueuedWriteAt(xpkObject objXpk, uint32_t iNodePos)
 {
 	xpkWriteNode* pNode;
@@ -3988,6 +4443,7 @@ static inline void procXpkRemoveQueuedWriteAt(xpkObject objXpk, uint32_t iNodePo
 	xrtArrayRemove(&objXpk->pWriteQueue->arrNode, iNodePos, 1);
 }
 
+// 按条目位置丢弃延迟写入
 static inline void procXpkDropQueuedWrite(xpkObject objXpk, uint32_t iPos)
 {
 	uint32_t iNodePos;
@@ -3998,6 +4454,7 @@ static inline void procXpkDropQueuedWrite(xpkObject objXpk, uint32_t iPos)
 	}
 }
 
+// 调整延迟写入位置
 static inline void procXpkShiftQueuedWritePos(xpkObject objXpk, uint32_t iPosRemoved)
 {
 	uint32_t iNodePos;
@@ -4015,6 +4472,7 @@ static inline void procXpkShiftQueuedWritePos(xpkObject objXpk, uint32_t iPosRem
 	}
 }
 
+// 立即写入原样文件并处理队列回退
 static inline int procXpkWriteImmediateStoreFileWithQueuedFallback(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath)
 {
 	xpkWriteNode* pNode;
@@ -4069,6 +4527,7 @@ static inline int procXpkWriteImmediateStoreFileWithQueuedFallback(xpkObject obj
 	return iRet;
 }
 
+// 队列写入
 static inline int procXpkQueueWrite(xpkObject objXpk, uint32_t iPos, uint8_t iLevel, void* pCompData, uint32_t iCompSize, uint64_t iRawSize)
 {
 	uint32_t iNodePos;
@@ -4114,6 +4573,7 @@ static inline int procXpkQueueWrite(xpkObject objXpk, uint32_t iPos, uint8_t iLe
 	return XPK_OK;
 }
 
+// 解析压缩级别
 static inline int procXpkResolveCompLevel(xpkObject objXpk, const xpkWriteOptions* pOpt, uint8_t* pLevelRet)
 {
 	uint8_t iLevel;
@@ -4138,6 +4598,7 @@ static inline int procXpkResolveCompLevel(xpkObject objXpk, const xpkWriteOption
 	return XPK_OK;
 }
 
+// 解析写入策略
 static inline uint8_t procXpkResolveWritePolicy(xpkObject objXpk, const xpkWriteOptions* pOpt)
 {
 	if ( pOpt == NULL ) {
@@ -4146,6 +4607,7 @@ static inline uint8_t procXpkResolveWritePolicy(xpkObject objXpk, const xpkWrite
 	return pOpt->writePolicy;
 }
 
+// 打开映射源文件
 static inline int procXpkOpenMappedSourceFile(xpkObject objXpk, const char* sPathFile, xfile* pFileRet, uint64_t* pSizeRet, xpkMappedFile* pMapRet)
 {
 	xfile hFile;
@@ -4190,6 +4652,7 @@ static inline int procXpkOpenMappedSourceFile(xpkObject objXpk, const char* sPat
 	return XPK_OK;
 }
 
+// 写入文件数据
 static inline int procXpkWriteFileData(xpkObject objXpk, const char* sPathFile, const void* pData, uint64_t iSize)
 {
 	xfile hFile;
@@ -4237,6 +4700,7 @@ static inline int procXpkWriteFileData(xpkObject objXpk, const char* sPathFile, 
 	return XPK_OK;
 }
 
+// 将包内范围复制到文件
 static inline int procXpkCopyPackageRangeToFile(xpkObject objXpk, uint64_t iOffsetSrc, uint64_t iSize, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -4326,6 +4790,7 @@ static inline int procXpkCopyPackageRangeToFile(xpkObject objXpk, uint64_t iOffs
 	return XPK_OK;
 }
 
+// 将原样条目复制到文件
 static inline int procXpkCopyStoredEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	uint32_t iLevel;
@@ -4365,6 +4830,7 @@ static inline int procXpkCopyStoredEntryToFile(xpkObject objXpk, xpkEntry* pEntr
 	return procXpkCopyPackageRangeToFile(objXpk, pEntry->iDataOffset, pEntry->iDataSize, sPathFile);
 }
 
+// 将原样 LZ4 条目复制到文件
 static inline int procXpkCopyStoredLz4EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -4446,6 +4912,7 @@ static inline int procXpkCopyStoredLz4EntryToFile(xpkObject objXpk, xpkEntry* pE
 	return iRet;
 }
 
+// 将原样 ZSTD 条目复制到文件
 static inline int procXpkCopyStoredZstdEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -4682,6 +5149,7 @@ static inline int procXpkCopyStoredZstdEntryToFile(xpkObject objXpk, xpkEntry* p
 	return XPK_OK;
 }
 
+// 将原样 LZMA2 条目复制到文件
 static inline int procXpkCopyStoredLzma2EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -4918,6 +5386,7 @@ static inline int procXpkCopyStoredLzma2EntryToFile(xpkObject objXpk, xpkEntry* 
 	return XPK_OK;
 }
 
+// 计算 Solid 原样原始大小
 static inline int procXpkCalcSolidStoredRawSize(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	uint64_t iRawSize;
@@ -4946,6 +5415,7 @@ static inline int procXpkCalcSolidStoredRawSize(xpkObject objXpk, uint64_t* pSiz
 	return XPK_OK;
 }
 
+// 将队列中的原样条目复制到文件
 static inline int procXpkCopyQueuedStoredEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -4983,6 +5453,7 @@ static inline int procXpkCopyQueuedStoredEntryToFile(xpkObject objXpk, xpkEntry*
 	return procXpkWriteFileData(objXpk, sPathFile, pNode->pCompData, pNode->iCompSize);
 }
 
+// 将解码后的 LZ4 块复制到文件
 static inline int procXpkCopyDecodedLz4BlockToFile(xpkObject objXpk, uint8_t iLevel, const void* pCompData, uint32_t iCompSize, uint64_t iRawSize, const char* sPathFile)
 {
 	void* pRawData;
@@ -5027,6 +5498,7 @@ static inline int procXpkCopyDecodedLz4BlockToFile(xpkObject objXpk, uint8_t iLe
 	return iRet;
 }
 
+// 将队列中的 LZ4 条目复制到文件
 static inline int procXpkCopyQueuedLz4EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -5064,6 +5536,7 @@ static inline int procXpkCopyQueuedLz4EntryToFile(xpkObject objXpk, xpkEntry* pE
 	return procXpkCopyDecodedLz4BlockToFile(objXpk, pNode->iLevel, pNode->pCompData, pNode->iCompSize, pNode->iRawSize, sPathFile);
 }
 
+// 将队列中的 ZSTD 条目复制到文件
 static inline int procXpkCopyQueuedZstdEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -5194,6 +5667,7 @@ static inline int procXpkCopyQueuedZstdEntryToFile(xpkObject objXpk, xpkEntry* p
 	return XPK_OK;
 }
 
+// 将队列中的 LZMA2 条目复制到文件
 static inline int procXpkCopyQueuedLzma2EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -5332,6 +5806,7 @@ static inline int procXpkCopyQueuedLzma2EntryToFile(xpkObject objXpk, xpkEntry* 
 	return XPK_OK;
 }
 
+// 写入立即
 static inline int procXpkWriteImmediate(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFile;
@@ -5393,6 +5868,7 @@ static inline int procXpkWriteImmediate(xpkObject objXpk, xpkEntry* pEntry, cons
 	return XPK_OK;
 }
 
+// 写入缓冲
 static inline int procXpkWriteBuffered(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	if ( iSize > 0 ) {
@@ -5429,6 +5905,7 @@ static inline int procXpkWriteBuffered(xpkObject objXpk, xpkEntry* pEntry, const
 	return XPK_OK;
 }
 
+// 写入临时路径复制
 static inline char* procXpkWriteTempPathDup(xpkObject objXpk, const char* sTag)
 {
 	char sSuffix[128];
@@ -5473,6 +5950,7 @@ static inline char* procXpkWriteTempPathDup(xpkObject objXpk, const char* sTag)
 	return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite), NULL;
 }
 
+// 缓冲写入 LZ4 数据
 static inline int procXpkWriteBufferedLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -5604,6 +6082,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 ZSTD 数据
 static inline int procXpkWriteBufferedZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -5802,6 +6281,7 @@ lblCleanup:
 }
 
 
+// 立即写入 LZ4 数据
 static inline int procXpkWriteImmediateLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -5951,6 +6431,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 ZSTD 数据
 static inline int procXpkWriteImmediateZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -6166,6 +6647,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 写入阶段 LZMA 顺序输入读取
 static inline SRes procXpkWriteLzmaSeqInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
 	xpkWriteLzmaSeqIn* pIn;
@@ -6199,6 +6681,7 @@ static inline SRes procXpkWriteLzmaSeqInRead(ISeqInStreamPtr pStream, void* pDat
 	return SZ_OK;
 }
 
+// 写入阶段 LZMA 顺序输出写入
 static inline size_t procXpkWriteLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const void* pData, size_t iSize)
 {
 	xpkWriteLzmaSeqOut* pOut;
@@ -6217,6 +6700,7 @@ static inline size_t procXpkWriteLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const
 	return iWrite;
 }
 
+// 写入阶段 LZMA 内存输入读取
 static inline SRes procXpkWriteLzmaMemInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
 	xpkWriteLzmaMemIn* pIn;
@@ -6249,6 +6733,7 @@ static inline SRes procXpkWriteLzmaMemInRead(ISeqInStreamPtr pStream, void* pDat
 	return SZ_OK;
 }
 
+// 缓冲写入 LZMA2 数据
 static inline int procXpkWriteBufferedLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -6391,6 +6876,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 LZMA2 数据
 static inline int procXpkWriteImmediateLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -6552,6 +7038,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 写入原始临时文件从源
 static inline int procXpkWriteRawTempFileFromSource(xpkObject objXpk, const char* sSrcPath, const char* sTag, xfile* pFileTmpRet, char** pPathTmpRet, uint64_t* pFileSizeRet, uint32_t* pHashRet)
 {
 	xfile hFileSrc;
@@ -6673,6 +7160,7 @@ static inline int procXpkWriteRawTempFileFromSource(xpkObject objXpk, const char
 	return XPK_OK;
 }
 
+// 编码映射的 LZ4 块
 static inline int procXpkEncodeMappedLz4Block(xpkObject objXpk, uint8_t iLevel, const xpkMappedFile* pMap, void** pCompDataRet, uint32_t* pCompSizeRet)
 {
 	void* pCompData;
@@ -6719,6 +7207,7 @@ static inline int procXpkEncodeMappedLz4Block(xpkObject objXpk, uint8_t iLevel, 
 	return XPK_OK;
 }
 
+// 立即写入 ZSTD 文件
 static inline int procXpkWriteImmediateZstdFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -6975,6 +7464,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 LZ4 文件
 static inline int procXpkWriteImmediateLz4File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -7102,6 +7592,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 LZMA2 文件
 static inline int procXpkWriteImmediateLzma2File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -7286,6 +7777,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 ZSTD 文件
 static inline int procXpkWriteBufferedZstdFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -7567,6 +8059,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 LZMA2 文件
 static inline int procXpkWriteBufferedLzma2File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -7777,6 +8270,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 LZ4 文件
 static inline int procXpkWriteBufferedLz4File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -7891,6 +8385,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 写入立即原样文件
 static inline int procXpkWriteImmediateStoreFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath)
 {
 	xfile hFileSrc;
@@ -8008,6 +8503,7 @@ static inline int procXpkWriteImmediateStoreFile(xpkObject objXpk, xpkEntry* pEn
 	return XPK_OK;
 }
 
+// 获取 Solid 目标压缩级别
 static inline uint8_t procXpkSolidTargetCompLevel(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -8016,6 +8512,7 @@ static inline uint8_t procXpkSolidTargetCompLevel(xpkObject objXpk)
 	return (uint8_t)objXpk->objHead.defComp;
 }
 
+// 获取 Solid 原样压缩级别
 static inline uint8_t procXpkSolidStoredCompLevel(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -8038,6 +8535,7 @@ static inline uint8_t procXpkSolidStoredCompLevel(xpkObject objXpk)
 	return procXpkSolidTargetCompLevel(objXpk);
 }
 
+// 计算 Solid 原始数据大小
 static inline int procXpkCalcSolidRawSize(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	uint32_t iPos;
@@ -8067,6 +8565,7 @@ static inline int procXpkCalcSolidRawSize(xpkObject objXpk, uint64_t* pSizeRet)
 	return XPK_OK;
 }
 
+// 读取并分配 Solid LZ4 切片
 static inline int procXpkReadSolidLz4SliceAlloc(xpkObject objXpk, xpkEntry* pEntry, void** pDataRet, uint64_t* pSizeRet)
 {
 	xfile hFileSrc;
@@ -8204,6 +8703,7 @@ static inline int procXpkReadSolidLz4SliceAlloc(xpkObject objXpk, xpkEntry* pEnt
 	return XPK_OK;
 }
 
+// 将 Solid LZ4 条目复制到文件
 static inline int procXpkCopySolidLz4EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -8307,6 +8807,7 @@ static inline int procXpkCopySolidLz4EntryToFile(xpkObject objXpk, xpkEntry* pEn
 	return iRet;
 }
 
+// 读取并分配 Solid ZSTD 切片
 static inline int procXpkReadSolidZstdSliceAlloc(xpkObject objXpk, xpkEntry* pEntry, void** pDataRet, uint64_t* pSizeRet)
 {
 	xfile hFileSrc;
@@ -8540,6 +9041,7 @@ static inline int procXpkReadSolidZstdSliceAlloc(xpkObject objXpk, xpkEntry* pEn
 	return XPK_OK;
 }
 
+// 将 Solid ZSTD 条目复制到文件
 static inline int procXpkCopySolidZstdEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -8765,6 +9267,7 @@ static inline int procXpkCopySolidZstdEntryToFile(xpkObject objXpk, xpkEntry* pE
 	return XPK_OK;
 }
 
+// 读取并分配 Solid LZMA2 切片
 static inline int procXpkReadSolidLzma2SliceAlloc(xpkObject objXpk, xpkEntry* pEntry, void** pDataRet, uint64_t* pSizeRet)
 {
 	xfile hFileSrc;
@@ -8995,6 +9498,7 @@ static inline int procXpkReadSolidLzma2SliceAlloc(xpkObject objXpk, xpkEntry* pE
 	return XPK_OK;
 }
 
+// 将 Solid LZMA2 条目复制到文件
 static inline int procXpkCopySolidLzma2EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -9220,6 +9724,7 @@ static inline int procXpkCopySolidLzma2EntryToFile(xpkObject objXpk, xpkEntry* p
 	return XPK_OK;
 }
 
+// 读取 Solid 条目数据
 static inline void* procXpkReadSolidEntryData(xpkObject objXpk, xpkEntry* pEntry, uint64_t* pSizeRet)
 {
 	void* pFileData;
@@ -9294,6 +9799,7 @@ static inline void* procXpkReadSolidEntryData(xpkObject objXpk, xpkEntry* pEntry
 	return NULL;
 }
 
+// 将 Solid 条目复制到文件
 static inline int procXpkCopySolidEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	uint64_t iSolidSize;
@@ -9340,6 +9846,7 @@ static inline int procXpkCopySolidEntryToFile(xpkObject objXpk, xpkEntry* pEntry
 	return procXpkSetError(objXpk, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
 
+// 原样条目数据
 static inline int procXpkStoreEntryData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	uint8_t iLevel;
@@ -9379,6 +9886,7 @@ static inline int procXpkStoreEntryData(xpkObject objXpk, xpkEntry* pEntry, cons
 	return XPK_OK;
 }
 
+// 基于文件句柄读取条目数据
 static inline void* procXpkReadEntryDataWithFile(xpkObject objXpk, xpkEntry* pEntry, uint64_t* pSizeRet, xfile hFile)
 {
 	xpkWriteNode* pNode;
@@ -9517,11 +10025,13 @@ static inline void* procXpkReadEntryDataWithFile(xpkObject objXpk, xpkEntry* pEn
 	return pRawData;
 }
 
+// 读取条目数据
 static inline void* procXpkReadEntryData(xpkObject objXpk, xpkEntry* pEntry, uint64_t* pSizeRet)
 {
 	return procXpkReadEntryDataWithFile(objXpk, pEntry, pSizeRet, NULL);
 }
 
+// 刷写延迟写入队列
 static inline int procXpkFlushQueuedWrites(xpkObject objXpk, xfile hFile)
 {
 	uint32_t iNodePos;
@@ -9533,6 +10043,7 @@ static inline int procXpkFlushQueuedWrites(xpkObject objXpk, xfile hFile)
 		return XPK_OK;
 	}
 
+	// 顺序落盘队列中的压缩块，并同步回填条目的最终偏移和大小。
 	for ( iNodePos = 1; iNodePos <= objXpk->pWriteQueue->arrNode.Count; iNodePos++ ) {
 		pNode = (xpkWriteNode*)xrtArrayGet(&objXpk->pWriteQueue->arrNode, iNodePos);
 		if ( pNode == NULL ) {
@@ -9568,6 +10079,13 @@ static inline int procXpkFlushQueuedWrites(xpkObject objXpk, xfile hFile)
 
 /* ===== File: src/service/save.h ===== */
 
+/*
+	xPack 保存模块
+
+	负责将脏状态落盘，并在失败时执行回滚恢复。
+*/
+
+// 捕获刷写快照
 static inline xpkFlushSnapshot* procXpkCaptureFlushSnapshots(xpkObject objXpk, uint32_t* pCountRet)
 {
 	xpkFlushSnapshot* arrSnapshot;
@@ -9622,6 +10140,7 @@ static inline xpkFlushSnapshot* procXpkCaptureFlushSnapshots(xpkObject objXpk, u
 	return arrSnapshot;
 }
 
+// 恢复刷写快照
 static inline void procXpkRestoreFlushSnapshots(xpkObject objXpk, const xpkFlushSnapshot* arrSnapshot, uint32_t iCount, const xpkHead* pHeadSaved, uint64_t iAppendPosSaved, uint64_t iFileSizeSaved)
 {
 	xpkEntry* pEntry;
@@ -9654,6 +10173,7 @@ static inline void procXpkRestoreFlushSnapshots(xpkObject objXpk, const xpkFlush
 	}
 }
 
+// 释放保存回滚
 static inline void procXpkFreeSaveRollback(xpkSaveRollback* pRollback)
 {
 	if ( pRollback == NULL ) {
@@ -9672,6 +10192,7 @@ static inline void procXpkFreeSaveRollback(xpkSaveRollback* pRollback)
 	}
 }
 
+// 保存回滚路径复制
 static inline char* procXpkSaveRollbackPathDup(xpkObject objXpk)
 {
 	char sSuffix[96];
@@ -9717,6 +10238,7 @@ static inline char* procXpkSaveRollbackPathDup(xpkObject objXpk)
 	return NULL;
 }
 
+// 将回滚尾段写入文件
 static inline int procXpkCaptureRollbackTailToFile(xpkObject objXpk, uint64_t iOffset, uint64_t iSize, const char* sPathTail)
 {
 	xfile hFile;
@@ -9767,6 +10289,7 @@ static inline int procXpkCaptureRollbackTailToFile(xpkObject objXpk, uint64_t iO
 	return XPK_OK;
 }
 
+// 从文件恢复回滚尾段
 static inline int procXpkRestoreRollbackTailFromFile(xpkObject objXpk, const xpkSaveRollback* pRollback)
 {
 	xfile hFile;
@@ -9824,6 +10347,7 @@ static inline int procXpkRestoreRollbackTailFromFile(xpkObject objXpk, const xpk
 	return XPK_OK;
 }
 
+// 捕获保存回滚上下文
 static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* pRollback)
 {
 	void* pHeadData;
@@ -9890,6 +10414,7 @@ static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* 
 	return XPK_OK;
 }
 
+// 恢复保存回滚上下文
 static inline int procXpkRestoreSaveRollback(xpkObject objXpk, const xpkSaveRollback* pRollback)
 {
 	int iRet;
@@ -9996,6 +10521,7 @@ static inline int procXpkRestoreSaveRollback(xpkObject objXpk, const xpkSaveRoll
 	return XPK_OK;
 }
 
+// 执行保存落盘流程
 static inline int procXpkSavePackage(xpkObject objXpk)
 {
 	xfile hFile;
@@ -10019,6 +10545,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 	uint32_t iPos;
 	xpkEntry* pEntry;
 
+	// 先确认当前对象允许直接保存，布局变更需要交给 build 路径处理。
 	if ( objXpk->bReadonly ) {
 		return procXpkSetError(objXpk, XPK_ERR_READONLY, sXpkErrorReadonly);
 	}
@@ -10047,6 +10574,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 	iAppendPosSaved = objXpk->iAppendPos;
 	iFileSizeSaved = objXpk->iFileSize;
 
+	// 预编码元数据，并提前抓取刷写快照与回滚上下文，保证中途失败后还能恢复现场。
 	iRet = procXpkCodecEncode(objXpk, (uint8_t)objXpk->objHead.metaComp, objXpk->pPackageMeta, objXpk->iPackageMetaSize, &pMetaComp, &iMetaCompSize, &iMetaLevel);
 	if ( iRet != XPK_OK ) {
 		return iRet;
@@ -10098,6 +10626,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		return iRet;
 	}
 
+	// 先把延迟写入队列刷入数据区，再重新编码条目表，保证偏移信息使用的是最终值。
 	iRet = procXpkFlushQueuedWrites(objXpk, hFile);
 	if ( iRet != XPK_OK ) {
 		if ( hFile != NULL ) {
@@ -10164,6 +10693,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		return iRet;
 	}
 
+	// 组装新的包头与尾段布局，并把元数据、条目表和头部一次性落盘。
 	objXpk->objHead.fileCount = objXpk->iEntryCount;
 	objXpk->objHead.dataOffset = objXpk->iAppendPos;
 	objXpk->objHead.metaComp = iMetaLevel;
@@ -10194,6 +10724,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		iRet = procXpkWriteAt(objXpk, hFile, 0, sHeadBuf, XPK_HEAD_SIZE);
 	}
 
+	// 写盘完成后统一释放临时缓冲；失败则回滚快照和原始尾段。
 	if ( hFile != NULL ) {
 		xrtClose(hFile);
 	}
@@ -10219,6 +10750,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		return iRet;
 	}
 
+	// 保存成功后把条目状态标记为已落盘，并清理脏标记。
 	for ( iPos = 1; iPos <= objXpk->iEntryCount; iPos++ ) {
 		pEntry = (xpkEntry*)xrtArrayGet(&objXpk->arrEntry, iPos);
 		if ( pEntry != NULL ) {
@@ -10240,6 +10772,13 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 
 /* ===== File: src/service/build.h ===== */
 
+/*
+	xPack Build 重构模块
+
+	负责按目标布局重写包体、复制有效条目并处理临时文件。
+*/
+
+// 判断文件系统路径文本是否相等
 static inline int procXpkPathTextEqualFs(const char* sPathA, const char* sPathB)
 {
 	if ( sPathA == NULL || sPathB == NULL ) {
@@ -10407,6 +10946,7 @@ static inline int procXpkPathTextEqualFs(const char* sPathA, const char* sPathB)
 #endif
 }
 
+// 复制并规范化文件系统路径
 static inline char* procXpkPathNormDupFs(const char* sPath)
 {
 	size_t iLenPath;
@@ -10513,6 +11053,7 @@ static inline char* procXpkPathNormDupFs(const char* sPath)
 #endif
 }
 
+// 判断路径是否位于目录内
 static inline int procXpkPathInDirFs(xpkObject objXpk, const char* sPath, const char* sDir, int* pMatchRet)
 {
 	char* sPathNorm;
@@ -10546,6 +11087,7 @@ static inline int procXpkPathInDirFs(xpkObject objXpk, const char* sPath, const 
 	return XPK_OK;
 }
 
+// 判断路径是否属于同一分卷族
 static inline int procXpkPathIsVolumeFamilyFs(xpkObject objXpk, const char* sPath, const char* sBasePath, int* pMatchRet)
 {
 	char* sPathNorm;
@@ -10592,6 +11134,7 @@ static inline int procXpkPathIsVolumeFamilyFs(xpkObject objXpk, const char* sPat
 	return XPK_OK;
 }
 
+// 构建复制元数据
 static inline int procXpkBuildCopyMeta(xpkObject objDst, xpkObject objSrc)
 {
 	void* pMetaDup;
@@ -10611,6 +11154,7 @@ static inline int procXpkBuildCopyMeta(xpkObject objDst, xpkObject objSrc)
 	return XPK_OK;
 }
 
+// 构建复制配置
 static inline int procXpkBuildCopyConfig(xpkObject objDst, xpkObject objSrc)
 {
 	int iRet;
@@ -10633,6 +11177,7 @@ static inline int procXpkBuildCopyConfig(xpkObject objDst, xpkObject objSrc)
 	return procXpkBuildCopyMeta(objDst, objSrc);
 }
 
+// 构建复制条目路径
 static inline char* procXpkBuildDupEntryPath(xpkObject objDst, const char* sPath)
 {
 	char* sPathDup;
@@ -10662,6 +11207,7 @@ static inline char* procXpkBuildDupEntryPath(xpkObject objDst, const char* sPath
 	return NULL;
 }
 
+// 构建初始化种子
 static inline int procXpkBuildInitSeed(xpkObject objDst, const xpkEntry* pEntrySrc, xpkEntry* pSeedRet)
 {
 	memset(pSeedRet, 0, sizeof(*pSeedRet));
@@ -10690,6 +11236,7 @@ static inline int procXpkBuildInitSeed(xpkObject objDst, const xpkEntry* pEntryS
 	return XPK_OK;
 }
 
+// 构建复制条目数据
 static inline int procXpkBuildCopyEntryData(xpkObject objDst, const xpkEntry* pEntrySrc, const void* pData, uint64_t iSize)
 {
 	xpkEntry objSeed;
@@ -10732,6 +11279,7 @@ static inline int procXpkBuildCopyEntryData(xpkObject objDst, const xpkEntry* pE
 	return XPK_OK;
 }
 
+// 构建写入按位置分块
 static inline int procXpkBuildWriteAtChunked(xpkObject objDst, xfile hFile, uint64_t iOffset, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -10762,6 +11310,7 @@ static inline int procXpkBuildWriteAtChunked(xpkObject objDst, xfile hFile, uint
 	return XPK_OK;
 }
 
+// 构建清理块文件
 static inline int procXpkBuildCleanupChunkFiles(void* pChunk, xfile hFileSrc, xfile hFileDst, int iRet)
 {
 	if ( pChunk != NULL ) {
@@ -10776,6 +11325,7 @@ static inline int procXpkBuildCleanupChunkFiles(void* pChunk, xfile hFileSrc, xf
 	return iRet;
 }
 
+// 构建复制原样负载
 static inline int procXpkBuildCopyStoredPayload(xpkObject objDst, xfile hFileDst, xpkObject objSrc, xfile hFileSrc, uint64_t iOffsetDst, uint64_t iOffsetSrc, uint64_t iSize, void* pChunkShared)
 {
 	void* pChunk;
@@ -10824,6 +11374,7 @@ static inline int procXpkBuildCopyStoredPayload(xpkObject objDst, xfile hFileDst
 	return XPK_OK;
 }
 
+// 从原始数据写入 Solid ZSTD 块
 static inline int procXpkBuildWriteSolidZstdFromRaw(xpkObject objDst, const void* pData, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileTmp;
@@ -11054,6 +11605,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 构建写入原样文件分块
 static inline int procXpkBuildWritePlainFileChunked(xpkObject objDst, xfile hFile, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -11083,6 +11635,7 @@ static inline int procXpkBuildWritePlainFileChunked(xpkObject objDst, xfile hFil
 	return XPK_OK;
 }
 
+// 构建阶段 LZMA 顺序输入读取
 static inline SRes procXpkBuildLzmaSeqInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
 	xpkBuildLzmaSeqIn* pIn;
@@ -11116,6 +11669,7 @@ static inline SRes procXpkBuildLzmaSeqInRead(ISeqInStreamPtr pStream, void* pDat
 	return SZ_OK;
 }
 
+// 构建阶段 LZMA 顺序输出写入
 static inline size_t procXpkBuildLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const void* pData, size_t iSize)
 {
 	xpkBuildLzmaSeqOut* pOut;
@@ -11134,6 +11688,7 @@ static inline size_t procXpkBuildLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const
 	return iWrite;
 }
 
+// 从文件写入 Solid ZSTD 块
 static inline int procXpkBuildWriteSolidZstdFromFile(xpkObject objDst, const char* sPathSrc, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileSrc;
@@ -11394,6 +11949,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 从文件写入 Solid LZMA2 块
 static inline int procXpkBuildWriteSolidLzma2FromFile(xpkObject objDst, const char* sPathSrc, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileSrc;
@@ -11586,6 +12142,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 从文件写入 Solid LZ4 块
 static inline int procXpkBuildWriteSolidLz4FromFile(xpkObject objDst, const char* sPathSrc, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileSrc;
@@ -11785,6 +12342,7 @@ static inline int procXpkBuildWriteSolidLz4FromFile(xpkObject objDst, const char
 	return XPK_OK;
 }
 
+// 流式复制有效条目到 Solid ZSTD 目标
 static inline int procXpkBuildCopyLiveEntriesSolidZstdStreaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -11932,6 +12490,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 流式复制有效条目到 Solid LZMA2 目标
 static inline int procXpkBuildCopyLiveEntriesSolidLzma2Streaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -12079,6 +12638,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 流式复制有效条目到 Solid LZ4 目标
 static inline int procXpkBuildCopyLiveEntriesSolidLz4Streaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -12226,6 +12786,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 流式复制有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreStreaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -12390,6 +12951,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 构建追加已复制条目
 static inline int procXpkBuildAppendCopiedEntry(xpkObject objDst, const xpkEntry* pEntrySrc, uint8_t iCompLevel, uint64_t iDataOffset, uint64_t iDataSize, uint64_t iFileSize)
 {
 	xpkEntry objSeed;
@@ -12417,6 +12979,7 @@ static inline int procXpkBuildAppendCopiedEntry(xpkObject objDst, const xpkEntry
 	return XPK_OK;
 }
 
+// 构建复制条目直通带文件
 static inline int procXpkBuildCopyEntryDirectWithFiles(xpkObject objDst, xpkObject objSrc, const xpkEntry* pEntrySrc, xfile hFileDst, xfile hFileSrc, void* pChunkShared)
 {
 	xpkWriteNode* pNode;
@@ -12523,11 +13086,13 @@ static inline int procXpkBuildCopyEntryDirectWithFiles(xpkObject objDst, xpkObje
 	return XPK_OK;
 }
 
+// 构建复制条目直通
 static inline int procXpkBuildCopyEntryDirect(xpkObject objDst, xpkObject objSrc, const xpkEntry* pEntrySrc)
 {
 	return procXpkBuildCopyEntryDirectWithFiles(objDst, objSrc, pEntrySrc, NULL, NULL, NULL);
 }
 
+// 构建复制条目
 static inline int procXpkBuildCopyEntry(xpkObject objDst, xpkObject objSrc, const xpkEntry* pEntrySrc)
 {
 	void* pData;
@@ -12548,6 +13113,7 @@ static inline int procXpkBuildCopyEntry(xpkObject objDst, xpkObject objSrc, cons
 	return iRet;
 }
 
+// 构建追加条目仅
 static inline int procXpkBuildAppendEntryOnly(xpkObject objDst, const xpkEntry* pEntrySrc, uint64_t iDataOffset, uint64_t iDataSize, uint64_t iFileSize)
 {
 	xpkEntry objEntry;
@@ -12597,6 +13163,7 @@ static inline int procXpkBuildAppendEntryOnly(xpkObject objDst, const xpkEntry* 
 	return XPK_OK;
 }
 
+// 检查 Solid 原样直拷条件
 static inline int procXpkBuildCheckSolidStoreDirect(xpkObject objDst, xpkObject objSrc, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -12663,6 +13230,7 @@ static inline int procXpkBuildCheckSolidStoreDirect(xpkObject objDst, xpkObject 
 	return XPK_OK;
 }
 
+// 检查普通布局单条目 Solid 直拷条件
 static inline int procXpkBuildCheckSingleEntrySolidDirectFromNormal(xpkObject objDst, xpkObject objSrc, xpkEntry** pEntryRet, xpkWriteNode** pNodeRet, uint64_t* pCompSizeRet, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -12764,6 +13332,7 @@ static inline int procXpkBuildCheckSingleEntrySolidDirectFromNormal(xpkObject ob
 	return XPK_OK;
 }
 
+// 从普通布局直拷单条目到 Solid
 static inline int procXpkBuildCopySingleEntrySolidDirectFromNormal(xpkObject objDst, xpkObject objSrc)
 {
 	xpkEntry* pEntry;
@@ -12843,6 +13412,7 @@ static inline int procXpkBuildCopySingleEntrySolidDirectFromNormal(xpkObject obj
 	return XPK_OK;
 }
 
+// 直拷有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreDirect(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -12933,6 +13503,7 @@ static inline int procXpkBuildCopyLiveEntriesSolidStoreDirect(xpkObject objDst, 
 	return XPK_OK;
 }
 
+// 检查 Solid 直拷条件
 static inline int procXpkBuildCheckSolidDirectCopy(xpkObject objDst, xpkObject objSrc, uint64_t* pCompSizeRet, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -12983,6 +13554,7 @@ static inline int procXpkBuildCheckSolidDirectCopy(xpkObject objDst, xpkObject o
 	return XPK_OK;
 }
 
+// 直拷 Solid 数据块
 static inline int procXpkBuildCopySolidBlockDirect(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13061,6 +13633,7 @@ static inline int procXpkBuildCopySolidBlockDirect(xpkObject objDst, xpkObject o
 	return XPK_OK;
 }
 
+// 紧凑复制有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreCompact(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13158,6 +13731,7 @@ static inline int procXpkBuildCopyLiveEntriesSolidStoreCompact(xpkObject objDst,
 	return XPK_OK;
 }
 
+// 从普通布局复制有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreFromNormal(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13282,6 +13856,7 @@ static inline int procXpkBuildCopyLiveEntriesSolidStoreFromNormal(xpkObject objD
 	return XPK_OK;
 }
 
+// 复制有效条目到 Solid 目标
 static inline int procXpkBuildCopyLiveEntriesSolid(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13357,6 +13932,7 @@ static inline int procXpkBuildCopyLiveEntriesSolid(xpkObject objDst, xpkObject o
 	return procXpkSetError(objDst, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
 
+// 从 Solid 源复制有效条目
 static inline int procXpkBuildCopyLiveEntriesFromSolidSource(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13405,6 +13981,7 @@ static inline int procXpkBuildCopyLiveEntriesFromSolidSource(xpkObject objDst, x
 	return XPK_OK;
 }
 
+// 从 Solid 原样源复制有效条目
 static inline int procXpkBuildCopyLiveEntriesFromSolidStoredSource(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13507,6 +14084,7 @@ static inline int procXpkBuildCopyLiveEntriesFromSolidStoredSource(xpkObject obj
 	return XPK_OK;
 }
 
+// 检查 Solid 单条目直拷条件
 static inline int procXpkBuildCheckSolidSingleEntryDirect(xpkObject objDst, xpkObject objSrc, xpkEntry** pEntryRet, uint64_t* pCompSizeRet, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -13576,6 +14154,7 @@ static inline int procXpkBuildCheckSolidSingleEntryDirect(xpkObject objDst, xpkO
 	return XPK_OK;
 }
 
+// 直拷单个 Solid 条目
 static inline int procXpkBuildCopySingleSolidEntryDirect(xpkObject objDst, xpkObject objSrc)
 {
 	xpkEntry* pEntry;
@@ -13649,6 +14228,7 @@ static inline int procXpkBuildCopySingleSolidEntryDirect(xpkObject objDst, xpkOb
 	return XPK_OK;
 }
 
+// 构建复制有效条目
 static inline int procXpkBuildCopyLiveEntries(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -13743,6 +14323,7 @@ static inline int procXpkBuildCopyLiveEntries(xpkObject objDst, xpkObject objSrc
 	return XPK_OK;
 }
 
+// 构建生成临时路径
 static inline char* procXpkBuildMakeTempPath(xpkObject objXpk, const xpkBuildOptions* pOpt, int bReplaceOriginal)
 {
 	size_t iPathLen;
@@ -13777,6 +14358,7 @@ static inline char* procXpkBuildMakeTempPath(xpkObject objXpk, const xpkBuildOpt
 	return sTempPath;
 }
 
+// 构建确保临时路径未占用
 static inline int procXpkBuildEnsureTempPathUnused(xpkObject objXpk, const char* sTempPath)
 {
 	if ( sTempPath == NULL || sTempPath[0] == '\0' ) {
@@ -13785,6 +14367,7 @@ static inline int procXpkBuildEnsureTempPathUnused(xpkObject objXpk, const char*
 	return procXpkEnsureVolumePathUnusedText(objXpk, sTempPath, sXpkErrorTempPathExists);
 }
 
+// 构建校验选项
 static inline int procXpkBuildValidateOptions(xpkObject objXpk, const xpkBuildOptions* pOpt, int* pReplaceOriginalRet)
 {
 	int bReplaceOriginal;
@@ -13857,6 +14440,7 @@ static inline int procXpkBuildValidateOptions(xpkObject objXpk, const xpkBuildOp
 	return XPK_OK;
 }
 
+// 构建重置临时路径
 static inline int procXpkBuildResetTempPath(xpkObject objXpk, const char* sTempPath)
 {
 	int iRet;
@@ -13877,6 +14461,7 @@ static inline int procXpkBuildResetTempPath(xpkObject objXpk, const char* sTempP
 	return XPK_OK;
 }
 
+// 构建重新加载自身
 static inline int procXpkBuildReloadSelf(xpkObject objXpk)
 {
 	xpkOpenOptions objOpt;
@@ -13913,6 +14498,7 @@ static inline int procXpkBuildReloadSelf(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 执行构建重构流程
 static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* pOpt)
 {
 	int bReplaceOriginal;
@@ -13927,6 +14513,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 	size_t iBuildTextSize;
 	int iRet;
 
+	// 先校验对象状态和 build 选项，避免后续在临时路径上做出不可逆修改。
 	if ( objXpk == NULL ) {
 		return procXpkReturnParamError(objXpk);
 	}
@@ -13957,6 +14544,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 		return iRet;
 	}
 
+	// 打开临时目标包，后续所有复制与保存都先落到这个安全副本里。
 	memset(&objOpenOpt, 0, sizeof(objOpenOpt));
 	objOpenOpt.createIfMissing = TRUE;
 	objBuild = xpkOpen(sTempPath, &objOpenOpt);
@@ -13979,6 +14567,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 	sBuildError[0] = '\0';
 	sFinalPath = NULL;
 
+	// 先复制包级配置，再复制有效条目，最后把临时包完整保存下来。
 	iRet = procXpkBuildCopyConfig(objBuild, objXpk);
 	if ( iRet == XPK_OK ) {
 		iRet = procXpkBuildCopyLiveEntries(objBuild, objXpk);
@@ -14012,6 +14601,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 		return procXpkSetError(objXpk, iRet, sBuildError);
 	}
 
+	// 非替换模式直接保留临时产物；替换模式则继续把结果移动回原路径。
 	if ( !bReplaceOriginal ) {
 		xpkClose(objBuild);
 		xpkFreeInternal(sTempPath);
@@ -14040,6 +14630,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 		return procXpkSetError(objXpk, iRet, sReplaceError);
 	}
 
+	// 用新构建对象接管当前运行时状态，避免再走一次完整重开流程。
 	sFinalPath = procXpkDupText(objXpk->sPathPackage);
 	if ( sFinalPath == NULL ) {
 		xpkClose(objBuild);
@@ -14066,6 +14657,13 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 
 /* ===== File: src/service/verify.h ===== */
 
+/*
+	xPack 校验与统计模块
+
+	负责条目校验、整包校验以及当前统计信息计算。
+*/
+
+// 哈希映射文件范围
 static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint64_t iSize, uint32_t* pHashRet)
 {
 	xpkMappedFile objMap;
@@ -14091,6 +14689,7 @@ static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint
 	return XPK_OK;
 }
 
+// 校验哈希匹配
 static inline int procXpkVerifyHashMatch(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint64_t iSize)
 {
 	uint32_t iHash;
@@ -14111,6 +14710,7 @@ static inline int procXpkVerifyHashMatch(xpkObject objXpk, xpkEntry* pEntry, con
 	return XPK_OK;
 }
 
+// 校验 Solid 条目
 static inline int procXpkVerifySolidEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
 	void* pData;
@@ -14171,11 +14771,13 @@ static inline int procXpkVerifySolidEntry(xpkObject objXpk, xpkEntry* pEntry)
 	return procXpkSetError(objXpk, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
 
+// 校验原样条目
 static inline int procXpkVerifyStoredEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
 	return procXpkVerifyStoredEntryWithFile(objXpk, pEntry, NULL);
 }
 
+// 校验原样条目带文件
 static inline int procXpkVerifyStoredEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile)
 {
 	xpkWriteNode* pNode;
@@ -14259,6 +14861,7 @@ static inline int procXpkVerifyStoredEntryWithFile(xpkObject objXpk, xpkEntry* p
 	return iRet;
 }
 
+// 校验原样条目映射
 static inline int procXpkVerifyStoredEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap)
 {
 	uint64_t iDataEnd;
@@ -14289,6 +14892,7 @@ static inline int procXpkVerifyStoredEntryMapped(xpkObject objXpk, xpkEntry* pEn
 	return procXpkVerifyHashMatch(objXpk, pEntry, (const uint8_t*)pMap->pView + pEntry->iDataOffset, pEntry->iDataSize);
 }
 
+// 基于文件句柄校验解码条目
 static inline int procXpkVerifyDecodedEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile)
 {
 	xpkWriteNode* pNode;
@@ -14339,6 +14943,7 @@ static inline int procXpkVerifyDecodedEntryWithFile(xpkObject objXpk, xpkEntry* 
 	return iRet;
 }
 
+// 基于映射校验解码条目
 static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap)
 {
 	void* pData;
@@ -14379,6 +14984,7 @@ static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pE
 	return iRet;
 }
 
+// 校验全部确保数据文件
 static inline int procXpkVerifyAllEnsureDataFile(xpkObject objXpk, xfile* pFileRet)
 {
 	if ( objXpk == NULL || pFileRet == NULL ) {
@@ -14399,6 +15005,7 @@ static inline int procXpkVerifyAllEnsureDataFile(xpkObject objXpk, xfile* pFileR
 	return XPK_OK;
 }
 
+// 校验条目
 static inline int procXpkVerifyEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
 	if ( objXpk == NULL || pEntry == NULL ) {
@@ -14417,6 +15024,7 @@ static inline int procXpkVerifyEntry(xpkObject objXpk, xpkEntry* pEntry)
 	return procXpkVerifyDecodedEntryWithFile(objXpk, pEntry, NULL);
 }
 
+// 逐条校验全部 Solid 压缩条目
 static inline int procXpkVerifyAllSolidCompressedEntriesByEntry(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -14455,6 +15063,7 @@ static inline int procXpkVerifyAllSolidCompressedEntriesByEntry(xpkObject objXpk
 	return XPK_OK;
 }
 
+// 基于映射校验全部 Solid 原样条目
 static inline int procXpkVerifyAllSolidStoredEntriesMapped(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -14536,6 +15145,7 @@ static inline int procXpkVerifyAllSolidStoredEntriesMapped(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 逐条校验全部 Solid 原样条目
 static inline int procXpkVerifyAllSolidStoredEntriesByEntry(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -14574,6 +15184,7 @@ static inline int procXpkVerifyAllSolidStoredEntriesByEntry(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 校验全部条目
 static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -14583,6 +15194,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 	xpkMappedFile objMapData;
 	int iRet;
 
+	// 先处理对象状态和 solid 专用校验路径，这些分支能避免通用逐条遍历。
 	if ( objXpk == NULL ) {
 		return procXpkReturnParamError(objXpk);
 	}
@@ -14609,6 +15221,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 	hFileData = NULL;
 	memset(&objMapData, 0, sizeof(objMapData));
 
+	// 普通布局下复用同一个数据文件句柄和映射视图，避免每个条目都重复打开文件。
 	for ( iPos = 1; iPos <= objXpk->iEntryCount; iPos++ ) {
 		pEntry = (xpkEntry*)xrtArrayGet(&objXpk->arrEntry, iPos);
 		if ( pEntry == NULL ) {
@@ -14652,6 +15265,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 			}
 		}
 
+		// 按条目当前存储形态选择原样校验或解码校验路径。
 		if ( (pEntry->iFlag & XPK_FLAG_COMP_MASK) == 0 ) {
 			if ( pNode == NULL && objMapData.pView != NULL ) {
 				iRet = procXpkVerifyStoredEntryMapped(objXpk, pEntry, &objMapData);
@@ -14674,6 +15288,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 		}
 	}
 
+	// 校验成功后统一释放共享资源并清理错误状态。
 	procXpkUnmapFile(&objMapData);
 	if ( hFileData != NULL ) {
 		xrtClose(hFileData);
@@ -14682,6 +15297,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 计算当前元数据字节数
 static inline int procXpkCalcCurrentMetaBytes(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	void* pMetaComp;
@@ -14709,6 +15325,7 @@ static inline int procXpkCalcCurrentMetaBytes(xpkObject objXpk, uint64_t* pSizeR
 	return XPK_OK;
 }
 
+// 计算当前条目字节数
 static inline int procXpkCalcCurrentEntryBytes(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	void* pEntryRaw;
@@ -14749,6 +15366,7 @@ static inline int procXpkCalcCurrentEntryBytes(xpkObject objXpk, uint64_t* pSize
 	return XPK_OK;
 }
 
+// 统计当前
 static inline int procXpkStatCurrent(xpkObject objXpk, xpkStat* pStatRet)
 {
 	uint32_t iPos;
@@ -14835,6 +15453,13 @@ static inline int procXpkStatCurrent(xpkObject objXpk, xpkStat* pStatRet)
 
 /* ===== File: src/service/each.h ===== */
 
+/*
+	xPack 遍历服务模块
+
+	负责按类型填充公开信息，并支持遍历与模式匹配。
+*/
+
+// 填充 Core 条目信息
 static inline void procXpkFillInfoCore(const xpkEntry* pEntry, xpkFileInfo* pInfoRet)
 {
 	memset(pInfoRet, 0, sizeof(*pInfoRet));
@@ -14845,6 +15470,7 @@ static inline void procXpkFillInfoCore(const xpkEntry* pEntry, xpkFileInfo* pInf
 	pInfoRet->fileSize = pEntry->iFileSize;
 }
 
+// 填充索引条目信息
 static inline void procXpkFillInfoIndex(const xpkEntry* pEntry, xpkFileInfoIndex* pInfoRet)
 {
 	memset(pInfoRet, 0, sizeof(*pInfoRet));
@@ -14856,6 +15482,7 @@ static inline void procXpkFillInfoIndex(const xpkEntry* pEntry, xpkFileInfoIndex
 	pInfoRet->fileIndex = pEntry->iFileIndex;
 }
 
+// 填充信息路径
 static inline void procXpkFillInfoPath(const xpkEntry* pEntry, xpkFileInfoPath* pInfoRet)
 {
 	size_t iPathLen;
@@ -14879,6 +15506,7 @@ static inline void procXpkFillInfoPath(const xpkEntry* pEntry, xpkFileInfoPath* 
 	pInfoRet->accessTime = pEntry->tAccessTime;
 }
 
+// 条目匹配键
 static inline const char* procXpkEntryMatchKey(xpkObject objXpk, const xpkEntry* pEntry, char sBuf[64], int* pCaseRet)
 {
 	if ( pCaseRet != NULL ) {
@@ -14900,6 +15528,7 @@ static inline const char* procXpkEntryMatchKey(xpkObject objXpk, const xpkEntry*
 	return sBuf;
 }
 
+// 模式匹配条目
 static inline int procXpkPatternMatchEntry(xpkObject objXpk, const xpkEntry* pEntry, const char* sPattern)
 {
 	char sBuf[64];
@@ -14918,6 +15547,7 @@ static inline int procXpkPatternMatchEntry(xpkObject objXpk, const xpkEntry* pEn
 	return xrtStrLike((str)sKey, 0, (str)sPattern, 0, bCase) ? TRUE : FALSE;
 }
 
+// 调用遍历回调
 static inline int procXpkEachInvoke(xpkObject objXpk, const xpkEntry* pEntry, xpkEachProc procEach, void* pArg)
 {
 	xpkFileInfo objInfo;
@@ -14946,6 +15576,7 @@ static inline int procXpkEachInvoke(xpkObject objXpk, const xpkEntry* pEntry, xp
 	return procEach(objXpk, pEntry->iPos, &objInfo, pArg);
 }
 
+// 遍历条目并执行回调
 static inline int procXpkEachWalk(xpkObject objXpk, const char* sPattern, xpkEachProc procEach, void* pArg)
 {
 	uint32_t iPos;
@@ -14993,6 +15624,13 @@ static inline int procXpkEachWalk(xpkObject objXpk, const char* sPattern, xpkEac
 
 /* ===== File: src/api/package_api.h ===== */
 
+/*
+	xPack 包级 API 实现
+
+	负责包对象生命周期、全局配置和元数据接口。
+*/
+
+// 确保包对象处于可修改状态
 static inline int procXpkEnsurePackageMutable(xpkObject objXpk)
 {
 	int iRet;
@@ -15007,6 +15645,7 @@ static inline int procXpkEnsurePackageMutable(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 打开包对象
 XPKAPI xpkObject xpkOpen(const char* sPackagePath, const xpkOpenOptions* pOpt)
 {
 	xpkObject objXpk;
@@ -15042,6 +15681,7 @@ XPKAPI xpkObject xpkOpen(const char* sPackagePath, const xpkOpenOptions* pOpt)
 	return objXpk;
 }
 
+// 关闭包对象
 XPKAPI int xpkClose(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -15055,6 +15695,7 @@ XPKAPI int xpkClose(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 保存当前包状态
 XPKAPI int xpkSave(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -15063,6 +15704,7 @@ XPKAPI int xpkSave(xpkObject objXpk)
 	return procXpkSavePackage(objXpk);
 }
 
+// 按目标布局重构包文件
 XPKAPI int xpkBuild(xpkObject objXpk, const xpkBuildOptions* pOpt)
 {
 	if ( objXpk == NULL ) {
@@ -15071,6 +15713,7 @@ XPKAPI int xpkBuild(xpkObject objXpk, const xpkBuildOptions* pOpt)
 	return procXpkBuildPackage(objXpk, pOpt);
 }
 
+// 获取包类型
 XPKAPI int xpkGetPackType(xpkObject objXpk, xpkPackType* pTypeRet)
 {
 	if ( objXpk == NULL ) {
@@ -15084,6 +15727,7 @@ XPKAPI int xpkGetPackType(xpkObject objXpk, xpkPackType* pTypeRet)
 	return XPK_OK;
 }
 
+// 设置包类型
 XPKAPI int xpkSetPackType(xpkObject objXpk, xpkPackType iType)
 {
 	int iRet;
@@ -15112,6 +15756,7 @@ XPKAPI int xpkSetPackType(xpkObject objXpk, xpkPackType iType)
 	return XPK_OK;
 }
 
+// 获取默认压缩级别
 XPKAPI int xpkGetDefaultComp(xpkObject objXpk, uint8_t* pLevelRet)
 {
 	if ( objXpk == NULL ) {
@@ -15125,6 +15770,7 @@ XPKAPI int xpkGetDefaultComp(xpkObject objXpk, uint8_t* pLevelRet)
 	return XPK_OK;
 }
 
+// 设置默认压缩级别
 XPKAPI int xpkSetDefaultComp(xpkObject objXpk, uint8_t iLevel)
 {
 	int iRet;
@@ -15145,6 +15791,7 @@ XPKAPI int xpkSetDefaultComp(xpkObject objXpk, uint8_t iLevel)
 	return XPK_OK;
 }
 
+// 获取元数据压缩级别
 XPKAPI int xpkGetMetaComp(xpkObject objXpk, uint8_t* pLevelRet)
 {
 	if ( objXpk == NULL ) {
@@ -15158,6 +15805,7 @@ XPKAPI int xpkGetMetaComp(xpkObject objXpk, uint8_t* pLevelRet)
 	return XPK_OK;
 }
 
+// 设置元数据压缩级别
 XPKAPI int xpkSetMetaComp(xpkObject objXpk, uint8_t iLevel)
 {
 	int iRet;
@@ -15178,6 +15826,7 @@ XPKAPI int xpkSetMetaComp(xpkObject objXpk, uint8_t iLevel)
 	return XPK_OK;
 }
 
+// 获取条目表压缩级别
 XPKAPI int xpkGetInfoComp(xpkObject objXpk, uint8_t* pLevelRet)
 {
 	if ( objXpk == NULL ) {
@@ -15191,6 +15840,7 @@ XPKAPI int xpkGetInfoComp(xpkObject objXpk, uint8_t* pLevelRet)
 	return XPK_OK;
 }
 
+// 设置条目表压缩级别
 XPKAPI int xpkSetInfoComp(xpkObject objXpk, uint8_t iLevel)
 {
 	int iRet;
@@ -15211,6 +15861,7 @@ XPKAPI int xpkSetInfoComp(xpkObject objXpk, uint8_t iLevel)
 	return XPK_OK;
 }
 
+// 获取信息扩展大小
 XPKAPI int xpkGetInfoExtSize(xpkObject objXpk, uint32_t* pSizeRet)
 {
 	if ( objXpk == NULL ) {
@@ -15224,6 +15875,7 @@ XPKAPI int xpkGetInfoExtSize(xpkObject objXpk, uint32_t* pSizeRet)
 	return XPK_OK;
 }
 
+// 设置信息扩展大小
 XPKAPI int xpkSetInfoExtSize(xpkObject objXpk, uint32_t iSize)
 {
 	int iRet;
@@ -15255,6 +15907,7 @@ XPKAPI int xpkSetInfoExtSize(xpkObject objXpk, uint32_t iSize)
 	return XPK_OK;
 }
 
+// 获取分卷大小
 XPKAPI int xpkGetVolumeSize(xpkObject objXpk, uint32_t* pSizeRet)
 {
 	if ( objXpk == NULL ) {
@@ -15268,6 +15921,7 @@ XPKAPI int xpkGetVolumeSize(xpkObject objXpk, uint32_t* pSizeRet)
 	return XPK_OK;
 }
 
+// 设置分卷大小
 XPKAPI int xpkSetVolumeSize(xpkObject objXpk, uint32_t iSize)
 {
 	int iRet;
@@ -15293,6 +15947,7 @@ XPKAPI int xpkSetVolumeSize(xpkObject objXpk, uint32_t iSize)
 	return XPK_OK;
 }
 
+// 获取 Solid 模式
 XPKAPI int xpkGetSolidMode(xpkObject objXpk, int* pEnabledRet)
 {
 	if ( objXpk == NULL ) {
@@ -15306,6 +15961,7 @@ XPKAPI int xpkGetSolidMode(xpkObject objXpk, int* pEnabledRet)
 	return XPK_OK;
 }
 
+// 设置 Solid 模式
 XPKAPI int xpkSetSolidMode(xpkObject objXpk, int bEnabled)
 {
 	int iRet;
@@ -15326,6 +15982,7 @@ XPKAPI int xpkSetSolidMode(xpkObject objXpk, int bEnabled)
 	return XPK_OK;
 }
 
+// 获取包元数据
 XPKAPI void* xpkMetaGet(xpkObject objXpk, uint32_t* pSizeRet)
 {
 	void* pRet;
@@ -15355,6 +16012,7 @@ XPKAPI void* xpkMetaGet(xpkObject objXpk, uint32_t* pSizeRet)
 	return pRet;
 }
 
+// 设置包元数据
 XPKAPI int xpkMetaSet(xpkObject objXpk, const void* pData, uint32_t iSize, uint8_t iCompLevel)
 {
 	void* pMetaNew;
@@ -15395,6 +16053,7 @@ XPKAPI int xpkMetaSet(xpkObject objXpk, const void* pData, uint32_t iSize, uint8
 	return XPK_OK;
 }
 
+// 清空包元数据
 XPKAPI int xpkMetaClear(xpkObject objXpk)
 {
 	int iRet;
@@ -15420,6 +16079,13 @@ XPKAPI int xpkMetaClear(xpkObject objXpk)
 
 /* ===== File: src/api/default_api.h ===== */
 
+/*
+	xPack 默认位置 API 实现
+
+	负责按位置访问条目的增删改查与读写。
+*/
+
+// 移除未保存条目
 static inline int procXpkRemoveUnsavedEntry(xpkObject objXpk, uint32_t iPos)
 {
 	xpkEntry* pEntry;
@@ -15467,6 +16133,7 @@ static inline int procXpkRemoveUnsavedEntry(xpkObject objXpk, uint32_t iPos)
 	return XPK_OK;
 }
 
+// 添加内存数据条目
 static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	xpkEntry objEntry;
@@ -15476,6 +16143,8 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 	if ( pPosRet != NULL ) {
 		*pPosRet = 0;
 	}
+
+	// 先校验对象状态、写权限和输入参数，避免后面进入半完成状态。
 	if ( objXpk == NULL ) {
 		return procXpkReturnParamError(objXpk);
 	}
@@ -15490,6 +16159,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 	}
 
+	// 根据种子条目复制可继承字段，并按包类型补齐扩展信息缓冲。
 	memset(&objEntry, 0, sizeof(objEntry));
 	if ( pEntrySeed != NULL ) {
 		objEntry = *pEntrySeed;
@@ -15524,6 +16194,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 		objEntry.iFlag = (objEntry.iFlag & ~XPK_FLAG_TYPE_MASK) | (((uint32_t)pOpt->fileType & 0x0Fu) << 4);
 	}
 
+	// 先把条目挂到数组里，再写入真实数据；这样出错时可以统一走回滚路径。
 	iRet = procXpkAppendEntryOwned(objXpk, &objEntry);
 	if ( iRet != XPK_OK ) {
 		procXpkFreeEntryOwned(&objEntry);
@@ -15541,6 +16212,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 		return iRet;
 	}
 
+	// 数据落盘成功后重建查找表，确保位置、路径和索引视图保持一致。
 	iRet = procXpkRebuildLookup(objXpk);
 	if ( iRet != XPK_OK ) {
 		procXpkRemoveUnsavedEntry(objXpk, pEntry->iPos);
@@ -15553,6 +16225,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 	return XPK_OK;
 }
 
+// 写入文件来源条目
 static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xfile hFile;
@@ -15569,11 +16242,14 @@ static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, cons
 		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 	}
 
+	// 先解析压缩级别和写入策略，后面的分发完全由这两个维度决定。
 	iRet = procXpkResolveCompLevel(objXpk, pOpt, &iLevel);
 	if ( iRet != XPK_OK ) {
 		return iRet;
 	}
 	iWritePolicy = procXpkResolveWritePolicy(objXpk, pOpt);
+
+	// 根据算法和写入策略分发到专用实现，避免所有路径都退回到单一的大内存方案。
 	if ( iLevel == 0 && iWritePolicy == XPK_WRITE_IMMEDIATE ) {
 		iRet = procXpkWriteImmediateStoreFile(objXpk, pEntry, sSrcPath);
 		if ( iRet != XPK_OK ) {
@@ -15665,6 +16341,8 @@ static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, cons
 	hFile = NULL;
 	memset(&objMap, 0, sizeof(objMap));
 	iSize = 0;
+
+	// 统一回落到“源文件映射 -> 通用写入入口”路径，覆盖剩余组合分支。
 	iRet = procXpkOpenMappedSourceFile(objXpk, sSrcPath, &hFile, &iSize, &objMap);
 	if ( iRet != XPK_OK ) {
 		return iRet;
@@ -15676,6 +16354,7 @@ static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, cons
 	return iRet;
 }
 
+// 添加文件来源条目
 static inline int procXpkAddFileEntry(xpkObject objXpk, xpkEntry* pEntrySeed, const char* sSrcPath, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	xpkEntry objEntry;
@@ -15762,6 +16441,7 @@ static inline int procXpkAddFileEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 	return XPK_OK;
 }
 
+// 更新内存数据条目
 static inline int procXpkUpdateEntryData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	uint32_t iFlagOld;
@@ -15790,6 +16470,7 @@ static inline int procXpkUpdateEntryData(xpkObject objXpk, xpkEntry* pEntry, con
 	return XPK_OK;
 }
 
+// 更新文件来源条目
 static inline int procXpkUpdateEntryFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	uint32_t iFlagOld;
@@ -15818,6 +16499,7 @@ static inline int procXpkUpdateEntryFile(xpkObject objXpk, xpkEntry* pEntry, con
 	return XPK_OK;
 }
 
+// 校验公开位置访问是否合法
 static inline int procXpkValidatePublicPosAccess(xpkObject objXpk, xpkEntry* pEntry)
 {
 	if ( objXpk == NULL || pEntry == NULL ) {
@@ -15829,6 +16511,7 @@ static inline int procXpkValidatePublicPosAccess(xpkObject objXpk, xpkEntry* pEn
 	return procXpkValidateLiveEntryLookup(objXpk, pEntry);
 }
 
+// 获取可见条目数量
 XPKAPI uint32_t xpkCount(xpkObject objXpk)
 {
 	uint32_t iCount;
@@ -15843,6 +16526,7 @@ XPKAPI uint32_t xpkCount(xpkObject objXpk)
 	return iCount;
 }
 
+// 获取位置条目信息
 XPKAPI int xpkGetInfo(xpkObject objXpk, uint32_t iPos, xpkFileInfo* pInfoRet)
 {
 	xpkEntry* pEntry;
@@ -15874,6 +16558,7 @@ XPKAPI int xpkGetInfo(xpkObject objXpk, uint32_t iPos, xpkFileInfo* pInfoRet)
 	return XPK_OK;
 }
 
+// 获取位置条目扩展信息
 XPKAPI int xpkGetInfoExt(xpkObject objXpk, uint32_t iPos, void* pDataRet, uint32_t iSize)
 {
 	xpkEntry* pEntry;
@@ -15910,6 +16595,7 @@ XPKAPI int xpkGetInfoExt(xpkObject objXpk, uint32_t iPos, void* pDataRet, uint32
 	return XPK_OK;
 }
 
+// 设置位置条目扩展信息
 XPKAPI int xpkSetInfoExt(xpkObject objXpk, uint32_t iPos, const void* pData, uint32_t iSize)
 {
 	xpkEntry* pEntry;
@@ -15960,6 +16646,7 @@ XPKAPI int xpkSetInfoExt(xpkObject objXpk, uint32_t iPos, const void* pData, uin
 	return XPK_OK;
 }
 
+// 按位置添加文件条目
 XPKAPI int xpkAddFile(xpkObject objXpk, const char* sSrcPath, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	int iRet;
@@ -15983,6 +16670,7 @@ XPKAPI int xpkAddFile(xpkObject objXpk, const char* sSrcPath, const xpkWriteOpti
 	return procXpkAddFileEntry(objXpk, NULL, sSrcPath, pOpt, pPosRet);
 }
 
+// 按位置添加内存数据条目
 XPKAPI int xpkAddData(xpkObject objXpk, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	int iRet;
@@ -16003,6 +16691,7 @@ XPKAPI int xpkAddData(xpkObject objXpk, const void* pData, uint64_t iSize, const
 	return procXpkAddDataEntry(objXpk, NULL, pData, iSize, pOpt, pPosRet);
 }
 
+// 按位置读取条目到文件
 XPKAPI int xpkReadToFile(xpkObject objXpk, uint32_t iPos, const char* sDstPath)
 {
 	xpkEntry* pEntry;
@@ -16065,6 +16754,7 @@ XPKAPI int xpkReadToFile(xpkObject objXpk, uint32_t iPos, const char* sDstPath)
 	return iRet;
 }
 
+// 按位置读取条目到内存
 XPKAPI void* xpkReadToMemory(xpkObject objXpk, uint32_t iPos, uint64_t* pSizeRet)
 {
 	xpkEntry* pEntry;
@@ -16090,6 +16780,7 @@ XPKAPI void* xpkReadToMemory(xpkObject objXpk, uint32_t iPos, uint64_t* pSizeRet
 	return procXpkReadEntryData(objXpk, pEntry, pSizeRet);
 }
 
+// 按位置更新文件条目
 XPKAPI int xpkUpdateFile(xpkObject objXpk, uint32_t iPos, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -16120,6 +16811,7 @@ XPKAPI int xpkUpdateFile(xpkObject objXpk, uint32_t iPos, const char* sSrcPath, 
 	return procXpkUpdateEntryFile(objXpk, pEntry, sSrcPath, pOpt);
 }
 
+// 按位置更新内存数据条目
 XPKAPI int xpkUpdateData(xpkObject objXpk, uint32_t iPos, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -16148,6 +16840,7 @@ XPKAPI int xpkUpdateData(xpkObject objXpk, uint32_t iPos, const void* pData, uin
 	return procXpkUpdateEntryData(objXpk, pEntry, pData, iSize, pOpt);
 }
 
+// 按位置移除条目
 XPKAPI int xpkRemove(xpkObject objXpk, uint32_t iPos)
 {
 	xpkEntry* pEntry;
@@ -16200,6 +16893,7 @@ XPKAPI int xpkRemove(xpkObject objXpk, uint32_t iPos)
 	return XPK_OK;
 }
 
+// 按位置设置条目标记
 XPKAPI int xpkSetFlag(xpkObject objXpk, uint32_t iPos, uint32_t iMask, uint32_t iValue)
 {
 	xpkEntry* pEntry;
@@ -16250,6 +16944,13 @@ XPKAPI int xpkSetFlag(xpkObject objXpk, uint32_t iPos, uint32_t iMask, uint32_t 
 
 /* ===== File: src/api/index_api.h ===== */
 
+/*
+	xPack 索引 API 实现
+
+	负责按 fileIndex 访问条目的增删改查。
+*/
+
+// 查找索引条目
 static inline xpkEntry* procXpkLookupIndexEntry(xpkObject objXpk, int64_t iFileIndex)
 {
 	uint32_t iPos;
@@ -16291,6 +16992,7 @@ static inline xpkEntry* procXpkLookupIndexEntry(xpkObject objXpk, int64_t iFileI
 	return pEntry;
 }
 
+// 按索引查找条目位置
 XPKAPI int xpkIndexFind(xpkObject objXpk, int64_t iFileIndex, uint32_t* pPosRet)
 {
 	xpkEntry* pEntry;
@@ -16322,6 +17024,7 @@ XPKAPI int xpkIndexFind(xpkObject objXpk, int64_t iFileIndex, uint32_t* pPosRet)
 	return XPK_OK;
 }
 
+// 按索引获取条目信息
 XPKAPI int xpkIndexGetInfo(xpkObject objXpk, int64_t iFileIndex, xpkFileInfoIndex* pInfoRet)
 {
 	xpkEntry* pEntry;
@@ -16357,6 +17060,7 @@ XPKAPI int xpkIndexGetInfo(xpkObject objXpk, int64_t iFileIndex, xpkFileInfoInde
 	return XPK_OK;
 }
 
+// 按索引添加文件条目
 XPKAPI int xpkIndexAddFile(xpkObject objXpk, int64_t iFileIndex, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -16389,6 +17093,7 @@ XPKAPI int xpkIndexAddFile(xpkObject objXpk, int64_t iFileIndex, const char* sSr
 	return procXpkAddFileEntry(objXpk, &objEntry, sSrcPath, pOpt, NULL);
 }
 
+// 按索引添加内存数据条目
 XPKAPI int xpkIndexAddData(xpkObject objXpk, int64_t iFileIndex, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -16421,6 +17126,7 @@ XPKAPI int xpkIndexAddData(xpkObject objXpk, int64_t iFileIndex, const void* pDa
 	return procXpkAddDataEntry(objXpk, &objEntry, pData, iSize, pOpt, NULL);
 }
 
+// 按索引读取条目到文件
 XPKAPI int xpkIndexReadToFile(xpkObject objXpk, int64_t iFileIndex, const char* sDstPath)
 {
 	uint32_t iPos;
@@ -16443,6 +17149,7 @@ XPKAPI int xpkIndexReadToFile(xpkObject objXpk, int64_t iFileIndex, const char* 
 	return xpkReadToFile(objXpk, iPos, sDstPath);
 }
 
+// 按索引读取条目到内存
 XPKAPI void* xpkIndexReadToMemory(xpkObject objXpk, int64_t iFileIndex, uint64_t* pSizeRet)
 {
 	uint32_t iPos;
@@ -16456,6 +17163,7 @@ XPKAPI void* xpkIndexReadToMemory(xpkObject objXpk, int64_t iFileIndex, uint64_t
 	return xpkReadToMemory(objXpk, iPos, pSizeRet);
 }
 
+// 按索引更新文件条目
 XPKAPI int xpkIndexUpdateFile(xpkObject objXpk, int64_t iFileIndex, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	uint32_t iPos;
@@ -16482,6 +17190,7 @@ XPKAPI int xpkIndexUpdateFile(xpkObject objXpk, int64_t iFileIndex, const char* 
 	return xpkUpdateFile(objXpk, iPos, sSrcPath, pOpt);
 }
 
+// 按索引更新内存数据条目
 XPKAPI int xpkIndexUpdateData(xpkObject objXpk, int64_t iFileIndex, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	uint32_t iPos;
@@ -16508,6 +17217,7 @@ XPKAPI int xpkIndexUpdateData(xpkObject objXpk, int64_t iFileIndex, const void* 
 	return xpkUpdateData(objXpk, iPos, pData, iSize, pOpt);
 }
 
+// 按索引移除条目
 XPKAPI int xpkIndexRemove(xpkObject objXpk, int64_t iFileIndex)
 {
 	uint32_t iPos;
@@ -16531,6 +17241,7 @@ XPKAPI int xpkIndexRemove(xpkObject objXpk, int64_t iFileIndex)
 	return xpkRemove(objXpk, iPos);
 }
 
+// 按索引设置条目标记
 XPKAPI int xpkIndexSetFlag(xpkObject objXpk, int64_t iFileIndex, uint32_t iMask, uint32_t iValue)
 {
 	uint32_t iPos;
@@ -16557,6 +17268,13 @@ XPKAPI int xpkIndexSetFlag(xpkObject objXpk, int64_t iFileIndex, uint32_t iMask,
 
 /* ===== File: src/api/path_api.h ===== */
 
+/*
+	xPack 路径 API 实现
+
+	负责按包内路径访问条目的增删改查与属性操作。
+*/
+
+// 按路径检查条目是否存在
 XPKAPI int xpkPathExists(xpkObject objXpk, const char* sPackagePath)
 {
 	xpkEntry* pEntry;
@@ -16588,6 +17306,7 @@ XPKAPI int xpkPathExists(xpkObject objXpk, const char* sPackagePath)
 	return TRUE;
 }
 
+// 按路径获取条目信息
 XPKAPI int xpkPathGetInfo(xpkObject objXpk, const char* sPackagePath, xpkFileInfoPath* pInfoRet)
 {
 	xpkEntry* pEntry;
@@ -16637,6 +17356,7 @@ XPKAPI int xpkPathGetInfo(xpkObject objXpk, const char* sPackagePath, xpkFileInf
 	return XPK_OK;
 }
 
+// 按路径添加文件条目
 XPKAPI int xpkPathAddFile(xpkObject objXpk, const char* sPackagePath, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -16682,6 +17402,7 @@ XPKAPI int xpkPathAddFile(xpkObject objXpk, const char* sPackagePath, const char
 	return iRet;
 }
 
+// 按路径添加内存数据条目
 XPKAPI int xpkPathAddData(xpkObject objXpk, const char* sPackagePath, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -16727,6 +17448,7 @@ XPKAPI int xpkPathAddData(xpkObject objXpk, const char* sPackagePath, const void
 	return iRet;
 }
 
+// 按路径读取条目到文件
 XPKAPI int xpkPathReadToFile(xpkObject objXpk, const char* sPackagePath, const char* sDstPath)
 {
 	xpkEntry* pEntry;
@@ -16756,6 +17478,7 @@ XPKAPI int xpkPathReadToFile(xpkObject objXpk, const char* sPackagePath, const c
 	return xpkReadToFile(objXpk, pEntry->iPos, sDstPath);
 }
 
+// 按路径读取条目到内存
 XPKAPI void* xpkPathReadToMemory(xpkObject objXpk, const char* sPackagePath, uint64_t* pSizeRet)
 {
 	xpkEntry* pEntry;
@@ -16788,6 +17511,7 @@ XPKAPI void* xpkPathReadToMemory(xpkObject objXpk, const char* sPackagePath, uin
 	return xpkReadToMemory(objXpk, pEntry->iPos, pSizeRet);
 }
 
+// 按路径更新文件条目
 XPKAPI int xpkPathUpdateFile(xpkObject objXpk, const char* sPackagePath, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -16821,6 +17545,7 @@ XPKAPI int xpkPathUpdateFile(xpkObject objXpk, const char* sPackagePath, const c
 	return xpkUpdateFile(objXpk, pEntry->iPos, sSrcPath, pOpt);
 }
 
+// 按路径更新内存数据条目
 XPKAPI int xpkPathUpdateData(xpkObject objXpk, const char* sPackagePath, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -16854,6 +17579,7 @@ XPKAPI int xpkPathUpdateData(xpkObject objXpk, const char* sPackagePath, const v
 	return xpkUpdateData(objXpk, pEntry->iPos, pData, iSize, pOpt);
 }
 
+// 按路径重命名条目
 XPKAPI int xpkPathRename(xpkObject objXpk, const char* sPathOld, const char* sPathNew)
 {
 	xpkEntry* pEntry;
@@ -16927,6 +17653,7 @@ XPKAPI int xpkPathRename(xpkObject objXpk, const char* sPathOld, const char* sPa
 	return XPK_OK;
 }
 
+// 按路径移除条目
 XPKAPI int xpkPathRemove(xpkObject objXpk, const char* sPackagePath)
 {
 	xpkEntry* pEntry;
@@ -16957,6 +17684,7 @@ XPKAPI int xpkPathRemove(xpkObject objXpk, const char* sPackagePath)
 	return xpkRemove(objXpk, pEntry->iPos);
 }
 
+// 按路径设置平台属性
 XPKAPI int xpkPathSetAttr(xpkObject objXpk, const char* sPackagePath, uint32_t iPlatformAttr)
 {
 	xpkEntry* pEntry;
@@ -16995,6 +17723,13 @@ XPKAPI int xpkPathSetAttr(xpkObject objXpk, const char* sPackagePath, uint32_t i
 
 /* ===== File: src/api/admin_api.h ===== */
 
+/*
+	xPack 管理 API 实现
+
+	负责遍历、校验、统计、内存释放与错误查询接口。
+*/
+
+// 遍历全部可见条目
 XPKAPI int xpkEach(xpkObject objXpk, xpkEachProc procEach, void* pArg)
 {
 	if ( objXpk == NULL ) {
@@ -17003,6 +17738,7 @@ XPKAPI int xpkEach(xpkObject objXpk, xpkEachProc procEach, void* pArg)
 	return procXpkEachWalk(objXpk, NULL, procEach, pArg);
 }
 
+// 按模式遍历匹配条目
 XPKAPI int xpkEachMatch(xpkObject objXpk, const char* sPattern, xpkEachProc procEach, void* pArg)
 {
 	if ( objXpk == NULL ) {
@@ -17011,6 +17747,7 @@ XPKAPI int xpkEachMatch(xpkObject objXpk, const char* sPattern, xpkEachProc proc
 	return procXpkEachWalk(objXpk, sPattern, procEach, pArg);
 }
 
+// 校验单个条目
 XPKAPI int xpkVerify(xpkObject objXpk, uint32_t iPos)
 {
 	xpkEntry* pEntry;
@@ -17033,6 +17770,7 @@ XPKAPI int xpkVerify(xpkObject objXpk, uint32_t iPos)
 	return procXpkVerifyEntry(objXpk, pEntry);
 }
 
+// 校验全部条目
 XPKAPI int xpkVerifyAll(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -17041,21 +17779,25 @@ XPKAPI int xpkVerifyAll(xpkObject objXpk)
 	return procXpkVerifyAllEntries(objXpk);
 }
 
+// 获取包统计信息
 XPKAPI int xpkStatGet(xpkObject objXpk, xpkStat* pStatRet)
 {
 	return procXpkStatCurrent(objXpk, pStatRet);
 }
 
+// 释放 xPack 返回的内存
 XPKAPI void xpkFree(void* pMem)
 {
 	xpkFreeInternal(pMem);
 }
 
+// 计算 32 位哈希值
 XPKAPI uint32_t xpkHash32(const void* pData, uint64_t iSize)
 {
 	return xpkHash32Internal(pData, iSize);
 }
 
+// 获取最后错误码
 XPKAPI xpkErrorCode xpkLastError(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -17064,6 +17806,7 @@ XPKAPI xpkErrorCode xpkLastError(xpkObject objXpk)
 	return (xpkErrorCode)objXpk->err.iCode;
 }
 
+// 获取最后错误文本
 XPKAPI const char* xpkLastErrorMessage(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {

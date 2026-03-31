@@ -1,3 +1,10 @@
+/*
+	xPack 遍历服务模块
+
+	负责按类型填充公开信息，并支持遍历与模式匹配。
+*/
+
+// 填充 Core 条目信息
 static inline void procXpkFillInfoCore(const xpkEntry* pEntry, xpkFileInfo* pInfoRet)
 {
 	memset(pInfoRet, 0, sizeof(*pInfoRet));
@@ -8,6 +15,7 @@ static inline void procXpkFillInfoCore(const xpkEntry* pEntry, xpkFileInfo* pInf
 	pInfoRet->fileSize = pEntry->iFileSize;
 }
 
+// 填充索引条目信息
 static inline void procXpkFillInfoIndex(const xpkEntry* pEntry, xpkFileInfoIndex* pInfoRet)
 {
 	memset(pInfoRet, 0, sizeof(*pInfoRet));
@@ -19,6 +27,7 @@ static inline void procXpkFillInfoIndex(const xpkEntry* pEntry, xpkFileInfoIndex
 	pInfoRet->fileIndex = pEntry->iFileIndex;
 }
 
+// 填充信息路径
 static inline void procXpkFillInfoPath(const xpkEntry* pEntry, xpkFileInfoPath* pInfoRet)
 {
 	size_t iPathLen;
@@ -42,6 +51,7 @@ static inline void procXpkFillInfoPath(const xpkEntry* pEntry, xpkFileInfoPath* 
 	pInfoRet->accessTime = pEntry->tAccessTime;
 }
 
+// 条目匹配键
 static inline const char* procXpkEntryMatchKey(xpkObject objXpk, const xpkEntry* pEntry, char sBuf[64], int* pCaseRet)
 {
 	if ( pCaseRet != NULL ) {
@@ -63,6 +73,7 @@ static inline const char* procXpkEntryMatchKey(xpkObject objXpk, const xpkEntry*
 	return sBuf;
 }
 
+// 模式匹配条目
 static inline int procXpkPatternMatchEntry(xpkObject objXpk, const xpkEntry* pEntry, const char* sPattern)
 {
 	char sBuf[64];
@@ -81,6 +92,7 @@ static inline int procXpkPatternMatchEntry(xpkObject objXpk, const xpkEntry* pEn
 	return xrtStrLike((str)sKey, 0, (str)sPattern, 0, bCase) ? TRUE : FALSE;
 }
 
+// 调用遍历回调
 static inline int procXpkEachInvoke(xpkObject objXpk, const xpkEntry* pEntry, xpkEachProc procEach, void* pArg)
 {
 	xpkFileInfo objInfo;
@@ -109,6 +121,7 @@ static inline int procXpkEachInvoke(xpkObject objXpk, const xpkEntry* pEntry, xp
 	return procEach(objXpk, pEntry->iPos, &objInfo, pArg);
 }
 
+// 遍历条目并执行回调
 static inline int procXpkEachWalk(xpkObject objXpk, const char* sPattern, xpkEachProc procEach, void* pArg)
 {
 	uint32_t iPos;

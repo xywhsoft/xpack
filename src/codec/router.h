@@ -1,3 +1,9 @@
+/*
+	xPack 编解码路由模块
+
+	负责压缩级别映射、编解码分派与压缩缓冲管理。
+*/
+
 static const xpkCompMap arrXpkCompTable[16] = {
 	{ XPK_ALG_STORE, 0 },
 	{ XPK_ALG_LZ4, 1 },
@@ -17,16 +23,19 @@ static const xpkCompMap arrXpkCompTable[16] = {
 	{ XPK_ALG_LZMA2, 9 }
 };
 
+// 将压缩级别映射为算法
 static inline uint32_t procXpkCompLevelToAlg(uint8_t iLevel)
 {
 	return arrXpkCompTable[iLevel & 0x0Fu].iAlgorithm;
 }
 
+// 将压缩级别映射为原生级别
 static inline int procXpkCompLevelToNative(uint8_t iLevel)
 {
 	return arrXpkCompTable[iLevel & 0x0Fu].iNativeLevel;
 }
 
+// 计算编解码输出上界
 static inline int procXpkCodecBound(xpkObject objXpk, uint8_t iLevel, uint32_t iRawSize, uint32_t* pSizeRet)
 {
 	uint64_t iBound64;
@@ -66,6 +75,7 @@ static inline int procXpkCodecBound(xpkObject objXpk, uint8_t iLevel, uint32_t i
 	return XPK_OK;
 }
 
+// 按原样策略复制压缩缓冲
 static inline int procXpkCodecStoreCopy(xpkObject objXpk, const void* pData, uint32_t iRawSize, void** pBufRet, uint32_t* pSizeRet, uint8_t* pLevelRet)
 {
 	void* pBuf;
@@ -89,6 +99,7 @@ static inline int procXpkCodecStoreCopy(xpkObject objXpk, const void* pData, uin
 	return XPK_OK;
 }
 
+// 执行数据编码
 static inline int procXpkCodecEncode(xpkObject objXpk, uint8_t iLevel, const void* pData, uint32_t iRawSize, void** pBufRet, uint32_t* pSizeRet, uint8_t* pLevelRet)
 {
 	uint32_t iBound;
@@ -201,6 +212,7 @@ static inline int procXpkCodecEncode(xpkObject objXpk, uint8_t iLevel, const voi
 	return XPK_OK;
 }
 
+// 执行数据解码
 static inline int procXpkCodecDecode(xpkObject objXpk, uint8_t iLevel, const void* pData, uint32_t iCompSize, uint32_t iRawSize, void** pBufRet)
 {
 	void* pBuf;

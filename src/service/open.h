@@ -1,3 +1,10 @@
+/*
+	xPack 打开加载模块
+
+	负责读取包头、元数据、条目表并恢复运行时状态。
+*/
+
+// 加载并解析包文件
 static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOpt)
 {
 	xfile hFile;
@@ -14,6 +21,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	uint32_t iLooseVolumeCount;
 	int iRet;
 
+	// 先处理目录冲突、缺失新建和空文件这几种快速返回分支。
 	if ( xrtDirExists((str)objXpk->sPathPackage) ) {
 		return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoOpen);
 	}
@@ -60,6 +68,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		return procXpkSetError(objXpk, XPK_ERR_FORMAT, sXpkErrorBadHead);
 	}
 
+	// 读取包头并校验布局字段，确认后再恢复运行时状态。
 	iRet = procXpkReadAtAlloc(objXpk, hFile, 0, XPK_HEAD_SIZE, (void**)&pHeadBuf);
 	if ( iRet != XPK_OK ) {
 		xrtClose(hFile);
@@ -109,6 +118,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 	procXpkMarkAppliedLayout(objXpk);
 	procXpkMarkClean(objXpk);
 
+	// 非分卷包优先走整文件映射，后续恢复元数据和条目表时能少一次额外拷贝。
 	memset(&objMap, 0, sizeof(objMap));
 	iMapSize = 0;
 	if ( !objHead.volumeMode && ((objHead.metaCompSize > 0) || (objHead.infoCompSize > 0)) ) {
@@ -120,6 +130,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		}
 	}
 
+	// 先恢复包元数据，保证后续对象状态与磁盘内容一致。
 	if ( objHead.metaCompSize > 0 ) {
 		pMetaComp = NULL;
 		pMetaRaw = NULL;
@@ -156,6 +167,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		objXpk->iPackageMetaSize = objHead.metaRawSize;
 	}
 
+	// 再恢复条目表，并重建条目数组与查找关系。
 	if ( objHead.infoCompSize > 0 ) {
 		pEntryComp = NULL;
 		pEntryRaw = NULL;
@@ -199,6 +211,7 @@ static inline int procXpkLoadPackage(xpkObject objXpk, const xpkOpenOptions* pOp
 		}
 	}
 
+	// 统一收尾临时资源，并清空最后错误状态。
 	procXpkUnmapFile(&objMap);
 	xrtClose(hFile);
 	procXpkClearError(objXpk);

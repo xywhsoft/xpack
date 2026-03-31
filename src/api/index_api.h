@@ -1,3 +1,10 @@
+/*
+	xPack 索引 API 实现
+
+	负责按 fileIndex 访问条目的增删改查。
+*/
+
+// 查找索引条目
 static inline xpkEntry* procXpkLookupIndexEntry(xpkObject objXpk, int64_t iFileIndex)
 {
 	uint32_t iPos;
@@ -39,6 +46,7 @@ static inline xpkEntry* procXpkLookupIndexEntry(xpkObject objXpk, int64_t iFileI
 	return pEntry;
 }
 
+// 按索引查找条目位置
 XPKAPI int xpkIndexFind(xpkObject objXpk, int64_t iFileIndex, uint32_t* pPosRet)
 {
 	xpkEntry* pEntry;
@@ -70,6 +78,7 @@ XPKAPI int xpkIndexFind(xpkObject objXpk, int64_t iFileIndex, uint32_t* pPosRet)
 	return XPK_OK;
 }
 
+// 按索引获取条目信息
 XPKAPI int xpkIndexGetInfo(xpkObject objXpk, int64_t iFileIndex, xpkFileInfoIndex* pInfoRet)
 {
 	xpkEntry* pEntry;
@@ -105,6 +114,7 @@ XPKAPI int xpkIndexGetInfo(xpkObject objXpk, int64_t iFileIndex, xpkFileInfoInde
 	return XPK_OK;
 }
 
+// 按索引添加文件条目
 XPKAPI int xpkIndexAddFile(xpkObject objXpk, int64_t iFileIndex, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -137,6 +147,7 @@ XPKAPI int xpkIndexAddFile(xpkObject objXpk, int64_t iFileIndex, const char* sSr
 	return procXpkAddFileEntry(objXpk, &objEntry, sSrcPath, pOpt, NULL);
 }
 
+// 按索引添加内存数据条目
 XPKAPI int xpkIndexAddData(xpkObject objXpk, int64_t iFileIndex, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry objEntry;
@@ -169,6 +180,7 @@ XPKAPI int xpkIndexAddData(xpkObject objXpk, int64_t iFileIndex, const void* pDa
 	return procXpkAddDataEntry(objXpk, &objEntry, pData, iSize, pOpt, NULL);
 }
 
+// 按索引读取条目到文件
 XPKAPI int xpkIndexReadToFile(xpkObject objXpk, int64_t iFileIndex, const char* sDstPath)
 {
 	uint32_t iPos;
@@ -191,6 +203,7 @@ XPKAPI int xpkIndexReadToFile(xpkObject objXpk, int64_t iFileIndex, const char* 
 	return xpkReadToFile(objXpk, iPos, sDstPath);
 }
 
+// 按索引读取条目到内存
 XPKAPI void* xpkIndexReadToMemory(xpkObject objXpk, int64_t iFileIndex, uint64_t* pSizeRet)
 {
 	uint32_t iPos;
@@ -204,6 +217,7 @@ XPKAPI void* xpkIndexReadToMemory(xpkObject objXpk, int64_t iFileIndex, uint64_t
 	return xpkReadToMemory(objXpk, iPos, pSizeRet);
 }
 
+// 按索引更新文件条目
 XPKAPI int xpkIndexUpdateFile(xpkObject objXpk, int64_t iFileIndex, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	uint32_t iPos;
@@ -230,6 +244,7 @@ XPKAPI int xpkIndexUpdateFile(xpkObject objXpk, int64_t iFileIndex, const char* 
 	return xpkUpdateFile(objXpk, iPos, sSrcPath, pOpt);
 }
 
+// 按索引更新内存数据条目
 XPKAPI int xpkIndexUpdateData(xpkObject objXpk, int64_t iFileIndex, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	uint32_t iPos;
@@ -256,6 +271,7 @@ XPKAPI int xpkIndexUpdateData(xpkObject objXpk, int64_t iFileIndex, const void* 
 	return xpkUpdateData(objXpk, iPos, pData, iSize, pOpt);
 }
 
+// 按索引移除条目
 XPKAPI int xpkIndexRemove(xpkObject objXpk, int64_t iFileIndex)
 {
 	uint32_t iPos;
@@ -279,6 +295,7 @@ XPKAPI int xpkIndexRemove(xpkObject objXpk, int64_t iFileIndex)
 	return xpkRemove(objXpk, iPos);
 }
 
+// 按索引设置条目标记
 XPKAPI int xpkIndexSetFlag(xpkObject objXpk, int64_t iFileIndex, uint32_t iMask, uint32_t iValue)
 {
 	uint32_t iPos;

@@ -1,3 +1,10 @@
+/*
+	xPack 包级 API 实现
+
+	负责包对象生命周期、全局配置和元数据接口。
+*/
+
+// 确保包对象处于可修改状态
 static inline int procXpkEnsurePackageMutable(xpkObject objXpk)
 {
 	int iRet;
@@ -12,6 +19,7 @@ static inline int procXpkEnsurePackageMutable(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 打开包对象
 XPKAPI xpkObject xpkOpen(const char* sPackagePath, const xpkOpenOptions* pOpt)
 {
 	xpkObject objXpk;
@@ -47,6 +55,7 @@ XPKAPI xpkObject xpkOpen(const char* sPackagePath, const xpkOpenOptions* pOpt)
 	return objXpk;
 }
 
+// 关闭包对象
 XPKAPI int xpkClose(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -60,6 +69,7 @@ XPKAPI int xpkClose(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 保存当前包状态
 XPKAPI int xpkSave(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -68,6 +78,7 @@ XPKAPI int xpkSave(xpkObject objXpk)
 	return procXpkSavePackage(objXpk);
 }
 
+// 按目标布局重构包文件
 XPKAPI int xpkBuild(xpkObject objXpk, const xpkBuildOptions* pOpt)
 {
 	if ( objXpk == NULL ) {
@@ -76,6 +87,7 @@ XPKAPI int xpkBuild(xpkObject objXpk, const xpkBuildOptions* pOpt)
 	return procXpkBuildPackage(objXpk, pOpt);
 }
 
+// 获取包类型
 XPKAPI int xpkGetPackType(xpkObject objXpk, xpkPackType* pTypeRet)
 {
 	if ( objXpk == NULL ) {
@@ -89,6 +101,7 @@ XPKAPI int xpkGetPackType(xpkObject objXpk, xpkPackType* pTypeRet)
 	return XPK_OK;
 }
 
+// 设置包类型
 XPKAPI int xpkSetPackType(xpkObject objXpk, xpkPackType iType)
 {
 	int iRet;
@@ -117,6 +130,7 @@ XPKAPI int xpkSetPackType(xpkObject objXpk, xpkPackType iType)
 	return XPK_OK;
 }
 
+// 获取默认压缩级别
 XPKAPI int xpkGetDefaultComp(xpkObject objXpk, uint8_t* pLevelRet)
 {
 	if ( objXpk == NULL ) {
@@ -130,6 +144,7 @@ XPKAPI int xpkGetDefaultComp(xpkObject objXpk, uint8_t* pLevelRet)
 	return XPK_OK;
 }
 
+// 设置默认压缩级别
 XPKAPI int xpkSetDefaultComp(xpkObject objXpk, uint8_t iLevel)
 {
 	int iRet;
@@ -150,6 +165,7 @@ XPKAPI int xpkSetDefaultComp(xpkObject objXpk, uint8_t iLevel)
 	return XPK_OK;
 }
 
+// 获取元数据压缩级别
 XPKAPI int xpkGetMetaComp(xpkObject objXpk, uint8_t* pLevelRet)
 {
 	if ( objXpk == NULL ) {
@@ -163,6 +179,7 @@ XPKAPI int xpkGetMetaComp(xpkObject objXpk, uint8_t* pLevelRet)
 	return XPK_OK;
 }
 
+// 设置元数据压缩级别
 XPKAPI int xpkSetMetaComp(xpkObject objXpk, uint8_t iLevel)
 {
 	int iRet;
@@ -183,6 +200,7 @@ XPKAPI int xpkSetMetaComp(xpkObject objXpk, uint8_t iLevel)
 	return XPK_OK;
 }
 
+// 获取条目表压缩级别
 XPKAPI int xpkGetInfoComp(xpkObject objXpk, uint8_t* pLevelRet)
 {
 	if ( objXpk == NULL ) {
@@ -196,6 +214,7 @@ XPKAPI int xpkGetInfoComp(xpkObject objXpk, uint8_t* pLevelRet)
 	return XPK_OK;
 }
 
+// 设置条目表压缩级别
 XPKAPI int xpkSetInfoComp(xpkObject objXpk, uint8_t iLevel)
 {
 	int iRet;
@@ -216,6 +235,7 @@ XPKAPI int xpkSetInfoComp(xpkObject objXpk, uint8_t iLevel)
 	return XPK_OK;
 }
 
+// 获取信息扩展大小
 XPKAPI int xpkGetInfoExtSize(xpkObject objXpk, uint32_t* pSizeRet)
 {
 	if ( objXpk == NULL ) {
@@ -229,6 +249,7 @@ XPKAPI int xpkGetInfoExtSize(xpkObject objXpk, uint32_t* pSizeRet)
 	return XPK_OK;
 }
 
+// 设置信息扩展大小
 XPKAPI int xpkSetInfoExtSize(xpkObject objXpk, uint32_t iSize)
 {
 	int iRet;
@@ -260,6 +281,7 @@ XPKAPI int xpkSetInfoExtSize(xpkObject objXpk, uint32_t iSize)
 	return XPK_OK;
 }
 
+// 获取分卷大小
 XPKAPI int xpkGetVolumeSize(xpkObject objXpk, uint32_t* pSizeRet)
 {
 	if ( objXpk == NULL ) {
@@ -273,6 +295,7 @@ XPKAPI int xpkGetVolumeSize(xpkObject objXpk, uint32_t* pSizeRet)
 	return XPK_OK;
 }
 
+// 设置分卷大小
 XPKAPI int xpkSetVolumeSize(xpkObject objXpk, uint32_t iSize)
 {
 	int iRet;
@@ -298,6 +321,7 @@ XPKAPI int xpkSetVolumeSize(xpkObject objXpk, uint32_t iSize)
 	return XPK_OK;
 }
 
+// 获取 Solid 模式
 XPKAPI int xpkGetSolidMode(xpkObject objXpk, int* pEnabledRet)
 {
 	if ( objXpk == NULL ) {
@@ -311,6 +335,7 @@ XPKAPI int xpkGetSolidMode(xpkObject objXpk, int* pEnabledRet)
 	return XPK_OK;
 }
 
+// 设置 Solid 模式
 XPKAPI int xpkSetSolidMode(xpkObject objXpk, int bEnabled)
 {
 	int iRet;
@@ -331,6 +356,7 @@ XPKAPI int xpkSetSolidMode(xpkObject objXpk, int bEnabled)
 	return XPK_OK;
 }
 
+// 获取包元数据
 XPKAPI void* xpkMetaGet(xpkObject objXpk, uint32_t* pSizeRet)
 {
 	void* pRet;
@@ -360,6 +386,7 @@ XPKAPI void* xpkMetaGet(xpkObject objXpk, uint32_t* pSizeRet)
 	return pRet;
 }
 
+// 设置包元数据
 XPKAPI int xpkMetaSet(xpkObject objXpk, const void* pData, uint32_t iSize, uint8_t iCompLevel)
 {
 	void* pMetaNew;
@@ -400,6 +427,7 @@ XPKAPI int xpkMetaSet(xpkObject objXpk, const void* pData, uint32_t iSize, uint8
 	return XPK_OK;
 }
 
+// 清空包元数据
 XPKAPI int xpkMetaClear(xpkObject objXpk)
 {
 	int iRet;

@@ -1,3 +1,10 @@
+/*
+	xPack 保存模块
+
+	负责将脏状态落盘，并在失败时执行回滚恢复。
+*/
+
+// 捕获刷写快照
 static inline xpkFlushSnapshot* procXpkCaptureFlushSnapshots(xpkObject objXpk, uint32_t* pCountRet)
 {
 	xpkFlushSnapshot* arrSnapshot;
@@ -52,6 +59,7 @@ static inline xpkFlushSnapshot* procXpkCaptureFlushSnapshots(xpkObject objXpk, u
 	return arrSnapshot;
 }
 
+// 恢复刷写快照
 static inline void procXpkRestoreFlushSnapshots(xpkObject objXpk, const xpkFlushSnapshot* arrSnapshot, uint32_t iCount, const xpkHead* pHeadSaved, uint64_t iAppendPosSaved, uint64_t iFileSizeSaved)
 {
 	xpkEntry* pEntry;
@@ -84,6 +92,7 @@ static inline void procXpkRestoreFlushSnapshots(xpkObject objXpk, const xpkFlush
 	}
 }
 
+// 释放保存回滚
 static inline void procXpkFreeSaveRollback(xpkSaveRollback* pRollback)
 {
 	if ( pRollback == NULL ) {
@@ -102,6 +111,7 @@ static inline void procXpkFreeSaveRollback(xpkSaveRollback* pRollback)
 	}
 }
 
+// 保存回滚路径复制
 static inline char* procXpkSaveRollbackPathDup(xpkObject objXpk)
 {
 	char sSuffix[96];
@@ -147,6 +157,7 @@ static inline char* procXpkSaveRollbackPathDup(xpkObject objXpk)
 	return NULL;
 }
 
+// 将回滚尾段写入文件
 static inline int procXpkCaptureRollbackTailToFile(xpkObject objXpk, uint64_t iOffset, uint64_t iSize, const char* sPathTail)
 {
 	xfile hFile;
@@ -197,6 +208,7 @@ static inline int procXpkCaptureRollbackTailToFile(xpkObject objXpk, uint64_t iO
 	return XPK_OK;
 }
 
+// 从文件恢复回滚尾段
 static inline int procXpkRestoreRollbackTailFromFile(xpkObject objXpk, const xpkSaveRollback* pRollback)
 {
 	xfile hFile;
@@ -254,6 +266,7 @@ static inline int procXpkRestoreRollbackTailFromFile(xpkObject objXpk, const xpk
 	return XPK_OK;
 }
 
+// 捕获保存回滚上下文
 static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* pRollback)
 {
 	void* pHeadData;
@@ -320,6 +333,7 @@ static inline int procXpkCaptureSaveRollback(xpkObject objXpk, xpkSaveRollback* 
 	return XPK_OK;
 }
 
+// 恢复保存回滚上下文
 static inline int procXpkRestoreSaveRollback(xpkObject objXpk, const xpkSaveRollback* pRollback)
 {
 	int iRet;
@@ -426,6 +440,7 @@ static inline int procXpkRestoreSaveRollback(xpkObject objXpk, const xpkSaveRoll
 	return XPK_OK;
 }
 
+// 执行保存落盘流程
 static inline int procXpkSavePackage(xpkObject objXpk)
 {
 	xfile hFile;
@@ -449,6 +464,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 	uint32_t iPos;
 	xpkEntry* pEntry;
 
+	// 先确认当前对象允许直接保存，布局变更需要交给 build 路径处理。
 	if ( objXpk->bReadonly ) {
 		return procXpkSetError(objXpk, XPK_ERR_READONLY, sXpkErrorReadonly);
 	}
@@ -477,6 +493,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 	iAppendPosSaved = objXpk->iAppendPos;
 	iFileSizeSaved = objXpk->iFileSize;
 
+	// 预编码元数据，并提前抓取刷写快照与回滚上下文，保证中途失败后还能恢复现场。
 	iRet = procXpkCodecEncode(objXpk, (uint8_t)objXpk->objHead.metaComp, objXpk->pPackageMeta, objXpk->iPackageMetaSize, &pMetaComp, &iMetaCompSize, &iMetaLevel);
 	if ( iRet != XPK_OK ) {
 		return iRet;
@@ -528,6 +545,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		return iRet;
 	}
 
+	// 先把延迟写入队列刷入数据区，再重新编码条目表，保证偏移信息使用的是最终值。
 	iRet = procXpkFlushQueuedWrites(objXpk, hFile);
 	if ( iRet != XPK_OK ) {
 		if ( hFile != NULL ) {
@@ -594,6 +612,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		return iRet;
 	}
 
+	// 组装新的包头与尾段布局，并把元数据、条目表和头部一次性落盘。
 	objXpk->objHead.fileCount = objXpk->iEntryCount;
 	objXpk->objHead.dataOffset = objXpk->iAppendPos;
 	objXpk->objHead.metaComp = iMetaLevel;
@@ -624,6 +643,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		iRet = procXpkWriteAt(objXpk, hFile, 0, sHeadBuf, XPK_HEAD_SIZE);
 	}
 
+	// 写盘完成后统一释放临时缓冲；失败则回滚快照和原始尾段。
 	if ( hFile != NULL ) {
 		xrtClose(hFile);
 	}
@@ -649,6 +669,7 @@ static inline int procXpkSavePackage(xpkObject objXpk)
 		return iRet;
 	}
 
+	// 保存成功后把条目状态标记为已落盘，并清理脏标记。
 	for ( iPos = 1; iPos <= objXpk->iEntryCount; iPos++ ) {
 		pEntry = (xpkEntry*)xrtArrayGet(&objXpk->arrEntry, iPos);
 		if ( pEntry != NULL ) {

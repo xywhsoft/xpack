@@ -1,3 +1,9 @@
+/*
+	xPack 文件存储模块
+
+	负责文件映射、分卷扫描、随机读写与物理文件操作。
+*/
+
 #include <stdio.h>
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <dirent.h>
@@ -6,6 +12,7 @@
 #include <unistd.h>
 #endif
 
+// 解除文件映射
 static inline void procXpkUnmapFile(xpkMappedFile* pMap)
 {
 	if ( pMap == NULL ) {
@@ -31,6 +38,7 @@ static inline void procXpkUnmapFile(xpkMappedFile* pMap)
 	pMap->iSize = 0;
 }
 
+// 建立只读文件映射
 static inline int procXpkMapFileReadOnly(xpkObject objXpk, xfile hFile, uint64_t iSize, xpkMappedFile* pMapRet)
 {
 	if ( pMapRet != NULL ) {
@@ -75,6 +83,7 @@ static inline int procXpkMapFileReadOnly(xpkObject objXpk, xfile hFile, uint64_t
 	return XPK_OK;
 }
 
+// 建立读写文件映射
 static inline int procXpkMapFileReadWrite(xpkObject objXpk, xfile hFile, uint64_t iSize, xpkMappedFile* pMapRet)
 {
 	size_t iPos;
@@ -132,6 +141,7 @@ static inline int procXpkMapFileReadWrite(xpkObject objXpk, xfile hFile, uint64_
 	return XPK_OK;
 }
 
+// 生成分卷路径文本
 static inline char* procXpkVolumePathDupText(const char* sPathPackage, uint32_t iVolume)
 {
 	char sSuffix[32];
@@ -164,6 +174,7 @@ static inline char* procXpkVolumePathDupText(const char* sPathPackage, uint32_t 
 	return sPathRet;
 }
 
+// 生成带后缀的路径文本
 static inline char* procXpkPathSuffixDupText(const char* sPathBase, const char* sSuffix)
 {
 	size_t iSizeBase;
@@ -186,6 +197,7 @@ static inline char* procXpkPathSuffixDupText(const char* sPathBase, const char* 
 	return sPathRet;
 }
 
+// 匹配松散分卷文件名
 static inline int procXpkLooseVolumeMatchName(const xpkLooseVolumeScan* pScan, const char* sName, uint32_t* pVolumeRet)
 {
 	const char* sDigit;
@@ -229,6 +241,7 @@ static inline int procXpkLooseVolumeMatchName(const xpkLooseVolumeScan* pScan, c
 	return TRUE;
 }
 
+// 拼接路径文本
 static inline char* procXpkPathJoinDupText(const char* sDirPath, const char* sName)
 {
 	size_t iSizeDir;
@@ -263,6 +276,7 @@ static inline char* procXpkPathJoinDupText(const char* sDirPath, const char* sNa
 	return sPathRet;
 }
 
+// 处理松散分卷条目
 static inline int procXpkHandleLooseVolumeEntry(xpkLooseVolumeScan* pScan, const char* sDirPath, const char* sName, int bDir)
 {
 	char* sPathEntry;
@@ -298,6 +312,7 @@ static inline int procXpkHandleLooseVolumeEntry(xpkLooseVolumeScan* pScan, const
 	return XPK_OK;
 }
 
+// 路径名称文本
 static inline const char* procXpkPathNameText(const char* sPath)
 {
 	const char* sName;
@@ -315,6 +330,7 @@ static inline const char* procXpkPathNameText(const char* sPath)
 	return sName;
 }
 
+// 路径目录复制文本
 static inline char* procXpkPathDirDupText(const char* sPath)
 {
 	const char* sSep;
@@ -348,6 +364,7 @@ static inline char* procXpkPathDirDupText(const char* sPath)
 	return sRet;
 }
 
+// 松散分卷扫描回调
 static inline int procXpkLooseVolumeScanProc(ptr sPath, size_t iSize, int bDir, ptr pData, ptr Param)
 {
 	xpkLooseVolumeScan* pScan;
@@ -414,6 +431,7 @@ static inline int procXpkLooseVolumeScanProc(ptr sPath, size_t iSize, int bDir, 
 	return FALSE;
 }
 
+// 扫描松散分卷文件从文本
 static inline int procXpkScanLooseVolumeFilesFromText(xpkObject objXpk, const char* sPathPackage, uint32_t iStartVolume, int bDelete, uint32_t* pCountRet)
 {
 	xpkLooseVolumeScan objScan;
@@ -534,11 +552,13 @@ static inline int procXpkScanLooseVolumeFilesFromText(xpkObject objXpk, const ch
 	return XPK_OK;
 }
 
+// 扫描松散分卷文件文本
 static inline int procXpkScanLooseVolumeFilesText(xpkObject objXpk, const char* sPathPackage, int bDelete, uint32_t* pCountRet)
 {
 	return procXpkScanLooseVolumeFilesFromText(objXpk, sPathPackage, 0, bDelete, pCountRet);
 }
 
+// 确保分卷路径未占用文本
 static inline int procXpkEnsureVolumePathUnusedText(xpkObject objXpk, const char* sPathPackage, const char* sErrorText)
 {
 	uint32_t iLooseVolumeCount;
@@ -563,6 +583,7 @@ static inline int procXpkEnsureVolumePathUnusedText(xpkObject objXpk, const char
 	return XPK_OK;
 }
 
+// 打开分卷文本
 static inline int procXpkOpenVolumeText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, int bReadonly, xfile* pFileRet)
 {
 	char* sPathVolume;
@@ -588,6 +609,7 @@ static inline int procXpkOpenVolumeText(xpkObject objXpk, const char* sPathPacka
 	return XPK_OK;
 }
 
+// 获取分卷物理大小文本
 static inline int procXpkGetVolumePhysicalSizeText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t* pSizeRet, int* pExistsRet)
 {
 	char* sPathVolume;
@@ -629,6 +651,7 @@ static inline int procXpkGetVolumePhysicalSizeText(xpkObject objXpk, const char*
 	return XPK_OK;
 }
 
+// 数量分卷文件文本
 static inline int procXpkCountVolumeFilesText(xpkObject objXpk, const char* sPathPackage, uint32_t* pCountRet)
 {
 	uint32_t iVolume;
@@ -657,6 +680,7 @@ static inline int procXpkCountVolumeFilesText(xpkObject objXpk, const char* sPat
 	return XPK_OK;
 }
 
+// 删除分卷文件文本
 static inline int procXpkDeleteVolumeFilesText(xpkObject objXpk, const char* sPathPackage, uint32_t iStartVolume)
 {
 	uint32_t iVolume;
@@ -693,6 +717,7 @@ static inline int procXpkDeleteVolumeFilesText(xpkObject objXpk, const char* sPa
 	return XPK_OK;
 }
 
+// 删除分卷文件连续文本
 static inline int procXpkDeleteVolumeFilesContiguousText(xpkObject objXpk, const char* sPathPackage, uint32_t iStartVolume)
 {
 	uint32_t iVolume;
@@ -723,6 +748,7 @@ static inline int procXpkDeleteVolumeFilesContiguousText(xpkObject objXpk, const
 	return XPK_OK;
 }
 
+// 删除分卷文件精确文本
 static inline int procXpkDeleteVolumeFilesExactText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolumeCount)
 {
 	uint32_t iVolume;
@@ -749,6 +775,7 @@ static inline int procXpkDeleteVolumeFilesExactText(xpkObject objXpk, const char
 	return XPK_OK;
 }
 
+// 转移分卷文件文本
 static inline int procXpkTransferVolumeFilesText(xpkObject objXpk, const char* sPathSrc, const char* sPathDst, int bMove, int bRewrite)
 {
 	uint32_t iVolumeCount;
@@ -810,6 +837,7 @@ static inline int procXpkTransferVolumeFilesText(xpkObject objXpk, const char* s
 	return XPK_OK;
 }
 
+// 移动分卷文件文本
 static inline int procXpkMoveVolumeFilesText(xpkObject objXpk, const char* sPathSrc, const char* sPathDst)
 {
 	uint32_t iVolumeCountSrc;
@@ -886,6 +914,7 @@ static inline int procXpkMoveVolumeFilesText(xpkObject objXpk, const char* sPath
 	return XPK_OK;
 }
 
+// 定位文件
 static inline int procXpkSeekFile(xpkObject objXpk, xfile hFile, uint64_t iOffset)
 {
 	size_t iPos;
@@ -904,6 +933,7 @@ static inline int procXpkSeekFile(xpkObject objXpk, xfile hFile, uint64_t iOffse
 	return XPK_OK;
 }
 
+// 计算逻辑文件大小
 static inline int procXpkCalcLogicalFileSize(xpkObject objXpk, const xpkHead* pHead, uint64_t* pSizeRet)
 {
 	uint32_t iVolume;
@@ -947,6 +977,7 @@ static inline int procXpkCalcLogicalFileSize(xpkObject objXpk, const xpkHead* pH
 	return XPK_OK;
 }
 
+// 读取分卷片段文本
 static inline int procXpkReadVolumePartText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t iOffsetVolume, void* pData, uint32_t iSize)
 {
 	char* sPathVolume;
@@ -1026,6 +1057,7 @@ static inline int procXpkReadVolumePartText(xpkObject objXpk, const char* sPathP
 	return XPK_OK;
 }
 
+// 写入分卷片段文本
 static inline int procXpkWriteVolumePartText(xpkObject objXpk, const char* sPathPackage, uint32_t iVolume, uint64_t iOffsetVolume, const void* pData, uint32_t iSize)
 {
 	char* sPathVolume;
@@ -1105,6 +1137,7 @@ static inline int procXpkWriteVolumePartText(xpkObject objXpk, const char* sPath
 	return XPK_OK;
 }
 
+// 原始读取
 static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData, uint32_t iSize)
 {
 	uint8_t* pCur;
@@ -1146,6 +1179,7 @@ static inline int procXpkRawRead(xpkObject objXpk, uint64_t iOffset, void* pData
 	return XPK_OK;
 }
 
+// 原始写入
 static inline int procXpkRawWrite(xpkObject objXpk, uint64_t iOffset, const void* pData, uint32_t iSize)
 {
 	const uint8_t* pCur;
@@ -1187,6 +1221,7 @@ static inline int procXpkRawWrite(xpkObject objXpk, uint64_t iOffset, const void
 	return XPK_OK;
 }
 
+// 读取按位置分配
 static inline int procXpkReadAtAlloc(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint32_t iSize, void** pDataRet)
 {
 	size_t iRead;
@@ -1258,6 +1293,7 @@ static inline int procXpkReadAtAlloc(xpkObject objXpk, xfile hFile, uint64_t iOf
 	return XPK_OK;
 }
 
+// 读取按位置缓冲
 static inline int procXpkReadAtBuffer(xpkObject objXpk, xfile hFile, uint64_t iOffset, void* pData, uint32_t iSize)
 {
 	size_t iRead;
@@ -1301,6 +1337,7 @@ static inline int procXpkReadAtBuffer(xpkObject objXpk, xfile hFile, uint64_t iO
 	return XPK_OK;
 }
 
+// 写入按位置
 static inline int procXpkWriteAt(xpkObject objXpk, xfile hFile, uint64_t iOffset, const void* pData, uint32_t iSize)
 {
 	size_t iWrite;
@@ -1347,6 +1384,7 @@ static inline int procXpkWriteAt(xpkObject objXpk, xfile hFile, uint64_t iOffset
 	return XPK_OK;
 }
 
+// 在指定位置设置文件 EOF
 static inline int procXpkSetEOFAt(xpkObject objXpk, xfile hFile, uint64_t iOffset)
 {
 	uint32_t iVolumeLast;

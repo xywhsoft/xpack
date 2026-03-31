@@ -1,3 +1,10 @@
+/*
+	xPack 校验与统计模块
+
+	负责条目校验、整包校验以及当前统计信息计算。
+*/
+
+// 哈希映射文件范围
 static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint64_t iOffset, uint64_t iSize, uint32_t* pHashRet)
 {
 	xpkMappedFile objMap;
@@ -23,6 +30,7 @@ static inline int procXpkHashMappedFileRange(xpkObject objXpk, xfile hFile, uint
 	return XPK_OK;
 }
 
+// 校验哈希匹配
 static inline int procXpkVerifyHashMatch(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint64_t iSize)
 {
 	uint32_t iHash;
@@ -43,6 +51,7 @@ static inline int procXpkVerifyHashMatch(xpkObject objXpk, xpkEntry* pEntry, con
 	return XPK_OK;
 }
 
+// 校验 Solid 条目
 static inline int procXpkVerifySolidEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
 	void* pData;
@@ -103,11 +112,13 @@ static inline int procXpkVerifySolidEntry(xpkObject objXpk, xpkEntry* pEntry)
 	return procXpkSetError(objXpk, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
 
+// 校验原样条目
 static inline int procXpkVerifyStoredEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
 	return procXpkVerifyStoredEntryWithFile(objXpk, pEntry, NULL);
 }
 
+// 校验原样条目带文件
 static inline int procXpkVerifyStoredEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile)
 {
 	xpkWriteNode* pNode;
@@ -191,6 +202,7 @@ static inline int procXpkVerifyStoredEntryWithFile(xpkObject objXpk, xpkEntry* p
 	return iRet;
 }
 
+// 校验原样条目映射
 static inline int procXpkVerifyStoredEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap)
 {
 	uint64_t iDataEnd;
@@ -221,6 +233,7 @@ static inline int procXpkVerifyStoredEntryMapped(xpkObject objXpk, xpkEntry* pEn
 	return procXpkVerifyHashMatch(objXpk, pEntry, (const uint8_t*)pMap->pView + pEntry->iDataOffset, pEntry->iDataSize);
 }
 
+// 基于文件句柄校验解码条目
 static inline int procXpkVerifyDecodedEntryWithFile(xpkObject objXpk, xpkEntry* pEntry, xfile hFile)
 {
 	xpkWriteNode* pNode;
@@ -271,6 +284,7 @@ static inline int procXpkVerifyDecodedEntryWithFile(xpkObject objXpk, xpkEntry* 
 	return iRet;
 }
 
+// 基于映射校验解码条目
 static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pEntry, const xpkMappedFile* pMap)
 {
 	void* pData;
@@ -311,6 +325,7 @@ static inline int procXpkVerifyDecodedEntryMapped(xpkObject objXpk, xpkEntry* pE
 	return iRet;
 }
 
+// 校验全部确保数据文件
 static inline int procXpkVerifyAllEnsureDataFile(xpkObject objXpk, xfile* pFileRet)
 {
 	if ( objXpk == NULL || pFileRet == NULL ) {
@@ -331,6 +346,7 @@ static inline int procXpkVerifyAllEnsureDataFile(xpkObject objXpk, xfile* pFileR
 	return XPK_OK;
 }
 
+// 校验条目
 static inline int procXpkVerifyEntry(xpkObject objXpk, xpkEntry* pEntry)
 {
 	if ( objXpk == NULL || pEntry == NULL ) {
@@ -349,6 +365,7 @@ static inline int procXpkVerifyEntry(xpkObject objXpk, xpkEntry* pEntry)
 	return procXpkVerifyDecodedEntryWithFile(objXpk, pEntry, NULL);
 }
 
+// 逐条校验全部 Solid 压缩条目
 static inline int procXpkVerifyAllSolidCompressedEntriesByEntry(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -387,6 +404,7 @@ static inline int procXpkVerifyAllSolidCompressedEntriesByEntry(xpkObject objXpk
 	return XPK_OK;
 }
 
+// 基于映射校验全部 Solid 原样条目
 static inline int procXpkVerifyAllSolidStoredEntriesMapped(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -468,6 +486,7 @@ static inline int procXpkVerifyAllSolidStoredEntriesMapped(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 逐条校验全部 Solid 原样条目
 static inline int procXpkVerifyAllSolidStoredEntriesByEntry(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -506,6 +525,7 @@ static inline int procXpkVerifyAllSolidStoredEntriesByEntry(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 校验全部条目
 static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -515,6 +535,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 	xpkMappedFile objMapData;
 	int iRet;
 
+	// 先处理对象状态和 solid 专用校验路径，这些分支能避免通用逐条遍历。
 	if ( objXpk == NULL ) {
 		return procXpkReturnParamError(objXpk);
 	}
@@ -541,6 +562,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 	hFileData = NULL;
 	memset(&objMapData, 0, sizeof(objMapData));
 
+	// 普通布局下复用同一个数据文件句柄和映射视图，避免每个条目都重复打开文件。
 	for ( iPos = 1; iPos <= objXpk->iEntryCount; iPos++ ) {
 		pEntry = (xpkEntry*)xrtArrayGet(&objXpk->arrEntry, iPos);
 		if ( pEntry == NULL ) {
@@ -584,6 +606,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 			}
 		}
 
+		// 按条目当前存储形态选择原样校验或解码校验路径。
 		if ( (pEntry->iFlag & XPK_FLAG_COMP_MASK) == 0 ) {
 			if ( pNode == NULL && objMapData.pView != NULL ) {
 				iRet = procXpkVerifyStoredEntryMapped(objXpk, pEntry, &objMapData);
@@ -606,6 +629,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 		}
 	}
 
+	// 校验成功后统一释放共享资源并清理错误状态。
 	procXpkUnmapFile(&objMapData);
 	if ( hFileData != NULL ) {
 		xrtClose(hFileData);
@@ -614,6 +638,7 @@ static inline int procXpkVerifyAllEntries(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 计算当前元数据字节数
 static inline int procXpkCalcCurrentMetaBytes(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	void* pMetaComp;
@@ -641,6 +666,7 @@ static inline int procXpkCalcCurrentMetaBytes(xpkObject objXpk, uint64_t* pSizeR
 	return XPK_OK;
 }
 
+// 计算当前条目字节数
 static inline int procXpkCalcCurrentEntryBytes(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	void* pEntryRaw;
@@ -681,6 +707,7 @@ static inline int procXpkCalcCurrentEntryBytes(xpkObject objXpk, uint64_t* pSize
 	return XPK_OK;
 }
 
+// 统计当前
 static inline int procXpkStatCurrent(xpkObject objXpk, xpkStat* pStatRet)
 {
 	uint32_t iPos;

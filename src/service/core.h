@@ -1,3 +1,9 @@
+/*
+	xPack 核心基础服务模块
+
+	负责错误状态、路径归一化、条目管理、查找表维护与对象生命周期。
+*/
+
 #include <ctype.h>
 
 static const char sXpkErrorInvalidObject[] = "invalid xpk object";
@@ -35,6 +41,7 @@ static const char sXpkErrorBackupPathExists[] = "backup path is occupied";
 static const char sXpkErrorPackagePathExists[] = "package path is occupied";
 static XRT_TLS_STORAGE xpkErrorState g_objXpkErrorTls = { XPK_OK, { 0 } };
 
+// 设置线程错误状态
 static inline void procXpkSetThreadError(int iCode, const char* sText)
 {
 	size_t iSizeText;
@@ -53,6 +60,7 @@ static inline void procXpkSetThreadError(int iCode, const char* sText)
 	g_objXpkErrorTls.sText[iSizeText] = '\0';
 }
 
+// 清理错误状态
 static inline void procXpkClearError(xpkObject objXpk)
 {
 	procXpkSetThreadError(XPK_OK, NULL);
@@ -62,6 +70,7 @@ static inline void procXpkClearError(xpkObject objXpk)
 	}
 }
 
+// 设置错误状态
 static inline int procXpkSetError(xpkObject objXpk, int iCode, const char* sText)
 {
 	size_t iSizeText;
@@ -86,6 +95,7 @@ static inline int procXpkSetError(xpkObject objXpk, int iCode, const char* sText
 	return iCode;
 }
 
+// 返回参数错误
 static inline int procXpkReturnParamError(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -94,6 +104,7 @@ static inline int procXpkReturnParamError(xpkObject objXpk)
 	return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 }
 
+// 确保对象可写
 static inline int procXpkEnsureWritable(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -105,6 +116,7 @@ static inline int procXpkEnsureWritable(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 在对象有效时设置参数错误
 static inline void procXpkSetParamErrorIfObject(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -113,6 +125,7 @@ static inline void procXpkSetParamErrorIfObject(xpkObject objXpk)
 	procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 }
 
+// 复制指定长度文本
 static inline char* procXpkDupTextN(const char* sText, size_t iSizeText)
 {
 	char* sRet;
@@ -128,6 +141,7 @@ static inline char* procXpkDupTextN(const char* sText, size_t iSizeText)
 	return sRet;
 }
 
+// 复制文本
 static inline char* procXpkDupText(const char* sText)
 {
 	if ( sText == NULL ) {
@@ -136,6 +150,7 @@ static inline char* procXpkDupText(const char* sText)
 	return procXpkDupTextN(sText, strlen(sText));
 }
 
+// 判断 Core 信息扩展是否启用
 static inline int procXpkCoreInfoExtEnabled(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -147,6 +162,7 @@ static inline int procXpkCoreInfoExtEnabled(xpkObject objXpk)
 	return (objXpk->objHead.infoExtSize > 0) ? TRUE : FALSE;
 }
 
+// 分配信息扩展缓冲
 static inline void* procXpkAllocInfoExt(xpkObject objXpk)
 {
 	void* pInfoExt;
@@ -163,6 +179,7 @@ static inline void* procXpkAllocInfoExt(xpkObject objXpk)
 	return pInfoExt;
 }
 
+// 复制信息扩展缓冲
 static inline void* procXpkDupInfoExt(xpkObject objXpk, const void* pInfoExtSrc)
 {
 	void* pInfoExt;
@@ -181,6 +198,7 @@ static inline void* procXpkDupInfoExt(xpkObject objXpk, const void* pInfoExtSrc)
 	return pInfoExt;
 }
 
+// 释放条目自有资源
 static inline void procXpkFreeEntryOwned(xpkEntry* pEntry)
 {
 	if ( pEntry == NULL ) {
@@ -196,6 +214,7 @@ static inline void procXpkFreeEntryOwned(xpkEntry* pEntry)
 	}
 }
 
+// 判断路径是否忽略大小写
 static inline int procXpkPathIgnoreCase(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -204,6 +223,7 @@ static inline int procXpkPathIgnoreCase(xpkObject objXpk)
 	return (objXpk->objHead.packType == XPK_PACK_WIN32) ? TRUE : FALSE;
 }
 
+// 判断字符是否为路径分隔符
 static inline int procXpkPathIsSep(xpkObject objXpk, char ch)
 {
 	if ( ch == '/' ) {
@@ -215,6 +235,7 @@ static inline int procXpkPathIsSep(xpkObject objXpk, char ch)
 	return FALSE;
 }
 
+// 复制指定长度路径文本
 static inline char* procXpkDupPathTextN(xpkObject objXpk, const char* sPath, size_t iSizePath)
 {
 	size_t iPosDst;
@@ -276,6 +297,7 @@ static inline char* procXpkDupPathTextN(xpkObject objXpk, const char* sPath, siz
 	return sText;
 }
 
+// 复制路径文本
 static inline char* procXpkDupPathText(xpkObject objXpk, const char* sPath)
 {
 	if ( sPath == NULL ) {
@@ -284,6 +306,7 @@ static inline char* procXpkDupPathText(xpkObject objXpk, const char* sPath)
 	return procXpkDupPathTextN(objXpk, sPath, strlen(sPath));
 }
 
+// 复制路径原样文本
 static inline char* procXpkDupPathStoredText(xpkObject objXpk, const char* sPath)
 {
 	char* sPathRet;
@@ -313,6 +336,7 @@ static inline char* procXpkDupPathStoredText(xpkObject objXpk, const char* sPath
 	return sPathRet;
 }
 
+// 校验原样路径文本
 static inline int procXpkValidateStoredPathText(xpkObject objXpk, const char* sPath)
 {
 	char* sPathDup;
@@ -331,6 +355,7 @@ static inline int procXpkValidateStoredPathText(xpkObject objXpk, const char* sP
 	return XPK_OK;
 }
 
+// 复制路径键
 static inline char* procXpkDupPathKey(xpkObject objXpk, const char* sPath)
 {
 	size_t iPos;
@@ -352,6 +377,7 @@ static inline char* procXpkDupPathKey(xpkObject objXpk, const char* sPath)
 	return sKey;
 }
 
+// 复制路径键已校验
 static inline char* procXpkDupPathKeyChecked(xpkObject objXpk, const char* sPath)
 {
 	size_t iPos;
@@ -373,6 +399,7 @@ static inline char* procXpkDupPathKeyChecked(xpkObject objXpk, const char* sPath
 	return sKey;
 }
 
+// 查找路径条目
 static inline xpkEntry* procXpkLookupPathEntry(xpkObject objXpk, const char* sPath)
 {
 	char* sKey;
@@ -479,6 +506,7 @@ static inline xpkEntry* procXpkLookupPathEntry(xpkObject objXpk, const char* sPa
 	return pEntry;
 }
 
+// 信息扩展大小按包类型
 static inline uint32_t procXpkInfoExtSizeByPackType(xpkPackType iType)
 {
 	switch ( iType ) {
@@ -494,21 +522,25 @@ static inline uint32_t procXpkInfoExtSizeByPackType(xpkPackType iType)
 	}
 }
 
+// 条目步长
 static inline uint32_t procXpkEntryStride(const xpkHead* pHead)
 {
 	return XPK_ENTRY_BASE_SIZE + pHead->infoExtSize;
 }
 
+// 条目删除
 static inline int procXpkEntryDeleted(const xpkEntry* pEntry)
 {
 	return ((pEntry->iFlag & XPK_FLAG_DELETED_MASK) != 0) ? TRUE : FALSE;
 }
 
+// 条目表原始大小
 static inline uint64_t procXpkEntryTableRawSize(const xpkHead* pHead)
 {
 	return (uint64_t)pHead->fileCount * (uint64_t)procXpkEntryStride(pHead);
 }
 
+// 获取条目按位置
 static inline xpkEntry* procXpkGetEntryByPos(xpkObject objXpk, uint32_t iPos)
 {
 	if ( (objXpk == NULL) || (iPos == 0) ) {
@@ -517,6 +549,7 @@ static inline xpkEntry* procXpkGetEntryByPos(xpkObject objXpk, uint32_t iPos)
 	return (xpkEntry*)xrtArrayGet(&objXpk->arrEntry, iPos);
 }
 
+// 校验条目数量状态
 static inline int procXpkValidateEntryCountState(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -528,6 +561,7 @@ static inline int procXpkValidateEntryCountState(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 获取公开条目按位置
 static inline int procXpkGetPublicEntryByPos(xpkObject objXpk, uint32_t iPos, xpkEntry** ppEntryRet)
 {
 	xpkEntry* pEntry;
@@ -556,6 +590,7 @@ static inline int procXpkGetPublicEntryByPos(xpkObject objXpk, uint32_t iPos, xp
 	return XPK_OK;
 }
 
+// 可见条目数量
 static inline uint32_t procXpkVisibleEntryCount(xpkObject objXpk)
 {
 	uint32_t iCount;
@@ -583,6 +618,7 @@ static inline uint32_t procXpkVisibleEntryCount(xpkObject objXpk)
 	return iCount;
 }
 
+// 可见条目数量严格
 static inline int procXpkVisibleEntryCountStrict(xpkObject objXpk, uint32_t* pCountRet)
 {
 	uint32_t iCount;
@@ -627,6 +663,7 @@ static inline int procXpkVisibleEntryCountStrict(xpkObject objXpk, uint32_t* pCo
 	return XPK_OK;
 }
 
+// 校验有效条目查找
 static inline int procXpkValidateLiveEntryLookup(xpkObject objXpk, const xpkEntry* pEntry)
 {
 	xpkEntry* pMap;
@@ -670,6 +707,7 @@ static inline int procXpkValidateLiveEntryLookup(xpkObject objXpk, const xpkEntr
 	return XPK_OK;
 }
 
+// 释放条目文本
 static inline void procXpkFreeEntryText(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -685,6 +723,7 @@ static inline void procXpkFreeEntryText(xpkObject objXpk)
 	}
 }
 
+// 重置查找
 static inline void procXpkResetLookup(xpkObject objXpk)
 {
 	xrtListUnit(&objXpk->lstEntry);
@@ -694,6 +733,7 @@ static inline void procXpkResetLookup(xpkObject objXpk)
 	xrtDictInit(&objXpk->tblEntry, sizeof(xpkEntry), XRT_OBJMODE_LOCAL);
 }
 
+// 重建查找
 static inline int procXpkRebuildLookup(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -772,6 +812,7 @@ static inline int procXpkRebuildLookup(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 重置条目
 static inline void procXpkResetEntries(xpkObject objXpk)
 {
 	procXpkFreeEntryText(objXpk);
@@ -787,6 +828,7 @@ static inline void procXpkResetEntries(xpkObject objXpk)
 	objXpk->iEntryCount = 0;
 }
 
+// 重置已加载状态
 static inline void procXpkResetLoadedState(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -807,6 +849,7 @@ static inline void procXpkResetLoadedState(xpkObject objXpk)
 	procXpkClearError(objXpk);
 }
 
+// 追加条目自有
 static inline int procXpkAppendEntryOwned(xpkObject objXpk, xpkEntry* pEntrySrc)
 {
 	uint32_t iPos;
@@ -832,6 +875,7 @@ static inline int procXpkAppendEntryOwned(xpkObject objXpk, xpkEntry* pEntrySrc)
 	return XPK_OK;
 }
 
+// 标记对象为干净状态
 static inline void procXpkMarkClean(xpkObject objXpk)
 {
 	objXpk->bDirtyHead = FALSE;
@@ -840,12 +884,14 @@ static inline void procXpkMarkClean(xpkObject objXpk)
 	objXpk->bDirtyData = FALSE;
 }
 
+// 标记脏条目表
 static inline void procXpkMarkDirtyEntryTable(xpkObject objXpk)
 {
 	objXpk->bDirtyEntryTable = TRUE;
 	objXpk->bDirtyHead = TRUE;
 }
 
+// 初始化默认包头
 static inline void procXpkInitHead(xpkObject objXpk)
 {
 	xtime tNow;
@@ -863,6 +909,7 @@ static inline void procXpkInitHead(xpkObject objXpk)
 	objXpk->objHead.changeTime = tNow;
 }
 
+// 标记已应用布局
 static inline void procXpkMarkAppliedLayout(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -874,6 +921,7 @@ static inline void procXpkMarkAppliedLayout(xpkObject objXpk)
 	objXpk->iVolumeSizeApplied = objXpk->objHead.volumeSize;
 }
 
+// 已应用分卷大小
 static inline uint32_t procXpkAppliedVolumeSize(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -882,6 +930,7 @@ static inline uint32_t procXpkAppliedVolumeSize(xpkObject objXpk)
 	return objXpk->iVolumeSizeApplied;
 }
 
+// 已应用分卷模式
 static inline int procXpkAppliedVolumeMode(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -890,6 +939,7 @@ static inline int procXpkAppliedVolumeMode(xpkObject objXpk)
 	return objXpk->bVolumeApplied ? TRUE : FALSE;
 }
 
+// 当前数据结束
 static inline uint64_t procXpkCurrentDataEnd(xpkObject objXpk)
 {
 	uint64_t iDataEnd;
@@ -908,6 +958,7 @@ static inline uint64_t procXpkCurrentDataEnd(xpkObject objXpk)
 	return iDataEnd;
 }
 
+// 判断分卷布局是否变化
 static inline int procXpkVolumeLayoutChanged(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -922,6 +973,7 @@ static inline int procXpkVolumeLayoutChanged(xpkObject objXpk)
 	return FALSE;
 }
 
+// 判断 Solid 布局是否变化
 static inline int procXpkSolidLayoutChanged(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -930,6 +982,7 @@ static inline int procXpkSolidLayoutChanged(xpkObject objXpk)
 	return (objXpk->bSolidApplied ? TRUE : FALSE) != (objXpk->objHead.solidMode ? TRUE : FALSE);
 }
 
+// 可采用目标布局
 static inline int procXpkCanAdoptTargetLayout(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -950,6 +1003,7 @@ static inline int procXpkCanAdoptTargetLayout(xpkObject objXpk)
 	return TRUE;
 }
 
+// 初始化对象
 static inline void procXpkInitObject(xpkObject objXpk, const xpkOpenOptions* pOpt)
 {
 	memset(objXpk, 0, sizeof(*objXpk));
@@ -965,6 +1019,7 @@ static inline void procXpkInitObject(xpkObject objXpk, const xpkOpenOptions* pOp
 	procXpkClearError(objXpk);
 }
 
+// 释放对象
 static inline void procXpkUnitObject(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {

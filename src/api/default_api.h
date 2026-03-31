@@ -1,3 +1,10 @@
+/*
+	xPack 默认位置 API 实现
+
+	负责按位置访问条目的增删改查与读写。
+*/
+
+// 移除未保存条目
 static inline int procXpkRemoveUnsavedEntry(xpkObject objXpk, uint32_t iPos)
 {
 	xpkEntry* pEntry;
@@ -45,6 +52,7 @@ static inline int procXpkRemoveUnsavedEntry(xpkObject objXpk, uint32_t iPos)
 	return XPK_OK;
 }
 
+// 添加内存数据条目
 static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	xpkEntry objEntry;
@@ -54,6 +62,8 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 	if ( pPosRet != NULL ) {
 		*pPosRet = 0;
 	}
+
+	// 先校验对象状态、写权限和输入参数，避免后面进入半完成状态。
 	if ( objXpk == NULL ) {
 		return procXpkReturnParamError(objXpk);
 	}
@@ -68,6 +78,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 	}
 
+	// 根据种子条目复制可继承字段，并按包类型补齐扩展信息缓冲。
 	memset(&objEntry, 0, sizeof(objEntry));
 	if ( pEntrySeed != NULL ) {
 		objEntry = *pEntrySeed;
@@ -102,6 +113,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 		objEntry.iFlag = (objEntry.iFlag & ~XPK_FLAG_TYPE_MASK) | (((uint32_t)pOpt->fileType & 0x0Fu) << 4);
 	}
 
+	// 先把条目挂到数组里，再写入真实数据；这样出错时可以统一走回滚路径。
 	iRet = procXpkAppendEntryOwned(objXpk, &objEntry);
 	if ( iRet != XPK_OK ) {
 		procXpkFreeEntryOwned(&objEntry);
@@ -119,6 +131,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 		return iRet;
 	}
 
+	// 数据落盘成功后重建查找表，确保位置、路径和索引视图保持一致。
 	iRet = procXpkRebuildLookup(objXpk);
 	if ( iRet != XPK_OK ) {
 		procXpkRemoveUnsavedEntry(objXpk, pEntry->iPos);
@@ -131,6 +144,7 @@ static inline int procXpkAddDataEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 	return XPK_OK;
 }
 
+// 写入文件来源条目
 static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xfile hFile;
@@ -147,11 +161,14 @@ static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, cons
 		return procXpkSetError(objXpk, XPK_ERR_PARAM, sXpkErrorInvalidParam);
 	}
 
+	// 先解析压缩级别和写入策略，后面的分发完全由这两个维度决定。
 	iRet = procXpkResolveCompLevel(objXpk, pOpt, &iLevel);
 	if ( iRet != XPK_OK ) {
 		return iRet;
 	}
 	iWritePolicy = procXpkResolveWritePolicy(objXpk, pOpt);
+
+	// 根据算法和写入策略分发到专用实现，避免所有路径都退回到单一的大内存方案。
 	if ( iLevel == 0 && iWritePolicy == XPK_WRITE_IMMEDIATE ) {
 		iRet = procXpkWriteImmediateStoreFile(objXpk, pEntry, sSrcPath);
 		if ( iRet != XPK_OK ) {
@@ -243,6 +260,8 @@ static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, cons
 	hFile = NULL;
 	memset(&objMap, 0, sizeof(objMap));
 	iSize = 0;
+
+	// 统一回落到“源文件映射 -> 通用写入入口”路径，覆盖剩余组合分支。
 	iRet = procXpkOpenMappedSourceFile(objXpk, sSrcPath, &hFile, &iSize, &objMap);
 	if ( iRet != XPK_OK ) {
 		return iRet;
@@ -254,6 +273,7 @@ static inline int procXpkStoreEntryFile(xpkObject objXpk, xpkEntry* pEntry, cons
 	return iRet;
 }
 
+// 添加文件来源条目
 static inline int procXpkAddFileEntry(xpkObject objXpk, xpkEntry* pEntrySeed, const char* sSrcPath, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	xpkEntry objEntry;
@@ -340,6 +360,7 @@ static inline int procXpkAddFileEntry(xpkObject objXpk, xpkEntry* pEntrySeed, co
 	return XPK_OK;
 }
 
+// 更新内存数据条目
 static inline int procXpkUpdateEntryData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	uint32_t iFlagOld;
@@ -368,6 +389,7 @@ static inline int procXpkUpdateEntryData(xpkObject objXpk, xpkEntry* pEntry, con
 	return XPK_OK;
 }
 
+// 更新文件来源条目
 static inline int procXpkUpdateEntryFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	uint32_t iFlagOld;
@@ -396,6 +418,7 @@ static inline int procXpkUpdateEntryFile(xpkObject objXpk, xpkEntry* pEntry, con
 	return XPK_OK;
 }
 
+// 校验公开位置访问是否合法
 static inline int procXpkValidatePublicPosAccess(xpkObject objXpk, xpkEntry* pEntry)
 {
 	if ( objXpk == NULL || pEntry == NULL ) {
@@ -407,6 +430,7 @@ static inline int procXpkValidatePublicPosAccess(xpkObject objXpk, xpkEntry* pEn
 	return procXpkValidateLiveEntryLookup(objXpk, pEntry);
 }
 
+// 获取可见条目数量
 XPKAPI uint32_t xpkCount(xpkObject objXpk)
 {
 	uint32_t iCount;
@@ -421,6 +445,7 @@ XPKAPI uint32_t xpkCount(xpkObject objXpk)
 	return iCount;
 }
 
+// 获取位置条目信息
 XPKAPI int xpkGetInfo(xpkObject objXpk, uint32_t iPos, xpkFileInfo* pInfoRet)
 {
 	xpkEntry* pEntry;
@@ -452,6 +477,7 @@ XPKAPI int xpkGetInfo(xpkObject objXpk, uint32_t iPos, xpkFileInfo* pInfoRet)
 	return XPK_OK;
 }
 
+// 获取位置条目扩展信息
 XPKAPI int xpkGetInfoExt(xpkObject objXpk, uint32_t iPos, void* pDataRet, uint32_t iSize)
 {
 	xpkEntry* pEntry;
@@ -488,6 +514,7 @@ XPKAPI int xpkGetInfoExt(xpkObject objXpk, uint32_t iPos, void* pDataRet, uint32
 	return XPK_OK;
 }
 
+// 设置位置条目扩展信息
 XPKAPI int xpkSetInfoExt(xpkObject objXpk, uint32_t iPos, const void* pData, uint32_t iSize)
 {
 	xpkEntry* pEntry;
@@ -538,6 +565,7 @@ XPKAPI int xpkSetInfoExt(xpkObject objXpk, uint32_t iPos, const void* pData, uin
 	return XPK_OK;
 }
 
+// 按位置添加文件条目
 XPKAPI int xpkAddFile(xpkObject objXpk, const char* sSrcPath, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	int iRet;
@@ -561,6 +589,7 @@ XPKAPI int xpkAddFile(xpkObject objXpk, const char* sSrcPath, const xpkWriteOpti
 	return procXpkAddFileEntry(objXpk, NULL, sSrcPath, pOpt, pPosRet);
 }
 
+// 按位置添加内存数据条目
 XPKAPI int xpkAddData(xpkObject objXpk, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt, uint32_t* pPosRet)
 {
 	int iRet;
@@ -581,6 +610,7 @@ XPKAPI int xpkAddData(xpkObject objXpk, const void* pData, uint64_t iSize, const
 	return procXpkAddDataEntry(objXpk, NULL, pData, iSize, pOpt, pPosRet);
 }
 
+// 按位置读取条目到文件
 XPKAPI int xpkReadToFile(xpkObject objXpk, uint32_t iPos, const char* sDstPath)
 {
 	xpkEntry* pEntry;
@@ -643,6 +673,7 @@ XPKAPI int xpkReadToFile(xpkObject objXpk, uint32_t iPos, const char* sDstPath)
 	return iRet;
 }
 
+// 按位置读取条目到内存
 XPKAPI void* xpkReadToMemory(xpkObject objXpk, uint32_t iPos, uint64_t* pSizeRet)
 {
 	xpkEntry* pEntry;
@@ -668,6 +699,7 @@ XPKAPI void* xpkReadToMemory(xpkObject objXpk, uint32_t iPos, uint64_t* pSizeRet
 	return procXpkReadEntryData(objXpk, pEntry, pSizeRet);
 }
 
+// 按位置更新文件条目
 XPKAPI int xpkUpdateFile(xpkObject objXpk, uint32_t iPos, const char* sSrcPath, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -698,6 +730,7 @@ XPKAPI int xpkUpdateFile(xpkObject objXpk, uint32_t iPos, const char* sSrcPath, 
 	return procXpkUpdateEntryFile(objXpk, pEntry, sSrcPath, pOpt);
 }
 
+// 按位置更新内存数据条目
 XPKAPI int xpkUpdateData(xpkObject objXpk, uint32_t iPos, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	xpkEntry* pEntry;
@@ -726,6 +759,7 @@ XPKAPI int xpkUpdateData(xpkObject objXpk, uint32_t iPos, const void* pData, uin
 	return procXpkUpdateEntryData(objXpk, pEntry, pData, iSize, pOpt);
 }
 
+// 按位置移除条目
 XPKAPI int xpkRemove(xpkObject objXpk, uint32_t iPos)
 {
 	xpkEntry* pEntry;
@@ -778,6 +812,7 @@ XPKAPI int xpkRemove(xpkObject objXpk, uint32_t iPos)
 	return XPK_OK;
 }
 
+// 按位置设置条目标记
 XPKAPI int xpkSetFlag(xpkObject objXpk, uint32_t iPos, uint32_t iMask, uint32_t iValue)
 {
 	xpkEntry* pEntry;

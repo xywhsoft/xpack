@@ -1,3 +1,10 @@
+/*
+	xPack 读写服务模块
+
+	负责条目读写、延迟写入队列、压缩路径与 solid 数据处理。
+*/
+
+// 按包偏移分块写入数据
 static inline int procXpkWriteAtChunkedPackage(xpkObject objXpk, xfile hFile, uint64_t iOffset, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -28,6 +35,7 @@ static inline int procXpkWriteAtChunkedPackage(xpkObject objXpk, xfile hFile, ui
 	return XPK_OK;
 }
 
+// 复制源文件内容到包文件
 static inline int procXpkCopySourceFileToPackage(xpkObject objXpk, xfile hFileSrc, xfile hFileDst, uint64_t iOffsetDst, uint64_t iSize)
 {
 	void* pChunk;
@@ -77,6 +85,7 @@ static inline int procXpkCopySourceFileToPackage(xpkObject objXpk, xfile hFileSr
 	return XPK_OK;
 }
 
+// 获取写入队列数量
 static inline int procXpkWriteQueueCount(xpkObject objXpk)
 {
 	if ( (objXpk == NULL) || (objXpk->pWriteQueue == NULL) ) {
@@ -85,6 +94,7 @@ static inline int procXpkWriteQueueCount(xpkObject objXpk)
 	return (int)objXpk->pWriteQueue->arrNode.Count;
 }
 
+// 初始化写入队列
 static inline int procXpkInitWriteQueue(xpkObject objXpk)
 {
 	if ( objXpk->pWriteQueue != NULL ) {
@@ -101,6 +111,7 @@ static inline int procXpkInitWriteQueue(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 释放写入队列
 static inline void procXpkUnitWriteQueue(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -123,6 +134,7 @@ static inline void procXpkUnitWriteQueue(xpkObject objXpk)
 	objXpk->pWriteQueue = NULL;
 }
 
+// 查找写入队列节点
 static inline xpkWriteNode* procXpkFindWriteNode(xpkObject objXpk, uint32_t iPos, uint32_t* pNodePosRet)
 {
 	uint32_t iNodePos;
@@ -148,6 +160,7 @@ static inline xpkWriteNode* procXpkFindWriteNode(xpkObject objXpk, uint32_t iPos
 	return NULL;
 }
 
+// 按节点位置移除延迟写入
 static inline void procXpkRemoveQueuedWriteAt(xpkObject objXpk, uint32_t iNodePos)
 {
 	xpkWriteNode* pNode;
@@ -164,6 +177,7 @@ static inline void procXpkRemoveQueuedWriteAt(xpkObject objXpk, uint32_t iNodePo
 	xrtArrayRemove(&objXpk->pWriteQueue->arrNode, iNodePos, 1);
 }
 
+// 按条目位置丢弃延迟写入
 static inline void procXpkDropQueuedWrite(xpkObject objXpk, uint32_t iPos)
 {
 	uint32_t iNodePos;
@@ -174,6 +188,7 @@ static inline void procXpkDropQueuedWrite(xpkObject objXpk, uint32_t iPos)
 	}
 }
 
+// 调整延迟写入位置
 static inline void procXpkShiftQueuedWritePos(xpkObject objXpk, uint32_t iPosRemoved)
 {
 	uint32_t iNodePos;
@@ -191,6 +206,7 @@ static inline void procXpkShiftQueuedWritePos(xpkObject objXpk, uint32_t iPosRem
 	}
 }
 
+// 立即写入原样文件并处理队列回退
 static inline int procXpkWriteImmediateStoreFileWithQueuedFallback(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath)
 {
 	xpkWriteNode* pNode;
@@ -245,6 +261,7 @@ static inline int procXpkWriteImmediateStoreFileWithQueuedFallback(xpkObject obj
 	return iRet;
 }
 
+// 队列写入
 static inline int procXpkQueueWrite(xpkObject objXpk, uint32_t iPos, uint8_t iLevel, void* pCompData, uint32_t iCompSize, uint64_t iRawSize)
 {
 	uint32_t iNodePos;
@@ -290,6 +307,7 @@ static inline int procXpkQueueWrite(xpkObject objXpk, uint32_t iPos, uint8_t iLe
 	return XPK_OK;
 }
 
+// 解析压缩级别
 static inline int procXpkResolveCompLevel(xpkObject objXpk, const xpkWriteOptions* pOpt, uint8_t* pLevelRet)
 {
 	uint8_t iLevel;
@@ -314,6 +332,7 @@ static inline int procXpkResolveCompLevel(xpkObject objXpk, const xpkWriteOption
 	return XPK_OK;
 }
 
+// 解析写入策略
 static inline uint8_t procXpkResolveWritePolicy(xpkObject objXpk, const xpkWriteOptions* pOpt)
 {
 	if ( pOpt == NULL ) {
@@ -322,6 +341,7 @@ static inline uint8_t procXpkResolveWritePolicy(xpkObject objXpk, const xpkWrite
 	return pOpt->writePolicy;
 }
 
+// 打开映射源文件
 static inline int procXpkOpenMappedSourceFile(xpkObject objXpk, const char* sPathFile, xfile* pFileRet, uint64_t* pSizeRet, xpkMappedFile* pMapRet)
 {
 	xfile hFile;
@@ -366,6 +386,7 @@ static inline int procXpkOpenMappedSourceFile(xpkObject objXpk, const char* sPat
 	return XPK_OK;
 }
 
+// 写入文件数据
 static inline int procXpkWriteFileData(xpkObject objXpk, const char* sPathFile, const void* pData, uint64_t iSize)
 {
 	xfile hFile;
@@ -413,6 +434,7 @@ static inline int procXpkWriteFileData(xpkObject objXpk, const char* sPathFile, 
 	return XPK_OK;
 }
 
+// 将包内范围复制到文件
 static inline int procXpkCopyPackageRangeToFile(xpkObject objXpk, uint64_t iOffsetSrc, uint64_t iSize, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -502,6 +524,7 @@ static inline int procXpkCopyPackageRangeToFile(xpkObject objXpk, uint64_t iOffs
 	return XPK_OK;
 }
 
+// 将原样条目复制到文件
 static inline int procXpkCopyStoredEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	uint32_t iLevel;
@@ -541,6 +564,7 @@ static inline int procXpkCopyStoredEntryToFile(xpkObject objXpk, xpkEntry* pEntr
 	return procXpkCopyPackageRangeToFile(objXpk, pEntry->iDataOffset, pEntry->iDataSize, sPathFile);
 }
 
+// 将原样 LZ4 条目复制到文件
 static inline int procXpkCopyStoredLz4EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -622,6 +646,7 @@ static inline int procXpkCopyStoredLz4EntryToFile(xpkObject objXpk, xpkEntry* pE
 	return iRet;
 }
 
+// 将原样 ZSTD 条目复制到文件
 static inline int procXpkCopyStoredZstdEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -858,6 +883,7 @@ static inline int procXpkCopyStoredZstdEntryToFile(xpkObject objXpk, xpkEntry* p
 	return XPK_OK;
 }
 
+// 将原样 LZMA2 条目复制到文件
 static inline int procXpkCopyStoredLzma2EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -1094,6 +1120,7 @@ static inline int procXpkCopyStoredLzma2EntryToFile(xpkObject objXpk, xpkEntry* 
 	return XPK_OK;
 }
 
+// 计算 Solid 原样原始大小
 static inline int procXpkCalcSolidStoredRawSize(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	uint64_t iRawSize;
@@ -1122,6 +1149,7 @@ static inline int procXpkCalcSolidStoredRawSize(xpkObject objXpk, uint64_t* pSiz
 	return XPK_OK;
 }
 
+// 将队列中的原样条目复制到文件
 static inline int procXpkCopyQueuedStoredEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -1159,6 +1187,7 @@ static inline int procXpkCopyQueuedStoredEntryToFile(xpkObject objXpk, xpkEntry*
 	return procXpkWriteFileData(objXpk, sPathFile, pNode->pCompData, pNode->iCompSize);
 }
 
+// 将解码后的 LZ4 块复制到文件
 static inline int procXpkCopyDecodedLz4BlockToFile(xpkObject objXpk, uint8_t iLevel, const void* pCompData, uint32_t iCompSize, uint64_t iRawSize, const char* sPathFile)
 {
 	void* pRawData;
@@ -1203,6 +1232,7 @@ static inline int procXpkCopyDecodedLz4BlockToFile(xpkObject objXpk, uint8_t iLe
 	return iRet;
 }
 
+// 将队列中的 LZ4 条目复制到文件
 static inline int procXpkCopyQueuedLz4EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -1240,6 +1270,7 @@ static inline int procXpkCopyQueuedLz4EntryToFile(xpkObject objXpk, xpkEntry* pE
 	return procXpkCopyDecodedLz4BlockToFile(objXpk, pNode->iLevel, pNode->pCompData, pNode->iCompSize, pNode->iRawSize, sPathFile);
 }
 
+// 将队列中的 ZSTD 条目复制到文件
 static inline int procXpkCopyQueuedZstdEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -1370,6 +1401,7 @@ static inline int procXpkCopyQueuedZstdEntryToFile(xpkObject objXpk, xpkEntry* p
 	return XPK_OK;
 }
 
+// 将队列中的 LZMA2 条目复制到文件
 static inline int procXpkCopyQueuedLzma2EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xpkWriteNode* pNode;
@@ -1508,6 +1540,7 @@ static inline int procXpkCopyQueuedLzma2EntryToFile(xpkObject objXpk, xpkEntry* 
 	return XPK_OK;
 }
 
+// 写入立即
 static inline int procXpkWriteImmediate(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFile;
@@ -1569,6 +1602,7 @@ static inline int procXpkWriteImmediate(xpkObject objXpk, xpkEntry* pEntry, cons
 	return XPK_OK;
 }
 
+// 写入缓冲
 static inline int procXpkWriteBuffered(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	if ( iSize > 0 ) {
@@ -1605,6 +1639,7 @@ static inline int procXpkWriteBuffered(xpkObject objXpk, xpkEntry* pEntry, const
 	return XPK_OK;
 }
 
+// 写入临时路径复制
 static inline char* procXpkWriteTempPathDup(xpkObject objXpk, const char* sTag)
 {
 	char sSuffix[128];
@@ -1649,6 +1684,7 @@ static inline char* procXpkWriteTempPathDup(xpkObject objXpk, const char* sTag)
 	return procXpkSetError(objXpk, XPK_ERR_IO, sXpkErrorIoWrite), NULL;
 }
 
+// 缓冲写入 LZ4 数据
 static inline int procXpkWriteBufferedLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -1780,6 +1816,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 ZSTD 数据
 static inline int procXpkWriteBufferedZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -1978,6 +2015,7 @@ lblCleanup:
 }
 
 
+// 立即写入 LZ4 数据
 static inline int procXpkWriteImmediateLz4Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -2127,6 +2165,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 ZSTD 数据
 static inline int procXpkWriteImmediateZstdData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -2342,6 +2381,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 写入阶段 LZMA 顺序输入读取
 static inline SRes procXpkWriteLzmaSeqInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
 	xpkWriteLzmaSeqIn* pIn;
@@ -2375,6 +2415,7 @@ static inline SRes procXpkWriteLzmaSeqInRead(ISeqInStreamPtr pStream, void* pDat
 	return SZ_OK;
 }
 
+// 写入阶段 LZMA 顺序输出写入
 static inline size_t procXpkWriteLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const void* pData, size_t iSize)
 {
 	xpkWriteLzmaSeqOut* pOut;
@@ -2393,6 +2434,7 @@ static inline size_t procXpkWriteLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const
 	return iWrite;
 }
 
+// 写入阶段 LZMA 内存输入读取
 static inline SRes procXpkWriteLzmaMemInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
 	xpkWriteLzmaMemIn* pIn;
@@ -2425,6 +2467,7 @@ static inline SRes procXpkWriteLzmaMemInRead(ISeqInStreamPtr pStream, void* pDat
 	return SZ_OK;
 }
 
+// 缓冲写入 LZMA2 数据
 static inline int procXpkWriteBufferedLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -2567,6 +2610,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 LZMA2 数据
 static inline int procXpkWriteImmediateLzma2Data(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint32_t iSize, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -2728,6 +2772,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 写入原始临时文件从源
 static inline int procXpkWriteRawTempFileFromSource(xpkObject objXpk, const char* sSrcPath, const char* sTag, xfile* pFileTmpRet, char** pPathTmpRet, uint64_t* pFileSizeRet, uint32_t* pHashRet)
 {
 	xfile hFileSrc;
@@ -2849,6 +2894,7 @@ static inline int procXpkWriteRawTempFileFromSource(xpkObject objXpk, const char
 	return XPK_OK;
 }
 
+// 编码映射的 LZ4 块
 static inline int procXpkEncodeMappedLz4Block(xpkObject objXpk, uint8_t iLevel, const xpkMappedFile* pMap, void** pCompDataRet, uint32_t* pCompSizeRet)
 {
 	void* pCompData;
@@ -2895,6 +2941,7 @@ static inline int procXpkEncodeMappedLz4Block(xpkObject objXpk, uint8_t iLevel, 
 	return XPK_OK;
 }
 
+// 立即写入 ZSTD 文件
 static inline int procXpkWriteImmediateZstdFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -3151,6 +3198,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 LZ4 文件
 static inline int procXpkWriteImmediateLz4File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -3278,6 +3326,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 立即写入 LZMA2 文件
 static inline int procXpkWriteImmediateLzma2File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -3462,6 +3511,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 ZSTD 文件
 static inline int procXpkWriteBufferedZstdFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -3743,6 +3793,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 LZMA2 文件
 static inline int procXpkWriteBufferedLzma2File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileSrc;
@@ -3953,6 +4004,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 缓冲写入 LZ4 文件
 static inline int procXpkWriteBufferedLz4File(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath, uint8_t iLevel)
 {
 	xfile hFileTmp;
@@ -4067,6 +4119,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 写入立即原样文件
 static inline int procXpkWriteImmediateStoreFile(xpkObject objXpk, xpkEntry* pEntry, const char* sSrcPath)
 {
 	xfile hFileSrc;
@@ -4184,6 +4237,7 @@ static inline int procXpkWriteImmediateStoreFile(xpkObject objXpk, xpkEntry* pEn
 	return XPK_OK;
 }
 
+// 获取 Solid 目标压缩级别
 static inline uint8_t procXpkSolidTargetCompLevel(xpkObject objXpk)
 {
 	if ( objXpk == NULL ) {
@@ -4192,6 +4246,7 @@ static inline uint8_t procXpkSolidTargetCompLevel(xpkObject objXpk)
 	return (uint8_t)objXpk->objHead.defComp;
 }
 
+// 获取 Solid 原样压缩级别
 static inline uint8_t procXpkSolidStoredCompLevel(xpkObject objXpk)
 {
 	uint32_t iPos;
@@ -4214,6 +4269,7 @@ static inline uint8_t procXpkSolidStoredCompLevel(xpkObject objXpk)
 	return procXpkSolidTargetCompLevel(objXpk);
 }
 
+// 计算 Solid 原始数据大小
 static inline int procXpkCalcSolidRawSize(xpkObject objXpk, uint64_t* pSizeRet)
 {
 	uint32_t iPos;
@@ -4243,6 +4299,7 @@ static inline int procXpkCalcSolidRawSize(xpkObject objXpk, uint64_t* pSizeRet)
 	return XPK_OK;
 }
 
+// 读取并分配 Solid LZ4 切片
 static inline int procXpkReadSolidLz4SliceAlloc(xpkObject objXpk, xpkEntry* pEntry, void** pDataRet, uint64_t* pSizeRet)
 {
 	xfile hFileSrc;
@@ -4380,6 +4437,7 @@ static inline int procXpkReadSolidLz4SliceAlloc(xpkObject objXpk, xpkEntry* pEnt
 	return XPK_OK;
 }
 
+// 将 Solid LZ4 条目复制到文件
 static inline int procXpkCopySolidLz4EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -4483,6 +4541,7 @@ static inline int procXpkCopySolidLz4EntryToFile(xpkObject objXpk, xpkEntry* pEn
 	return iRet;
 }
 
+// 读取并分配 Solid ZSTD 切片
 static inline int procXpkReadSolidZstdSliceAlloc(xpkObject objXpk, xpkEntry* pEntry, void** pDataRet, uint64_t* pSizeRet)
 {
 	xfile hFileSrc;
@@ -4716,6 +4775,7 @@ static inline int procXpkReadSolidZstdSliceAlloc(xpkObject objXpk, xpkEntry* pEn
 	return XPK_OK;
 }
 
+// 将 Solid ZSTD 条目复制到文件
 static inline int procXpkCopySolidZstdEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -4941,6 +5001,7 @@ static inline int procXpkCopySolidZstdEntryToFile(xpkObject objXpk, xpkEntry* pE
 	return XPK_OK;
 }
 
+// 读取并分配 Solid LZMA2 切片
 static inline int procXpkReadSolidLzma2SliceAlloc(xpkObject objXpk, xpkEntry* pEntry, void** pDataRet, uint64_t* pSizeRet)
 {
 	xfile hFileSrc;
@@ -5171,6 +5232,7 @@ static inline int procXpkReadSolidLzma2SliceAlloc(xpkObject objXpk, xpkEntry* pE
 	return XPK_OK;
 }
 
+// 将 Solid LZMA2 条目复制到文件
 static inline int procXpkCopySolidLzma2EntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	xfile hFileSrc;
@@ -5396,6 +5458,7 @@ static inline int procXpkCopySolidLzma2EntryToFile(xpkObject objXpk, xpkEntry* p
 	return XPK_OK;
 }
 
+// 读取 Solid 条目数据
 static inline void* procXpkReadSolidEntryData(xpkObject objXpk, xpkEntry* pEntry, uint64_t* pSizeRet)
 {
 	void* pFileData;
@@ -5470,6 +5533,7 @@ static inline void* procXpkReadSolidEntryData(xpkObject objXpk, xpkEntry* pEntry
 	return NULL;
 }
 
+// 将 Solid 条目复制到文件
 static inline int procXpkCopySolidEntryToFile(xpkObject objXpk, xpkEntry* pEntry, const char* sPathFile)
 {
 	uint64_t iSolidSize;
@@ -5516,6 +5580,7 @@ static inline int procXpkCopySolidEntryToFile(xpkObject objXpk, xpkEntry* pEntry
 	return procXpkSetError(objXpk, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
 
+// 原样条目数据
 static inline int procXpkStoreEntryData(xpkObject objXpk, xpkEntry* pEntry, const void* pData, uint64_t iSize, const xpkWriteOptions* pOpt)
 {
 	uint8_t iLevel;
@@ -5555,6 +5620,7 @@ static inline int procXpkStoreEntryData(xpkObject objXpk, xpkEntry* pEntry, cons
 	return XPK_OK;
 }
 
+// 基于文件句柄读取条目数据
 static inline void* procXpkReadEntryDataWithFile(xpkObject objXpk, xpkEntry* pEntry, uint64_t* pSizeRet, xfile hFile)
 {
 	xpkWriteNode* pNode;
@@ -5693,11 +5759,13 @@ static inline void* procXpkReadEntryDataWithFile(xpkObject objXpk, xpkEntry* pEn
 	return pRawData;
 }
 
+// 读取条目数据
 static inline void* procXpkReadEntryData(xpkObject objXpk, xpkEntry* pEntry, uint64_t* pSizeRet)
 {
 	return procXpkReadEntryDataWithFile(objXpk, pEntry, pSizeRet, NULL);
 }
 
+// 刷写延迟写入队列
 static inline int procXpkFlushQueuedWrites(xpkObject objXpk, xfile hFile)
 {
 	uint32_t iNodePos;
@@ -5709,6 +5777,7 @@ static inline int procXpkFlushQueuedWrites(xpkObject objXpk, xfile hFile)
 		return XPK_OK;
 	}
 
+	// 顺序落盘队列中的压缩块，并同步回填条目的最终偏移和大小。
 	for ( iNodePos = 1; iNodePos <= objXpk->pWriteQueue->arrNode.Count; iNodePos++ ) {
 		pNode = (xpkWriteNode*)xrtArrayGet(&objXpk->pWriteQueue->arrNode, iNodePos);
 		if ( pNode == NULL ) {

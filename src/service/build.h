@@ -1,3 +1,10 @@
+/*
+	xPack Build 重构模块
+
+	负责按目标布局重写包体、复制有效条目并处理临时文件。
+*/
+
+// 判断文件系统路径文本是否相等
 static inline int procXpkPathTextEqualFs(const char* sPathA, const char* sPathB)
 {
 	if ( sPathA == NULL || sPathB == NULL ) {
@@ -165,6 +172,7 @@ static inline int procXpkPathTextEqualFs(const char* sPathA, const char* sPathB)
 #endif
 }
 
+// 复制并规范化文件系统路径
 static inline char* procXpkPathNormDupFs(const char* sPath)
 {
 	size_t iLenPath;
@@ -271,6 +279,7 @@ static inline char* procXpkPathNormDupFs(const char* sPath)
 #endif
 }
 
+// 判断路径是否位于目录内
 static inline int procXpkPathInDirFs(xpkObject objXpk, const char* sPath, const char* sDir, int* pMatchRet)
 {
 	char* sPathNorm;
@@ -304,6 +313,7 @@ static inline int procXpkPathInDirFs(xpkObject objXpk, const char* sPath, const 
 	return XPK_OK;
 }
 
+// 判断路径是否属于同一分卷族
 static inline int procXpkPathIsVolumeFamilyFs(xpkObject objXpk, const char* sPath, const char* sBasePath, int* pMatchRet)
 {
 	char* sPathNorm;
@@ -350,6 +360,7 @@ static inline int procXpkPathIsVolumeFamilyFs(xpkObject objXpk, const char* sPat
 	return XPK_OK;
 }
 
+// 构建复制元数据
 static inline int procXpkBuildCopyMeta(xpkObject objDst, xpkObject objSrc)
 {
 	void* pMetaDup;
@@ -369,6 +380,7 @@ static inline int procXpkBuildCopyMeta(xpkObject objDst, xpkObject objSrc)
 	return XPK_OK;
 }
 
+// 构建复制配置
 static inline int procXpkBuildCopyConfig(xpkObject objDst, xpkObject objSrc)
 {
 	int iRet;
@@ -391,6 +403,7 @@ static inline int procXpkBuildCopyConfig(xpkObject objDst, xpkObject objSrc)
 	return procXpkBuildCopyMeta(objDst, objSrc);
 }
 
+// 构建复制条目路径
 static inline char* procXpkBuildDupEntryPath(xpkObject objDst, const char* sPath)
 {
 	char* sPathDup;
@@ -420,6 +433,7 @@ static inline char* procXpkBuildDupEntryPath(xpkObject objDst, const char* sPath
 	return NULL;
 }
 
+// 构建初始化种子
 static inline int procXpkBuildInitSeed(xpkObject objDst, const xpkEntry* pEntrySrc, xpkEntry* pSeedRet)
 {
 	memset(pSeedRet, 0, sizeof(*pSeedRet));
@@ -448,6 +462,7 @@ static inline int procXpkBuildInitSeed(xpkObject objDst, const xpkEntry* pEntryS
 	return XPK_OK;
 }
 
+// 构建复制条目数据
 static inline int procXpkBuildCopyEntryData(xpkObject objDst, const xpkEntry* pEntrySrc, const void* pData, uint64_t iSize)
 {
 	xpkEntry objSeed;
@@ -490,6 +505,7 @@ static inline int procXpkBuildCopyEntryData(xpkObject objDst, const xpkEntry* pE
 	return XPK_OK;
 }
 
+// 构建写入按位置分块
 static inline int procXpkBuildWriteAtChunked(xpkObject objDst, xfile hFile, uint64_t iOffset, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -520,6 +536,7 @@ static inline int procXpkBuildWriteAtChunked(xpkObject objDst, xfile hFile, uint
 	return XPK_OK;
 }
 
+// 构建清理块文件
 static inline int procXpkBuildCleanupChunkFiles(void* pChunk, xfile hFileSrc, xfile hFileDst, int iRet)
 {
 	if ( pChunk != NULL ) {
@@ -534,6 +551,7 @@ static inline int procXpkBuildCleanupChunkFiles(void* pChunk, xfile hFileSrc, xf
 	return iRet;
 }
 
+// 构建复制原样负载
 static inline int procXpkBuildCopyStoredPayload(xpkObject objDst, xfile hFileDst, xpkObject objSrc, xfile hFileSrc, uint64_t iOffsetDst, uint64_t iOffsetSrc, uint64_t iSize, void* pChunkShared)
 {
 	void* pChunk;
@@ -582,6 +600,7 @@ static inline int procXpkBuildCopyStoredPayload(xpkObject objDst, xfile hFileDst
 	return XPK_OK;
 }
 
+// 从原始数据写入 Solid ZSTD 块
 static inline int procXpkBuildWriteSolidZstdFromRaw(xpkObject objDst, const void* pData, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileTmp;
@@ -812,6 +831,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 构建写入原样文件分块
 static inline int procXpkBuildWritePlainFileChunked(xpkObject objDst, xfile hFile, const void* pData, uint64_t iSize)
 {
 	const uint8_t* pCur;
@@ -841,6 +861,7 @@ static inline int procXpkBuildWritePlainFileChunked(xpkObject objDst, xfile hFil
 	return XPK_OK;
 }
 
+// 构建阶段 LZMA 顺序输入读取
 static inline SRes procXpkBuildLzmaSeqInRead(ISeqInStreamPtr pStream, void* pData, size_t* pSize)
 {
 	xpkBuildLzmaSeqIn* pIn;
@@ -874,6 +895,7 @@ static inline SRes procXpkBuildLzmaSeqInRead(ISeqInStreamPtr pStream, void* pDat
 	return SZ_OK;
 }
 
+// 构建阶段 LZMA 顺序输出写入
 static inline size_t procXpkBuildLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const void* pData, size_t iSize)
 {
 	xpkBuildLzmaSeqOut* pOut;
@@ -892,6 +914,7 @@ static inline size_t procXpkBuildLzmaSeqOutWrite(ISeqOutStreamPtr pStream, const
 	return iWrite;
 }
 
+// 从文件写入 Solid ZSTD 块
 static inline int procXpkBuildWriteSolidZstdFromFile(xpkObject objDst, const char* sPathSrc, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileSrc;
@@ -1152,6 +1175,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 从文件写入 Solid LZMA2 块
 static inline int procXpkBuildWriteSolidLzma2FromFile(xpkObject objDst, const char* sPathSrc, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileSrc;
@@ -1344,6 +1368,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 从文件写入 Solid LZ4 块
 static inline int procXpkBuildWriteSolidLz4FromFile(xpkObject objDst, const char* sPathSrc, uint64_t iRawSize, uint8_t iLevel, uint32_t* pCompSizeRet, uint8_t* pLevelRet)
 {
 	xfile hFileSrc;
@@ -1543,6 +1568,7 @@ static inline int procXpkBuildWriteSolidLz4FromFile(xpkObject objDst, const char
 	return XPK_OK;
 }
 
+// 流式复制有效条目到 Solid ZSTD 目标
 static inline int procXpkBuildCopyLiveEntriesSolidZstdStreaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -1690,6 +1716,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 流式复制有效条目到 Solid LZMA2 目标
 static inline int procXpkBuildCopyLiveEntriesSolidLzma2Streaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -1837,6 +1864,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 流式复制有效条目到 Solid LZ4 目标
 static inline int procXpkBuildCopyLiveEntriesSolidLz4Streaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -1984,6 +2012,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 流式复制有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreStreaming(xpkObject objDst, xpkObject objSrc, uint64_t iSolidRawSize64)
 {
 	uint32_t iPos;
@@ -2148,6 +2177,7 @@ lblCleanup:
 	return iRet;
 }
 
+// 构建追加已复制条目
 static inline int procXpkBuildAppendCopiedEntry(xpkObject objDst, const xpkEntry* pEntrySrc, uint8_t iCompLevel, uint64_t iDataOffset, uint64_t iDataSize, uint64_t iFileSize)
 {
 	xpkEntry objSeed;
@@ -2175,6 +2205,7 @@ static inline int procXpkBuildAppendCopiedEntry(xpkObject objDst, const xpkEntry
 	return XPK_OK;
 }
 
+// 构建复制条目直通带文件
 static inline int procXpkBuildCopyEntryDirectWithFiles(xpkObject objDst, xpkObject objSrc, const xpkEntry* pEntrySrc, xfile hFileDst, xfile hFileSrc, void* pChunkShared)
 {
 	xpkWriteNode* pNode;
@@ -2281,11 +2312,13 @@ static inline int procXpkBuildCopyEntryDirectWithFiles(xpkObject objDst, xpkObje
 	return XPK_OK;
 }
 
+// 构建复制条目直通
 static inline int procXpkBuildCopyEntryDirect(xpkObject objDst, xpkObject objSrc, const xpkEntry* pEntrySrc)
 {
 	return procXpkBuildCopyEntryDirectWithFiles(objDst, objSrc, pEntrySrc, NULL, NULL, NULL);
 }
 
+// 构建复制条目
 static inline int procXpkBuildCopyEntry(xpkObject objDst, xpkObject objSrc, const xpkEntry* pEntrySrc)
 {
 	void* pData;
@@ -2306,6 +2339,7 @@ static inline int procXpkBuildCopyEntry(xpkObject objDst, xpkObject objSrc, cons
 	return iRet;
 }
 
+// 构建追加条目仅
 static inline int procXpkBuildAppendEntryOnly(xpkObject objDst, const xpkEntry* pEntrySrc, uint64_t iDataOffset, uint64_t iDataSize, uint64_t iFileSize)
 {
 	xpkEntry objEntry;
@@ -2355,6 +2389,7 @@ static inline int procXpkBuildAppendEntryOnly(xpkObject objDst, const xpkEntry* 
 	return XPK_OK;
 }
 
+// 检查 Solid 原样直拷条件
 static inline int procXpkBuildCheckSolidStoreDirect(xpkObject objDst, xpkObject objSrc, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -2421,6 +2456,7 @@ static inline int procXpkBuildCheckSolidStoreDirect(xpkObject objDst, xpkObject 
 	return XPK_OK;
 }
 
+// 检查普通布局单条目 Solid 直拷条件
 static inline int procXpkBuildCheckSingleEntrySolidDirectFromNormal(xpkObject objDst, xpkObject objSrc, xpkEntry** pEntryRet, xpkWriteNode** pNodeRet, uint64_t* pCompSizeRet, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -2522,6 +2558,7 @@ static inline int procXpkBuildCheckSingleEntrySolidDirectFromNormal(xpkObject ob
 	return XPK_OK;
 }
 
+// 从普通布局直拷单条目到 Solid
 static inline int procXpkBuildCopySingleEntrySolidDirectFromNormal(xpkObject objDst, xpkObject objSrc)
 {
 	xpkEntry* pEntry;
@@ -2601,6 +2638,7 @@ static inline int procXpkBuildCopySingleEntrySolidDirectFromNormal(xpkObject obj
 	return XPK_OK;
 }
 
+// 直拷有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreDirect(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -2691,6 +2729,7 @@ static inline int procXpkBuildCopyLiveEntriesSolidStoreDirect(xpkObject objDst, 
 	return XPK_OK;
 }
 
+// 检查 Solid 直拷条件
 static inline int procXpkBuildCheckSolidDirectCopy(xpkObject objDst, xpkObject objSrc, uint64_t* pCompSizeRet, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -2741,6 +2780,7 @@ static inline int procXpkBuildCheckSolidDirectCopy(xpkObject objDst, xpkObject o
 	return XPK_OK;
 }
 
+// 直拷 Solid 数据块
 static inline int procXpkBuildCopySolidBlockDirect(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -2819,6 +2859,7 @@ static inline int procXpkBuildCopySolidBlockDirect(xpkObject objDst, xpkObject o
 	return XPK_OK;
 }
 
+// 紧凑复制有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreCompact(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -2916,6 +2957,7 @@ static inline int procXpkBuildCopyLiveEntriesSolidStoreCompact(xpkObject objDst,
 	return XPK_OK;
 }
 
+// 从普通布局复制有效条目到 Solid 原样目标
 static inline int procXpkBuildCopyLiveEntriesSolidStoreFromNormal(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -3040,6 +3082,7 @@ static inline int procXpkBuildCopyLiveEntriesSolidStoreFromNormal(xpkObject objD
 	return XPK_OK;
 }
 
+// 复制有效条目到 Solid 目标
 static inline int procXpkBuildCopyLiveEntriesSolid(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -3115,6 +3158,7 @@ static inline int procXpkBuildCopyLiveEntriesSolid(xpkObject objDst, xpkObject o
 	return procXpkSetError(objDst, XPK_ERR_STATE, sXpkErrorBadFormat);
 }
 
+// 从 Solid 源复制有效条目
 static inline int procXpkBuildCopyLiveEntriesFromSolidSource(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -3163,6 +3207,7 @@ static inline int procXpkBuildCopyLiveEntriesFromSolidSource(xpkObject objDst, x
 	return XPK_OK;
 }
 
+// 从 Solid 原样源复制有效条目
 static inline int procXpkBuildCopyLiveEntriesFromSolidStoredSource(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -3265,6 +3310,7 @@ static inline int procXpkBuildCopyLiveEntriesFromSolidStoredSource(xpkObject obj
 	return XPK_OK;
 }
 
+// 检查 Solid 单条目直拷条件
 static inline int procXpkBuildCheckSolidSingleEntryDirect(xpkObject objDst, xpkObject objSrc, xpkEntry** pEntryRet, uint64_t* pCompSizeRet, int* pCanCopyRet)
 {
 	uint32_t iPos;
@@ -3334,6 +3380,7 @@ static inline int procXpkBuildCheckSolidSingleEntryDirect(xpkObject objDst, xpkO
 	return XPK_OK;
 }
 
+// 直拷单个 Solid 条目
 static inline int procXpkBuildCopySingleSolidEntryDirect(xpkObject objDst, xpkObject objSrc)
 {
 	xpkEntry* pEntry;
@@ -3407,6 +3454,7 @@ static inline int procXpkBuildCopySingleSolidEntryDirect(xpkObject objDst, xpkOb
 	return XPK_OK;
 }
 
+// 构建复制有效条目
 static inline int procXpkBuildCopyLiveEntries(xpkObject objDst, xpkObject objSrc)
 {
 	uint32_t iPos;
@@ -3501,6 +3549,7 @@ static inline int procXpkBuildCopyLiveEntries(xpkObject objDst, xpkObject objSrc
 	return XPK_OK;
 }
 
+// 构建生成临时路径
 static inline char* procXpkBuildMakeTempPath(xpkObject objXpk, const xpkBuildOptions* pOpt, int bReplaceOriginal)
 {
 	size_t iPathLen;
@@ -3535,6 +3584,7 @@ static inline char* procXpkBuildMakeTempPath(xpkObject objXpk, const xpkBuildOpt
 	return sTempPath;
 }
 
+// 构建确保临时路径未占用
 static inline int procXpkBuildEnsureTempPathUnused(xpkObject objXpk, const char* sTempPath)
 {
 	if ( sTempPath == NULL || sTempPath[0] == '\0' ) {
@@ -3543,6 +3593,7 @@ static inline int procXpkBuildEnsureTempPathUnused(xpkObject objXpk, const char*
 	return procXpkEnsureVolumePathUnusedText(objXpk, sTempPath, sXpkErrorTempPathExists);
 }
 
+// 构建校验选项
 static inline int procXpkBuildValidateOptions(xpkObject objXpk, const xpkBuildOptions* pOpt, int* pReplaceOriginalRet)
 {
 	int bReplaceOriginal;
@@ -3615,6 +3666,7 @@ static inline int procXpkBuildValidateOptions(xpkObject objXpk, const xpkBuildOp
 	return XPK_OK;
 }
 
+// 构建重置临时路径
 static inline int procXpkBuildResetTempPath(xpkObject objXpk, const char* sTempPath)
 {
 	int iRet;
@@ -3635,6 +3687,7 @@ static inline int procXpkBuildResetTempPath(xpkObject objXpk, const char* sTempP
 	return XPK_OK;
 }
 
+// 构建重新加载自身
 static inline int procXpkBuildReloadSelf(xpkObject objXpk)
 {
 	xpkOpenOptions objOpt;
@@ -3671,6 +3724,7 @@ static inline int procXpkBuildReloadSelf(xpkObject objXpk)
 	return XPK_OK;
 }
 
+// 执行构建重构流程
 static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* pOpt)
 {
 	int bReplaceOriginal;
@@ -3685,6 +3739,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 	size_t iBuildTextSize;
 	int iRet;
 
+	// 先校验对象状态和 build 选项，避免后续在临时路径上做出不可逆修改。
 	if ( objXpk == NULL ) {
 		return procXpkReturnParamError(objXpk);
 	}
@@ -3715,6 +3770,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 		return iRet;
 	}
 
+	// 打开临时目标包，后续所有复制与保存都先落到这个安全副本里。
 	memset(&objOpenOpt, 0, sizeof(objOpenOpt));
 	objOpenOpt.createIfMissing = TRUE;
 	objBuild = xpkOpen(sTempPath, &objOpenOpt);
@@ -3737,6 +3793,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 	sBuildError[0] = '\0';
 	sFinalPath = NULL;
 
+	// 先复制包级配置，再复制有效条目，最后把临时包完整保存下来。
 	iRet = procXpkBuildCopyConfig(objBuild, objXpk);
 	if ( iRet == XPK_OK ) {
 		iRet = procXpkBuildCopyLiveEntries(objBuild, objXpk);
@@ -3770,6 +3827,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 		return procXpkSetError(objXpk, iRet, sBuildError);
 	}
 
+	// 非替换模式直接保留临时产物；替换模式则继续把结果移动回原路径。
 	if ( !bReplaceOriginal ) {
 		xpkClose(objBuild);
 		xpkFreeInternal(sTempPath);
@@ -3798,6 +3856,7 @@ static inline int procXpkBuildPackage(xpkObject objXpk, const xpkBuildOptions* p
 		return procXpkSetError(objXpk, iRet, sReplaceError);
 	}
 
+	// 用新构建对象接管当前运行时状态，避免再走一次完整重开流程。
 	sFinalPath = procXpkDupText(objXpk->sPathPackage);
 	if ( sFinalPath == NULL ) {
 		xpkClose(objBuild);

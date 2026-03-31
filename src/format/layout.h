@@ -1,3 +1,10 @@
+/*
+	xPack 磁盘布局模块
+
+	负责包头与条目表的编解码、布局校验和默认布局初始化。
+*/
+
+// 写入 32 位小端值
 static inline void procXpkWrite32LE(uint8_t* pBuf, uint32_t iValue)
 {
 	pBuf[0] = (uint8_t)(iValue & 0xFFu);
@@ -6,12 +13,14 @@ static inline void procXpkWrite32LE(uint8_t* pBuf, uint32_t iValue)
 	pBuf[3] = (uint8_t)((iValue >> 24) & 0xFFu);
 }
 
+// 写入 64 位小端值
 static inline void procXpkWrite64LE(uint8_t* pBuf, uint64_t iValue)
 {
 	procXpkWrite32LE(pBuf, (uint32_t)(iValue & 0xFFFFFFFFu));
 	procXpkWrite32LE(pBuf + 4, (uint32_t)(iValue >> 32));
 }
 
+// 读取 32 位小端值
 static inline uint32_t procXpkRead32LE(const uint8_t* pBuf)
 {
 	return ((uint32_t)pBuf[0]) |
@@ -20,12 +29,14 @@ static inline uint32_t procXpkRead32LE(const uint8_t* pBuf)
 		((uint32_t)pBuf[3] << 24);
 }
 
+// 读取 64 位小端值
 static inline uint64_t procXpkRead64LE(const uint8_t* pBuf)
 {
 	return ((uint64_t)procXpkRead32LE(pBuf)) |
 		((uint64_t)procXpkRead32LE(pBuf + 4) << 32);
 }
 
+// 应用包类型默认布局
 static inline int procXpkApplyPackType(xpkObject objXpk, xpkPackType iType)
 {
 	uint32_t iInfoExtSize;
@@ -40,6 +51,7 @@ static inline int procXpkApplyPackType(xpkObject objXpk, xpkPackType iType)
 	return XPK_OK;
 }
 
+// 校验包头布局
 static inline int procXpkValidateHead(xpkObject objXpk, const xpkHead* pHead)
 {
 	uint32_t iInfoExtSize;
@@ -79,6 +91,7 @@ static inline int procXpkValidateHead(xpkObject objXpk, const xpkHead* pHead)
 	return XPK_OK;
 }
 
+// 编码包头
 static inline void procXpkEncodeHead(const xpkHead* pHead, uint8_t sBuf[XPK_HEAD_SIZE])
 {
 	uint32_t iFlags1;
@@ -110,6 +123,7 @@ static inline void procXpkEncodeHead(const xpkHead* pHead, uint8_t sBuf[XPK_HEAD
 	procXpkWrite64LE(sBuf + 56, (uint64_t)pHead->changeTime);
 }
 
+// 解码包头
 static inline void procXpkDecodeHead(const uint8_t sBuf[XPK_HEAD_SIZE], xpkHead* pHead)
 {
 	uint32_t iFlags1;
@@ -140,6 +154,7 @@ static inline void procXpkDecodeHead(const uint8_t sBuf[XPK_HEAD_SIZE], xpkHead*
 	pHead->changeTime = (xtime)procXpkRead64LE(sBuf + 56);
 }
 
+// 编码条目表
 static inline int procXpkEncodeEntryTable(xpkObject objXpk, void** pDataRet, uint32_t* pSizeRet)
 {
 	uint32_t iPos;
@@ -228,6 +243,7 @@ static inline int procXpkEncodeEntryTable(xpkObject objXpk, void** pDataRet, uin
 	return XPK_OK;
 }
 
+// 解码条目表
 static inline int procXpkDecodeEntryTable(xpkObject objXpk, const void* pData, uint32_t iSize)
 {
 	uint32_t iPos;
