@@ -82,6 +82,9 @@ static bool procTestFilterValid(const char* sFilter)
 	if ( procTestFilterEquals(sFilter, "integration", "build_volume") ) {
 		return TRUE;
 	}
+	if ( strcmp(sFilter, "integration/large_io") == 0 ) {
+		return TRUE;
+	}
 	if ( strcmp(sFilter, "integration/build_volume/direct") == 0 ) {
 		return TRUE;
 	}
@@ -129,6 +132,7 @@ static void procTestPrintFilterHelp(void)
 	printf("  unit/index_path\n");
 	printf("  unit/index_path/direct\n");
 	printf("  integration\n");
+	printf("  integration/large_io\n");
 	printf("  integration/build_volume\n");
 	printf("  integration/build_volume/direct\n");
 	printf("  integration/stress\n");
@@ -139,6 +143,7 @@ static void procTestPrintFilterHelp(void)
 	printf("note:\n");
 	printf("  filters use staged cumulative execution.\n");
 	printf("  unit runs smoke + unit.\n");
+	printf("  integration/large_io runs smoke + unit + opt-in 4GB+ large-io regressions.\n");
 	printf("  integration/build_volume runs smoke + unit + build_volume.\n");
 	printf("  integration/stress runs smoke + unit + build_volume repeated N times.\n");
 	printf("  integration/solid_readonly runs smoke + unit + build_volume + solid_readonly.\n");
@@ -254,6 +259,7 @@ int main(int argc, char** argv)
 	const char* sTestFilter;
 	bool bRunSmoke;
 	bool bRunUnit;
+	bool bRunLargeIo;
 	bool bRunBuildVolume;
 	bool bRunStress;
 	bool bRunSolidReadonly;
@@ -334,17 +340,20 @@ int main(int argc, char** argv)
 	bRunSmoke =
 		procTestFilterEquals(sTestFilter, "smoke", "open_core")
 		|| procTestFilterEquals(sTestFilter, "unit", "index_path")
+		|| ((sTestFilter != NULL) && (strcmp(sTestFilter, "integration/large_io") == 0))
 		|| procTestFilterEquals(sTestFilter, "integration", "build_volume")
 		|| procTestFilterEquals(sTestFilter, "integration", "stress")
 		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly");
 
 	bRunUnit =
 		procTestFilterEquals(sTestFilter, "unit", "index_path")
+		|| ((sTestFilter != NULL) && (strcmp(sTestFilter, "integration/large_io") == 0))
 		|| procTestFilterEquals(sTestFilter, "integration", "build_volume")
 		|| procTestFilterEquals(sTestFilter, "integration", "stress")
 		|| procTestFilterEquals(sTestFilter, "integration", "solid_readonly")
 		|| bDirectUnit;
 
+	bRunLargeIo = (sTestFilter != NULL) && (strcmp(sTestFilter, "integration/large_io") == 0);
 	bRunBuildVolume =
 		procTestFilterEquals(sTestFilter, "integration", "build_volume")
 		|| procTestFilterEquals(sTestFilter, "integration", "stress")

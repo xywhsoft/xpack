@@ -157,13 +157,14 @@ release\x64\xpack_test.exe
 4. `unit`
 5. `unit/index_path`
 6. `integration`
-7. `integration/build_volume`
-8. `integration/stress`
-9. `integration/solid_readonly`
-10. `unit/index_path/direct`
-11. `integration/build_volume/direct`
-12. `integration/stress/direct`
-13. `integration/solid_readonly/direct`
+7. `integration/large_io`
+8. `integration/build_volume`
+9. `integration/stress`
+10. `integration/solid_readonly`
+11. `unit/index_path/direct`
+12. `integration/build_volume/direct`
+13. `integration/stress/direct`
+14. `integration/solid_readonly/direct`
 
 也可以通过环境变量传入：
 
@@ -178,11 +179,12 @@ release\x64\xpack_test.exe
 
 1. `smoke` 只跑 `smoke`。
 2. `unit` 会跑 `smoke + unit`。
-3. `integration/build_volume` 会跑 `smoke + unit + integration/build_volume`。
-4. `integration/solid_readonly` 会跑 `smoke + unit + integration/build_volume + integration/solid_readonly`。
-5. `integration` 等价于当前完整回归。
-6. `integration/stress` 会跑 `smoke + unit + integration/build_volume`，并把 `integration/build_volume` 整轮重复 `5` 次。
-7. 以 `/direct` 结尾的过滤值只执行当前阶段本体，不再自动带上前置阶段。
+3. `integration/large_io` 会跑 `smoke + unit +` 显式启用的 `4GB+` 大文件与大偏移长时回归。
+4. `integration/build_volume` 会跑 `smoke + unit + integration/build_volume`。
+5. `integration/solid_readonly` 会跑 `smoke + unit + integration/build_volume + integration/solid_readonly`。
+6. `integration` 等价于当前完整回归。
+7. `integration/stress` 会跑 `smoke + unit + integration/build_volume`，并把 `integration/build_volume` 整轮重复 `5` 次。
+8. 以 `/direct` 结尾的过滤值只执行当前阶段本体，不再自动带上前置阶段。
 
 ### 7.4 Windows 压测脚本
 

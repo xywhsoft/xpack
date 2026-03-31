@@ -61,6 +61,7 @@ release\x64\xpack_test.exe unit
 release\x64\xpack_test.exe unit/index_path
 release\x64\xpack_test.exe unit/index_path/direct
 release\x64\xpack_test.exe integration
+release\x64\xpack_test.exe integration/large_io
 release\x64\xpack_test.exe integration/build_volume
 release\x64\xpack_test.exe integration/build_volume/direct
 release\x64\xpack_test.exe integration/stress
@@ -91,6 +92,8 @@ release\x64\xpack_test.exe
 ### 4.3 integration
 
 `save / build / reopen / rollback / volume / solid / readonly` 等跨模块主链。
+
+`integration/large_io` 额外承载显式执行的 `4GB+` 大文件与大偏移长时回归，不放进默认 `smoke / unit` 快速路径。
 
 ## 5. 当前限制
 

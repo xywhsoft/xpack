@@ -258,6 +258,8 @@
 		xpkClose(objXpk);
 		return 279;
 	}
+	if ( bRunLargeIo ) {
+		/* opt-in 4GB+ large-io regression: keep smoke fast by default */
 	hFile = xrtOpen((str)sPathPkgCore, FALSE, XRT_CP_BINARY);
 	if ( hFile == NULL ) {
 		xpkClose(objXpk);
@@ -1313,6 +1315,7 @@
 	remove(sPathFileHuge);
 	xpkClose(objXpk);
 	remove(sPathPkgStoreHuge);
+	}
 
 	objXpk = xpkOpen(sPathPkgCore, NULL);
 	if ( objXpk == NULL ) {

@@ -730,6 +730,8 @@
 	xpkClose(objXpk);
 	procTestDeletePathFamily(sPathPkgTest);
 
+	if ( bRunLargeIo ) {
+		/* opt-in 4GB+ large-io regression: keep unit fast by default */
 	procTestDeletePathFamily(sPathPkgTest);
 	memset(&objOpt, 0, sizeof(objOpt));
 	objOpt.createIfMissing = TRUE;
@@ -998,6 +1000,7 @@
 	remove(sPathFileHuge);
 	xpkClose(objXpk);
 	procTestDeletePathFamily(sPathPkgTest);
+	}
 
 	procTestDeletePathFamily(sPathPkgTest);
 	iDataLargeSize = (96u * 1024u) + 57u;
