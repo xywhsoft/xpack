@@ -63,8 +63,13 @@ static BOOL GuiArchiveFolderExists(GuiApp* app, const WCHAR* folder);
 static BOOL GuiCollectSelectedSourceIndexes(GuiApp* app, size_t** indexesOut, size_t* countOut);
 static BOOL GuiQueryArchiveDiskStamp(const WCHAR* archivePath, FILETIME* writeTimeOut, uint64_t* fileSizeOut);
 static BOOL GuiUpdateArchiveDiskStamp(GuiApp* app);
+static WCHAR* GuiAllocEmptyWideText(void);
+static BOOL GuiEncodeMetaUtf8Text(const WCHAR* text, void** outData, uint32_t* outSize);
 static uint8_t GuiEntryFileType(uint32_t flag);
 static void GuiFormatFileType(uint8_t fileType, WCHAR* buf, size_t cchBuf);
+static void GuiBuildDuplicateLeafName(const WCHAR* sourceName, UINT copyIndex, WCHAR* outName, size_t cchOutName);
+static BOOL GuiBuildRenameTargetPath(GuiApp* app, const WCHAR* inputValue, WCHAR* targetPath, size_t cchTargetPath);
+static BOOL GuiSelectViewItemByFullPath(GuiApp* app, GuiViewItemKind kind, const WCHAR* fullPath);
 
 static void GuiBuildExtractOutputPath(xpkPackType packType, const WCHAR* destPath, const GuiArchiveItem* item, WCHAR* outPath, size_t cchOutPath)
 {
@@ -1932,6 +1937,11 @@ BOOL GuiArchiveCanReplaceSelection(GuiApp* app)
 	return GuiArchiveCanOpenSelection(app);
 }
 
+BOOL GuiArchiveCanDuplicateSelection(GuiApp* app)
+{
+	return GuiArchiveCanOpenSelection(app);
+}
+
 BOOL GuiArchiveCanEditSelectionInfoExt(GuiApp* app)
 {
 	return app != NULL
@@ -2843,6 +2853,14 @@ BOOL GuiArchiveCanRenameSelection(GuiApp* app)
 
 	viewItem = GuiArchiveGetSingleSelectedViewItem(app);
 	return viewItem != NULL && (viewItem->kind == GUI_VIEW_ITEM_FILE || viewItem->kind == GUI_VIEW_ITEM_DIR);
+}
+
+BOOL GuiArchiveCanSetSelectionFileIndex(GuiApp* app)
+{
+	return app != NULL
+		&& app->archive != NULL
+		&& app->packType == XPK_PACK_INDEX
+		&& GuiArchiveGetSingleSelectedItem(app) != NULL;
 }
 
 BOOL GuiArchiveCanSetSelectionFileType(GuiApp* app)
@@ -4884,6 +4902,208 @@ BOOL GuiArchiveReplaceSelection(GuiApp* app)
 	return GuiArchiveReplaceItemFromPath(app, selectedItem, sourcePath, L"替换条目");
 }
 
+BOOL GuiArchiveDuplicateSelection(GuiApp* app)
+{
+	GuiArchiveItem* item;
+	xpkWriteOptions writeOpt;
+	WCHAR tempRoot[XPKGUI_MAX_TEMP_PATH];
+	WCHAR sourcePath[XPKGUI_MAX_TEMP_PATH];
+	WCHAR targetPath[XPKGUI_ITEM_TEXT];
+	char utf8Source[XPK_PATH_BYTES];
+	char utf8Target[XPK_PATH_BYTES];
+	int64_t fileIndex;
+	uint32_t newPos;
+	void* infoBuf;
+
+	if ( app == NULL || app->archive == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiArchiveCanDuplicateSelection(app) ) {
+		MessageBoxW(app->window, L"请选择单个文件进行复制。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	item = GuiArchiveGetSingleSelectedItem(app);
+	if ( item == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiArchiveExtractSingleSelectionToTemp(app, L"复制条目", tempRoot, _countof(tempRoot), sourcePath, _countof(sourcePath)) ) {
+		return FALSE;
+	}
+	if ( !GuiUtf8FromWide(sourcePath, utf8Source, sizeof(utf8Source)) ) {
+		MessageBoxW(app->window, L"临时文件路径转换失败。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+
+	ZeroMemory(&writeOpt, sizeof(writeOpt));
+	writeOpt.compLevel = 0xFFu;
+	writeOpt.writePolicy = app->writePolicy;
+	writeOpt.fileType = GuiEntryFileType(item->flag);
+
+	infoBuf = NULL;
+	newPos = 0;
+	fileIndex = 0;
+	targetPath[0] = L'\0';
+
+	if ( app->packType == XPK_PACK_CORE && app->infoExtSize > 0 ) {
+		infoBuf = malloc(app->infoExtSize);
+		if ( infoBuf == NULL ) {
+			MessageBoxW(app->window, L"内存不足，无法复制条目 InfoExt。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			return FALSE;
+		}
+		if ( xpkGetInfoExt(app->archive, item->pos, infoBuf, app->infoExtSize) != XPK_OK ) {
+			free(infoBuf);
+			GuiShowArchiveError(app, L"读取条目 InfoExt");
+			return FALSE;
+		}
+	}
+
+	if ( app->packType == XPK_PACK_INDEX ) {
+		int64_t defaultIndex;
+
+		defaultIndex = item->fileIndex + 1;
+		if ( defaultIndex <= item->fileIndex || xpkIndexFind(app->archive, defaultIndex, NULL) == XPK_OK ) {
+			defaultIndex = GuiFindNextIndexSeed(app);
+		}
+		if ( !GuiPromptIndexAddOptions(app->window, L"复制条目", defaultIndex, &fileIndex) ) {
+			free(infoBuf);
+			return FALSE;
+		}
+		if ( xpkIndexFind(app->archive, fileIndex, NULL) == XPK_OK ) {
+			free(infoBuf);
+			MessageBoxW(app->window, L"该 fileIndex 已存在。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		if ( xpkIndexAddFile(app->archive, fileIndex, utf8Source, &writeOpt) != XPK_OK ) {
+			free(infoBuf);
+			GuiShowArchiveError(app, L"复制条目");
+			return FALSE;
+		}
+	} else if ( GuiIsPathPackType(app->packType) ) {
+		GuiInputDialogState dialogState;
+		WCHAR defaultValue[XPKGUI_ITEM_TEXT];
+		WCHAR candidateLeaf[XPKGUI_ITEM_TEXT];
+		WCHAR candidateFull[XPKGUI_ITEM_TEXT];
+		WCHAR sourceDir[XPKGUI_ITEM_TEXT];
+		const WCHAR* remainder;
+		const WCHAR* slash;
+		size_t dirLen;
+		UINT copyIndex;
+		BOOL foundCandidate;
+
+		sourceDir[0] = L'\0';
+		slash = wcsrchr(item->name, L'/');
+		if ( slash == NULL ) {
+			slash = wcsrchr(item->name, L'\\');
+		}
+		if ( slash != NULL ) {
+			dirLen = (size_t)(slash - item->name);
+			if ( dirLen >= _countof(sourceDir) ) {
+				dirLen = _countof(sourceDir) - 1;
+			}
+			wcsncpy_s(sourceDir, _countof(sourceDir), item->name, dirLen);
+			sourceDir[dirLen] = L'\0';
+		}
+
+		candidateFull[0] = L'\0';
+		foundCandidate = FALSE;
+		for ( copyIndex = 0; copyIndex < 1024u; ++copyIndex ) {
+			GuiBuildDuplicateLeafName(item->name, copyIndex, candidateLeaf, _countof(candidateLeaf));
+			if ( sourceDir[0] != L'\0' ) {
+				GuiBuildChildViewPath(sourceDir, candidateLeaf, candidateFull, _countof(candidateFull));
+			} else {
+				wcsncpy_s(candidateFull, _countof(candidateFull), candidateLeaf, _TRUNCATE);
+			}
+			GuiPathToPackageUtf8(candidateFull, utf8Target, sizeof(utf8Target));
+			if ( !xpkPathExists(app->archive, utf8Target) ) {
+				foundCandidate = TRUE;
+				break;
+			}
+		}
+		if ( !foundCandidate ) {
+			free(infoBuf);
+			MessageBoxW(app->window, L"无法为复制条目生成目标路径。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			return FALSE;
+		}
+
+		ZeroMemory(&dialogState, sizeof(dialogState));
+		dialogState.title = L"复制条目";
+		if ( app->currentFolder[0] != L'\0' && !app->flatView ) {
+			dialogState.prompt = L"新包内路径(相对当前目录):";
+		} else {
+			dialogState.prompt = L"新包内路径:";
+		}
+		if ( app->currentFolder[0] != L'\0' && !app->flatView && GuiPathMatchFolderPrefix(candidateFull, app->currentFolder, &remainder) ) {
+			wcsncpy_s(defaultValue, _countof(defaultValue), remainder, _TRUNCATE);
+		} else {
+			wcsncpy_s(defaultValue, _countof(defaultValue), candidateFull, _TRUNCATE);
+		}
+		wcsncpy_s(dialogState.value, _countof(dialogState.value), defaultValue, _TRUNCATE);
+		if ( !GuiRunInputDialog(app->window, &dialogState) ) {
+			free(infoBuf);
+			return FALSE;
+		}
+		if ( !GuiBuildRenameTargetPath(app, dialogState.value, targetPath, _countof(targetPath)) ) {
+			free(infoBuf);
+			MessageBoxW(app->window, L"请输入有效的包内路径。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		if ( _wcsicmp(targetPath, item->name) == 0 ) {
+			free(infoBuf);
+			MessageBoxW(app->window, L"新包内路径不能与原条目相同。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		GuiPathToPackageUtf8(targetPath, utf8Target, sizeof(utf8Target));
+		if ( xpkPathExists(app->archive, utf8Target) ) {
+			free(infoBuf);
+			MessageBoxW(app->window, L"该包内路径已存在。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		if ( xpkPathAddFile(app->archive, utf8Target, utf8Source, &writeOpt) != XPK_OK ) {
+			free(infoBuf);
+			GuiShowArchiveError(app, L"复制条目");
+			return FALSE;
+		}
+		if ( xpkPathSetAttr(app->archive, utf8Target, item->attr) != XPK_OK ) {
+			free(infoBuf);
+			GuiShowArchiveError(app, L"复制条目");
+			GuiArchiveOpenPath(app, app->archivePath, FALSE);
+			return FALSE;
+		}
+	} else {
+		if ( xpkAddFile(app->archive, utf8Source, &writeOpt, &newPos) != XPK_OK ) {
+			free(infoBuf);
+			GuiShowArchiveError(app, L"复制条目");
+			return FALSE;
+		}
+	}
+
+	if ( infoBuf != NULL ) {
+		if ( xpkSetInfoExt(app->archive, newPos, infoBuf, app->infoExtSize) != XPK_OK ) {
+			free(infoBuf);
+			GuiShowArchiveError(app, L"复制条目");
+			GuiArchiveOpenPath(app, app->archivePath, FALSE);
+			return FALSE;
+		}
+		free(infoBuf);
+	}
+
+	if ( !GuiArchiveSave(app) ) {
+		return FALSE;
+	}
+
+	if ( app->packType == XPK_PACK_INDEX ) {
+		_snwprintf_s(targetPath, _countof(targetPath), _TRUNCATE, L"%lld", (long long)fileIndex);
+		GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	} else if ( GuiIsPathPackType(app->packType) ) {
+		GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	} else {
+		_snwprintf_s(targetPath, _countof(targetPath), _TRUNCATE, L"Entry %u", newPos);
+		GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	}
+	return TRUE;
+}
+
 BOOL GuiArchiveOpenSelectionWith(GuiApp* app)
 {
 	WCHAR tempRoot[XPKGUI_MAX_TEMP_PATH];
@@ -5420,6 +5640,52 @@ static void GuiTrimPathNameForEdit(const WCHAR* src, WCHAR* dst, size_t cchDst)
 	}
 }
 
+static void GuiBuildDuplicateLeafName(const WCHAR* sourceName, UINT copyIndex, WCHAR* outName, size_t cchOutName)
+{
+	const WCHAR* leaf;
+	const WCHAR* slash1;
+	const WCHAR* slash2;
+	const WCHAR* ext;
+	size_t leafLen;
+	size_t baseLen;
+
+	if ( outName == NULL || cchOutName == 0 ) {
+		return;
+	}
+
+	leaf = sourceName;
+	if ( leaf == NULL || leaf[0] == L'\0' ) {
+		leaf = L"entry";
+	} else {
+		slash1 = wcsrchr(leaf, L'/');
+		slash2 = wcsrchr(leaf, L'\\');
+		if ( slash1 != NULL || slash2 != NULL ) {
+			const WCHAR* lastSlash;
+
+			lastSlash = slash1;
+			if ( lastSlash == NULL || (slash2 != NULL && slash2 > lastSlash) ) {
+				lastSlash = slash2;
+			}
+			if ( lastSlash != NULL && lastSlash[1] != L'\0' ) {
+				leaf = lastSlash + 1;
+			}
+		}
+	}
+
+	leafLen = wcslen(leaf);
+	ext = wcsrchr(leaf, L'.');
+	if ( ext == NULL || ext == leaf ) {
+		ext = leaf + leafLen;
+	}
+	baseLen = (size_t)(ext - leaf);
+
+	if ( copyIndex == 0 ) {
+		_snwprintf_s(outName, cchOutName, _TRUNCATE, L"%.*s - Copy%s", (int)baseLen, leaf, ext);
+	} else {
+		_snwprintf_s(outName, cchOutName, _TRUNCATE, L"%.*s - Copy %u%s", (int)baseLen, leaf, (unsigned)(copyIndex + 1), ext);
+	}
+}
+
 static BOOL GuiBuildRenameTargetPath(GuiApp* app, const WCHAR* inputValue, WCHAR* targetPath, size_t cchTargetPath)
 {
 	WCHAR trimmed[XPKGUI_ITEM_TEXT];
@@ -5552,6 +5818,133 @@ BOOL GuiArchiveAddEmptyEntry(GuiApp* app)
 	}
 	_snwprintf_s(promptText, _countof(promptText), _TRUNCATE, L"Entry %u", pos);
 	GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, promptText);
+	return TRUE;
+}
+
+BOOL GuiArchiveCreateTextEntry(GuiApp* app)
+{
+	xpkWriteOptions writeOpt;
+	GuiTextEditorDialogState state;
+	WCHAR targetPath[XPKGUI_ITEM_TEXT];
+	WCHAR title[128];
+	WCHAR prompt[512];
+	WCHAR idText[64];
+	WCHAR* textBuf;
+	void* utf8Buf;
+	uint32_t utf8Size;
+	char utf8Path[XPK_PATH_BYTES];
+	int64_t fileIndex;
+	uint32_t pos;
+
+	if ( app == NULL || app->archive == NULL ) {
+		return FALSE;
+	}
+
+	targetPath[0] = L'\0';
+	fileIndex = 0;
+	pos = 0;
+	if ( app->packType == XPK_PACK_INDEX ) {
+		if ( !GuiPromptIndexAddOptions(app->window, L"创建文本条目", GuiFindNextIndexSeed(app), &fileIndex) ) {
+			return FALSE;
+		}
+		if ( xpkIndexFind(app->archive, fileIndex, NULL) == XPK_OK ) {
+			MessageBoxW(app->window, L"该 fileIndex 已存在。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		_snwprintf_s(idText, _countof(idText), _TRUNCATE, L"%lld", (long long)fileIndex);
+		_snwprintf_s(title, _countof(title), _TRUNCATE, L"Create Text Entry - %s", idText);
+		_snwprintf_s(prompt, _countof(prompt), _TRUNCATE, L"将创建 fileIndex=%s 的 UTF-8 文本条目。直接输入文本并确定即可写入归档。", idText);
+	} else if ( GuiIsPathPackType(app->packType) ) {
+		GuiInputDialogState pathDialog;
+
+		ZeroMemory(&pathDialog, sizeof(pathDialog));
+		pathDialog.title = L"创建文本条目";
+		pathDialog.prompt = (app->currentFolder[0] != L'\0' && !app->flatView) ? L"包内路径(相对当前目录):" : L"包内路径:";
+		wcsncpy_s(pathDialog.value, _countof(pathDialog.value), L"new_text.txt", _TRUNCATE);
+		if ( !GuiRunInputDialog(app->window, &pathDialog) ) {
+			return FALSE;
+		}
+		if ( !GuiBuildRenameTargetPath(app, pathDialog.value, targetPath, _countof(targetPath)) ) {
+			MessageBoxW(app->window, L"请输入有效的包内路径。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		GuiPathToPackageUtf8(targetPath, utf8Path, sizeof(utf8Path));
+		if ( xpkPathExists(app->archive, utf8Path) ) {
+			MessageBoxW(app->window, L"该包内路径已存在。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+			return FALSE;
+		}
+		_snwprintf_s(title, _countof(title), _TRUNCATE, L"Create Text Entry - %s", targetPath);
+		_snwprintf_s(prompt, _countof(prompt), _TRUNCATE, L"将创建包内路径 %s 的 UTF-8 文本条目。直接输入文本并确定即可写入归档。", targetPath);
+	} else {
+		wcsncpy_s(title, _countof(title), L"Create Text Entry", _TRUNCATE);
+		wcsncpy_s(prompt, _countof(prompt), L"将创建新的 UTF-8 文本条目。直接输入文本并确定即可写入归档。", _TRUNCATE);
+	}
+
+	textBuf = GuiAllocEmptyWideText();
+	if ( textBuf == NULL ) {
+		MessageBoxW(app->window, L"内存不足，无法创建文本编辑器。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+
+	ZeroMemory(&state, sizeof(state));
+	state.title = title;
+	state.prompt = prompt;
+	state.text = textBuf;
+	state.cchText = 1;
+	state.readOnly = FALSE;
+	if ( !GuiRunTextEditorDialog(app->window, &state) ) {
+		free(state.text);
+		return FALSE;
+	}
+
+	utf8Buf = NULL;
+	utf8Size = 0;
+	if ( !GuiEncodeMetaUtf8Text(state.text, &utf8Buf, &utf8Size) ) {
+		free(state.text);
+		MessageBoxW(app->window, L"无法把文本编码为 UTF-8。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+	free(state.text);
+
+	ZeroMemory(&writeOpt, sizeof(writeOpt));
+	writeOpt.compLevel = 0xFFu;
+	writeOpt.writePolicy = app->writePolicy;
+	writeOpt.fileType = 2u;
+
+	if ( app->packType == XPK_PACK_INDEX ) {
+		if ( xpkIndexAddData(app->archive, fileIndex, utf8Buf, utf8Size, &writeOpt) != XPK_OK ) {
+			free(utf8Buf);
+			GuiShowArchiveError(app, L"创建文本条目");
+			return FALSE;
+		}
+	} else if ( GuiIsPathPackType(app->packType) ) {
+		if ( xpkPathAddData(app->archive, utf8Path, utf8Buf, utf8Size, &writeOpt) != XPK_OK ) {
+			free(utf8Buf);
+			GuiShowArchiveError(app, L"创建文本条目");
+			return FALSE;
+		}
+	} else {
+		if ( xpkAddData(app->archive, utf8Buf, utf8Size, &writeOpt, &pos) != XPK_OK ) {
+			free(utf8Buf);
+			GuiShowArchiveError(app, L"创建文本条目");
+			return FALSE;
+		}
+	}
+	free(utf8Buf);
+
+	if ( !GuiArchiveSave(app) ) {
+		return FALSE;
+	}
+
+	if ( app->packType == XPK_PACK_INDEX ) {
+		_snwprintf_s(targetPath, _countof(targetPath), _TRUNCATE, L"%lld", (long long)fileIndex);
+		GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	} else if ( GuiIsPathPackType(app->packType) ) {
+		GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	} else {
+		_snwprintf_s(targetPath, _countof(targetPath), _TRUNCATE, L"Entry %u", pos);
+		GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	}
 	return TRUE;
 }
 
@@ -5795,6 +6188,70 @@ BOOL GuiArchiveRenameSelection(GuiApp* app)
 	}
 
 	return GuiArchiveSave(app);
+}
+
+BOOL GuiArchiveSetSelectionFileIndex(GuiApp* app)
+{
+	GuiArchiveItem* item;
+	xpkWriteOptions writeOpt;
+	WCHAR tempRoot[XPKGUI_MAX_TEMP_PATH];
+	WCHAR sourcePath[XPKGUI_MAX_TEMP_PATH];
+	char utf8Source[XPK_PATH_BYTES];
+	int64_t newFileIndex;
+	WCHAR targetPath[XPKGUI_ITEM_TEXT];
+
+	if ( app == NULL || app->archive == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiArchiveCanSetSelectionFileIndex(app) ) {
+		MessageBoxW(app != NULL ? app->window : NULL, L"请选择 Index 包中的单个文件设置 fileIndex。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	item = GuiArchiveGetSingleSelectedItem(app);
+	if ( item == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiPromptIndexAddOptions(app->window, L"设置 FileIndex", item->fileIndex, &newFileIndex) ) {
+		return FALSE;
+	}
+	if ( newFileIndex == item->fileIndex ) {
+		return TRUE;
+	}
+	if ( xpkIndexFind(app->archive, newFileIndex, NULL) == XPK_OK ) {
+		MessageBoxW(app->window, L"该 fileIndex 已存在。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+	if ( !GuiArchiveExtractSingleSelectionToTemp(app, L"调整 FileIndex", tempRoot, _countof(tempRoot), sourcePath, _countof(sourcePath)) ) {
+		return FALSE;
+	}
+	if ( !GuiUtf8FromWide(sourcePath, utf8Source, sizeof(utf8Source)) ) {
+		MessageBoxW(app->window, L"临时文件路径转换失败。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+
+	ZeroMemory(&writeOpt, sizeof(writeOpt));
+	writeOpt.compLevel = 0xFFu;
+	writeOpt.writePolicy = app->writePolicy;
+	writeOpt.fileType = GuiEntryFileType(item->flag);
+
+	if ( xpkIndexAddFile(app->archive, newFileIndex, utf8Source, &writeOpt) != XPK_OK ) {
+		GuiShowArchiveError(app, L"设置 FileIndex");
+		return FALSE;
+	}
+	if ( xpkIndexRemove(app->archive, item->fileIndex) != XPK_OK ) {
+		(void)xpkIndexRemove(app->archive, newFileIndex);
+		GuiShowArchiveError(app, L"设置 FileIndex");
+		GuiArchiveOpenPath(app, app->archivePath, FALSE);
+		return FALSE;
+	}
+	if ( !GuiArchiveSave(app) ) {
+		return FALSE;
+	}
+
+	_snwprintf_s(targetPath, _countof(targetPath), _TRUNCATE, L"%lld", (long long)newFileIndex);
+	GuiSelectViewItemByFullPath(app, GUI_VIEW_ITEM_FILE, targetPath);
+	return TRUE;
 }
 
 BOOL GuiArchiveVerify(GuiApp* app)

@@ -336,6 +336,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	BOOL canExtract;
 	BOOL canDelete;
 	BOOL allowRename;
+	BOOL canSetFileIndex;
 	BOOL canSetFileType;
 	BOOL canSetPathAttr;
 	BOOL canVerifySelection;
@@ -345,6 +346,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	BOOL canShowInExplorer;
 	BOOL canEdit;
 	BOOL canReplace;
+	BOOL canDuplicate;
 	BOOL canEditInfoExt;
 	BOOL canSelectByPattern;
 	BOOL canSelectSameExt;
@@ -377,10 +379,12 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	canShowInExplorer = GuiArchiveCanShowSelectionInExplorer(app);
 	canEdit = GuiArchiveCanEditSelection(app);
 	canReplace = GuiArchiveCanReplaceSelection(app);
+	canDuplicate = GuiArchiveCanDuplicateSelection(app);
 	canEditInfoExt = GuiArchiveCanEditSelectionInfoExt(app);
 	canExtract = GuiArchiveCanExtractSelection(app);
 	canDelete = GuiArchiveCanDeleteSelection(app);
 	allowRename = GuiArchiveCanRenameSelection(app);
+	canSetFileIndex = GuiArchiveCanSetSelectionFileIndex(app);
 	canSetFileType = GuiArchiveCanSetSelectionFileType(app);
 	canSetPathAttr = GuiArchiveCanSetSelectionPathAttr(app);
 	canVerifySelection = GuiArchiveCanVerifySelection(app);
@@ -401,7 +405,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		return;
 	}
 
-	if ( canOpen || canView || canEditText || canShowInExplorer || canEdit || canReplace || canEditInfoExt || canExtract || canDelete || allowRename || canSetFileType || canSetPathAttr || canVerifySelection || canCopy || canCopyHash || canShowProperties || canSelectByPattern || canSelectSameExt || canSelectSameHash || canSelectDuplicates || canSelectDuplicateCopies || canDeleteDuplicateCopies || canInvertSelection || canLocateInTree ) {
+	if ( canOpen || canView || canEditText || canShowInExplorer || canEdit || canReplace || canDuplicate || canEditInfoExt || canExtract || canDelete || allowRename || canSetFileIndex || canSetFileType || canSetPathAttr || canVerifySelection || canCopy || canCopyHash || canShowProperties || canSelectByPattern || canSelectSameExt || canSelectSameHash || canSelectDuplicates || canSelectDuplicateCopies || canDeleteDuplicateCopies || canInvertSelection || canLocateInTree ) {
 		if ( canOpen ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_OPEN, L"Open");
 			AppendMenuW(menu, MF_STRING, ID_ACTION_OPEN_WITH, L"Open With...");
@@ -417,6 +421,9 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		}
 		if ( canReplace ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_REPLACE, L"Replace...");
+		}
+		if ( canDuplicate ) {
+			AppendMenuW(menu, MF_STRING, ID_ACTION_DUPLICATE, L"Duplicate Entry...");
 		}
 		if ( canShowInExplorer ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_SHOW_IN_EXPLORER, L"Show In Explorer");
@@ -441,6 +448,9 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		}
 		if ( allowRename ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_RENAME, L"Rename...");
+		}
+		if ( canSetFileIndex ) {
+			AppendMenuW(menu, MF_STRING, ID_ACTION_SET_FILE_INDEX, L"Set FileIndex...");
 		}
 		if ( canSetFileType ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_SET_FILE_TYPE, L"Set File Type...");
@@ -485,6 +495,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	AppendMenuW(menu, MF_STRING, ID_ACTION_ADD_FILES, L"Add Files...");
 	AppendMenuW(menu, MF_STRING, ID_ACTION_ADD_FOLDER, L"Add Folder...");
 	AppendMenuW(menu, MF_STRING, ID_ACTION_ADD_EMPTY, L"Add Empty Entry...");
+	AppendMenuW(menu, MF_STRING, ID_ACTION_CREATE_TEXT, L"Create Text Entry...");
 	AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
 	AppendMenuW(menu, MF_STRING, ID_ACTION_VERIFY_ALL, L"Verify All");
 	AppendMenuW(menu, MF_STRING, ID_FILE_PROPERTIES, L"Archive Properties");
@@ -504,6 +515,7 @@ void GuiSetMenuState(GuiApp* app)
 	BOOL canExtract;
 	BOOL canDelete;
 	BOOL canRename;
+	BOOL canSetFileIndex;
 	BOOL canSetFileType;
 	BOOL canSetPathAttr;
 	BOOL canVerifySelection;
@@ -513,6 +525,7 @@ void GuiSetMenuState(GuiApp* app)
 	BOOL canShowInExplorer;
 	BOOL canEdit;
 	BOOL canReplace;
+	BOOL canDuplicate;
 	BOOL canEditInfoExt;
 	BOOL canSelectByPattern;
 	BOOL canSelectSameExt;
@@ -543,10 +556,12 @@ void GuiSetMenuState(GuiApp* app)
 	canShowInExplorer = hasArchive && GuiArchiveCanShowSelectionInExplorer(app);
 	canEdit = hasArchive && GuiArchiveCanEditSelection(app);
 	canReplace = hasArchive && GuiArchiveCanReplaceSelection(app);
+	canDuplicate = hasArchive && GuiArchiveCanDuplicateSelection(app);
 	canEditInfoExt = hasArchive && GuiArchiveCanEditSelectionInfoExt(app);
 	canExtract = hasArchive && GuiArchiveCanExtractSelection(app);
 	canDelete = hasArchive && GuiArchiveCanDeleteSelection(app);
 	canRename = hasArchive && GuiArchiveCanRenameSelection(app);
+	canSetFileIndex = hasArchive && GuiArchiveCanSetSelectionFileIndex(app);
 	canSetFileType = hasArchive && GuiArchiveCanSetSelectionFileType(app);
 	canSetPathAttr = hasArchive && GuiArchiveCanSetSelectionPathAttr(app);
 	canVerifySelection = hasArchive && GuiArchiveCanVerifySelection(app);
@@ -583,6 +598,7 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_ACTION_EDIT_TEXT, MF_BYCOMMAND | (canEditText ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_EDIT, MF_BYCOMMAND | (canEdit ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_REPLACE, MF_BYCOMMAND | (canReplace ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_ACTION_DUPLICATE, MF_BYCOMMAND | (canDuplicate ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_SHOW_IN_EXPLORER, MF_BYCOMMAND | (canShowInExplorer ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_INFO_EXT, MF_BYCOMMAND | (canEditInfoExt ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_INFO_EXT_IMPORT, MF_BYCOMMAND | (canEditInfoExt ? MF_ENABLED : MF_GRAYED));
@@ -592,10 +608,12 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_ACTION_ADD_FILES, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_ADD_FOLDER, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_ADD_EMPTY, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_ACTION_CREATE_TEXT, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_EXTRACT, MF_BYCOMMAND | (canExtract ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_EXTRACT_ALL, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_DELETE, MF_BYCOMMAND | (canDelete ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_RENAME, MF_BYCOMMAND | (canRename ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_ACTION_SET_FILE_INDEX, MF_BYCOMMAND | (canSetFileIndex ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_SET_FILE_TYPE, MF_BYCOMMAND | (canSetFileType ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_SET_PATH_ATTR, MF_BYCOMMAND | (canSetPathAttr ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_VERIFY, MF_BYCOMMAND | (canVerifySelection ? MF_ENABLED : MF_GRAYED));
@@ -1077,8 +1095,17 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_ACTION_REPLACE:
 					GuiArchiveReplaceSelection(app);
 					return 0;
+				case ID_ACTION_DUPLICATE:
+					GuiArchiveDuplicateSelection(app);
+					return 0;
+				case ID_ACTION_SET_FILE_INDEX:
+					GuiArchiveSetSelectionFileIndex(app);
+					return 0;
 				case ID_ACTION_ADD_EMPTY:
 					GuiArchiveAddEmptyEntry(app);
+					return 0;
+				case ID_ACTION_CREATE_TEXT:
+					GuiArchiveCreateTextEntry(app);
 					return 0;
 				case ID_ACTION_OPEN_WITH:
 					GuiArchiveOpenSelectionWith(app);

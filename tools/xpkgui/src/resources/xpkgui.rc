@@ -26,12 +26,14 @@ BEGIN
         MENUITEM "Add Files...", ID_ACTION_ADD_FILES
         MENUITEM "Add Folder...", ID_ACTION_ADD_FOLDER
         MENUITEM "Add Empty Entry...", ID_ACTION_ADD_EMPTY
+        MENUITEM "Create Text Entry...", ID_ACTION_CREATE_TEXT
         MENUITEM SEPARATOR
         MENUITEM "Open\tEnter", ID_ACTION_OPEN
         MENUITEM "View\tF3", ID_ACTION_VIEW
         MENUITEM "Edit Text...", ID_ACTION_EDIT_TEXT
         MENUITEM "Edit\tF4", ID_ACTION_EDIT
         MENUITEM "Replace...", ID_ACTION_REPLACE
+        MENUITEM "Duplicate Entry...", ID_ACTION_DUPLICATE
         MENUITEM "Open With...", ID_ACTION_OPEN_WITH
         MENUITEM "Show In Explorer", ID_ACTION_SHOW_IN_EXPLORER
         MENUITEM "Extract Selected...", ID_ACTION_EXTRACT
@@ -39,6 +41,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Delete", ID_ACTION_DELETE
         MENUITEM "Rename", ID_ACTION_RENAME
+        MENUITEM "Set FileIndex...", ID_ACTION_SET_FILE_INDEX
         MENUITEM "Set File Type...", ID_ACTION_SET_FILE_TYPE
         MENUITEM "Set Platform Attr...", ID_ACTION_SET_PATH_ATTR
         MENUITEM "Properties\tAlt+Enter", ID_ACTION_PROPERTIES

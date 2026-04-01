@@ -23,6 +23,7 @@ GUI 目前已经把 xPack 的核心归档能力接进来了：
 - 所有 pack type 都支持对当前选区批量设置条目 `File Type`，兼容旧版约定的 `Unknown / Binary / Text / Image / Audio / Video / Archive`
 - Explorer 右键菜单
 - 已打开归档时支持直接创建空条目；`index` 包会提示 `fileIndex`，`linux/win32` 包会提示包内路径
+- 已打开归档时也支持直接创建 UTF-8 文本条目，并立即在 GUI 内编辑后写入归档
 - 添加 / 创建后写入 / 解压 / 校验 / 重构 具备独立进度窗口，不再直接卡死主界面
 - 进度窗口会显示当前正在处理的文件或目标路径
 - `Verify` 支持智能行为：有选区时校验选中条目/目录子树，无选区时校验整包；菜单里也已拆分为 `Verify Selected` 和 `Verify All`
@@ -33,6 +34,7 @@ GUI 目前已经把 xPack 的核心归档能力接进来了：
 - `linux` / `win32` 包支持在目录视图和 `Flat View` 之间切换，且可将选中的平铺结果直接定位回目录树，方便全局搜索和批量操作
 - `linux` / `win32` 包支持对当前选区批量设置 `platformAttr`；目录会递归作用到整个子树，输入支持十进制和 `0x` 十六进制
 - 向 `index` 包添加内容时可指定起始 `fileIndex`；向 `linux` / `win32` 包添加内容时可指定包内根前缀，便于直接控制逻辑索引和入包路径
+- `index` 包支持对单个文件直接 `Set FileIndex...`，可把已有条目迁移到新的 `fileIndex`
 - 顶部导航栏支持 `Back / Forward / Root / Up / Go`，目录视图、`Flat View`、`Locate In Tree` 和手动路径跳转共用同一套浏览历史
 - `File -> Recent Archives` 会持久化最近打开或创建的归档，下次启动仍可直接打开
 - 单个文件支持直接 `Open` 或 `Open With...`，都会先解压到临时目录再交给系统处理；如果包内文件本身是 `.xpk`，则 `Open` 会直接用新的 `xpkgui` 窗口打开；`Enter` / 双击文件也走同样逻辑
@@ -40,6 +42,7 @@ GUI 目前已经把 xPack 的核心归档能力接进来了：
 - 单个文件支持 `Edit Text...`：小型 UTF-8 文本可直接在 GUI 内编辑并写回归档；非文本内容会退化为十六进制只读预览
 - `Edit` 会先解压到临时目录并用记事本打开；关闭记事本后如果检测到内容变化，会提示是否直接写回归档
 - 单个文件支持 `Replace...`，可直接选一个外部文件替换当前条目，保留原有包内位置和当前 `File Type`
+- 单个文件支持 `Duplicate Entry...`：可直接复制为新条目；`index` 包会提示新的 `fileIndex`，`linux/win32` 包会提示新的包内路径，并尽量保留 `File Type`、`core InfoExt` 和 `path platformAttr`
 - 单个文件也支持 `Show In Explorer`，会先解压到临时目录，再让 Explorer 直接定位到该文件
 - 选中目录后可以直接解压整个子树；单个目录也支持整棵子树重命名
 - 选中项支持 `Properties` 查看条目或当前选区摘要；归档属性和选中项属性已区分
