@@ -1,0 +1,152 @@
+#pragma code_page(65001)
+
+#include <windows.h>
+#include "resource.h"
+
+IDR_MAIN_MENU MENU
+BEGIN
+    POPUP "File"
+    BEGIN
+        MENUITEM "New...", ID_FILE_NEW
+        MENUITEM "Open...", ID_FILE_OPEN
+        POPUP "Recent Archives"
+        BEGIN
+            MENUITEM "(Empty)", 0, GRAYED
+        END
+        MENUITEM "Close", ID_FILE_CLOSE
+        MENUITEM SEPARATOR
+        MENUITEM "Save", ID_FILE_SAVE
+        MENUITEM "Rebuild", ID_FILE_REBUILD
+        MENUITEM "Archive Properties", ID_FILE_PROPERTIES
+        MENUITEM SEPARATOR
+        MENUITEM "Exit", ID_FILE_EXIT
+    END
+    POPUP "Archive"
+    BEGIN
+        MENUITEM "Add Files...", ID_ACTION_ADD_FILES
+        MENUITEM "Add Folder...", ID_ACTION_ADD_FOLDER
+        MENUITEM "Add Empty Entry...", ID_ACTION_ADD_EMPTY
+        MENUITEM SEPARATOR
+        MENUITEM "Open\tEnter", ID_ACTION_OPEN
+        MENUITEM "View\tF3", ID_ACTION_VIEW
+        MENUITEM "Edit Text...", ID_ACTION_EDIT_TEXT
+        MENUITEM "Edit\tF4", ID_ACTION_EDIT
+        MENUITEM "Replace...", ID_ACTION_REPLACE
+        MENUITEM "Open With...", ID_ACTION_OPEN_WITH
+        MENUITEM "Show In Explorer", ID_ACTION_SHOW_IN_EXPLORER
+        MENUITEM "Extract Selected...", ID_ACTION_EXTRACT
+        MENUITEM "Extract All...", ID_ACTION_EXTRACT_ALL
+        MENUITEM SEPARATOR
+        MENUITEM "Delete", ID_ACTION_DELETE
+        MENUITEM "Rename", ID_ACTION_RENAME
+        MENUITEM "Set File Type...", ID_ACTION_SET_FILE_TYPE
+        MENUITEM "Set Platform Attr...", ID_ACTION_SET_PATH_ATTR
+        MENUITEM "Properties\tAlt+Enter", ID_ACTION_PROPERTIES
+        MENUITEM "View/Edit Entry InfoExt...", ID_ACTION_INFO_EXT
+        MENUITEM "Import Entry InfoExt...", ID_ACTION_INFO_EXT_IMPORT
+        MENUITEM "Export Entry InfoExt...", ID_ACTION_INFO_EXT_EXPORT
+        MENUITEM "Clear Entry InfoExt", ID_ACTION_INFO_EXT_CLEAR
+        MENUITEM SEPARATOR
+        MENUITEM "Verify Selected", ID_ACTION_VERIFY
+        MENUITEM "Verify All", ID_ACTION_VERIFY_ALL
+    END
+    POPUP "Edit"
+    BEGIN
+        MENUITEM "Copy Selected Names/Paths\tCtrl+C", ID_EDIT_COPY_PATHS
+        MENUITEM "Copy Entry Hash", ID_EDIT_COPY_HASH
+        MENUITEM "Select By Pattern...", ID_EDIT_SELECT_BY_PATTERN
+        MENUITEM "Select Same Extension", ID_EDIT_SELECT_SAME_EXT
+        MENUITEM "Select Same Hash", ID_EDIT_SELECT_SAME_HASH
+        MENUITEM "Select Duplicate Files", ID_EDIT_SELECT_DUPLICATES
+        MENUITEM "Select Duplicate Copies", ID_EDIT_SELECT_DUP_COPIES
+        MENUITEM "Delete Duplicate Copies...", ID_EDIT_DELETE_DUP_COPIES
+        MENUITEM "Invert Selection", ID_EDIT_INVERT_SELECTION
+    END
+    POPUP "Tools"
+    BEGIN
+        MENUITEM "Archive Settings...", ID_TOOLS_ARCHIVE_SETTINGS
+        MENUITEM "View/Edit Meta...", ID_TOOLS_META_EDIT
+        MENUITEM SEPARATOR
+        MENUITEM "Import Meta...", ID_TOOLS_META_IMPORT
+        MENUITEM "Export Meta...", ID_TOOLS_META_EXPORT
+        MENUITEM "Clear Meta", ID_TOOLS_META_CLEAR
+    END
+    POPUP "View"
+    BEGIN
+        MENUITEM "Back\tAlt+Left", ID_VIEW_BACK
+        MENUITEM "Forward\tAlt+Right", ID_VIEW_FORWARD
+        MENUITEM SEPARATOR
+        MENUITEM "Refresh\tF5", ID_VIEW_REFRESH
+        MENUITEM "Flat View", ID_VIEW_FLAT
+        MENUITEM "Locate In Tree", ID_VIEW_LOCATE_IN_TREE
+    END
+    POPUP "Help"
+    BEGIN
+        MENUITEM "About", ID_HELP_ABOUT
+    END
+END
+
+IDD_ARCHIVE_CONFIG DIALOGEX 0, 0, 340, 210
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Archive Configuration"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT       "Archive Path",      -1,                     10, 12, 80, 10
+    EDITTEXT    IDC_CFG_ARCHIVE_PATH,                        10, 24, 250, 14, ES_AUTOHSCROLL
+    PUSHBUTTON  "Browse...",         IDC_CFG_BROWSE,         266, 23, 62, 16
+
+    LTEXT       "Pack Type",         -1,                     10, 48, 80, 10
+    COMBOBOX    IDC_CFG_PACK_TYPE,                           10, 60, 120, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT       "Write Policy",      -1,                     180, 48, 80, 10
+    COMBOBOX    IDC_CFG_WRITE_POLICY,                        180, 60, 120, 50, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT       "Default Comp",      -1,                     10, 86, 80, 10
+    COMBOBOX    IDC_CFG_DEFAULT_COMP,                        10, 98, 150, 140, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT       "Meta Comp",         -1,                     180, 86, 80, 10
+    COMBOBOX    IDC_CFG_META_COMP,                           180, 98, 150, 140, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT       "Info Comp",         -1,                     10, 124, 80, 10
+    COMBOBOX    IDC_CFG_INFO_COMP,                           10, 136, 150, 140, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT       "InfoExt Size",      -1,                     180, 124, 80, 10
+    EDITTEXT    IDC_CFG_INFOEXT_SIZE,                        180, 136, 70, 14, ES_AUTOHSCROLL | ES_NUMBER
+
+    CONTROL     "Solid Layout",      IDC_CFG_SOLID_MODE,     "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 10, 164, 100, 12
+    LTEXT       "Volume Size",       -1,                     180, 162, 80, 10
+    EDITTEXT    IDC_CFG_VOLUME_SIZE,                         180, 176, 70, 14, ES_AUTOHSCROLL | ES_NUMBER
+
+    DEFPUSHBUTTON "OK",              IDOK,                   84, 190, 70, 16
+    PUSHBUTTON    "Cancel",          IDCANCEL,               184, 190, 70, 16
+END
+
+IDD_INPUT_DIALOG DIALOGEX 0, 0, 250, 80
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Input"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT       "Input",             IDC_INPUT_PROMPT,       10, 10, 230, 10
+    EDITTEXT    IDC_INPUT_VALUE,                             10, 24, 230, 14, ES_AUTOHSCROLL
+    DEFPUSHBUTTON "OK",              IDOK,                   56, 52, 60, 16
+    PUSHBUTTON    "Cancel",          IDCANCEL,               136, 52, 60, 16
+END
+
+IDD_TASK_PROGRESS DIALOGEX 0, 0, 260, 100
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Processing"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT       "Working...",        IDC_TASK_STATUS,        10, 12, 240, 10
+    LTEXT       "",                  IDC_TASK_DETAIL,        10, 25, 240, 16, SS_PATHELLIPSIS
+    CONTROL     "",                  IDC_TASK_PROGRESS_BAR,  "msctls_progress32", WS_CHILD | WS_VISIBLE | PBS_SMOOTH, 10, 48, 240, 14
+    PUSHBUTTON  "Cancel",            IDCANCEL,               100, 74, 60, 16
+END
+
+IDD_TEXT_EDITOR DIALOGEX 0, 0, 360, 220
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Text Editor"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT       "Text",              IDC_TEXT_PROMPT,        10, 10, 340, 18
+    EDITTEXT    IDC_TEXT_VALUE,                             10, 30, 340, 160, ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON "OK",              IDOK,                   110, 198, 60, 16
+    PUSHBUTTON    "Cancel",          IDCANCEL,               190, 198, 60, 16
+END
