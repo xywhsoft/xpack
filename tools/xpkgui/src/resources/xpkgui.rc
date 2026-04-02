@@ -60,6 +60,8 @@ BEGIN
         MENUITEM "Select By Pattern...", ID_EDIT_SELECT_BY_PATTERN
         MENUITEM "Select Same Extension", ID_EDIT_SELECT_SAME_EXT
         MENUITEM "Select Same Hash", ID_EDIT_SELECT_SAME_HASH
+        MENUITEM "Select Same File Type", ID_EDIT_SELECT_SAME_FILETYPE
+        MENUITEM "Select Same Platform Attr", ID_EDIT_SELECT_SAME_ATTR
         MENUITEM "Select Duplicate Files", ID_EDIT_SELECT_DUPLICATES
         MENUITEM "Select Duplicate Copies", ID_EDIT_SELECT_DUP_COPIES
         MENUITEM "Delete Duplicate Copies...", ID_EDIT_DELETE_DUP_COPIES

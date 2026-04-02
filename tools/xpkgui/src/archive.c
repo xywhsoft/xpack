@@ -2019,6 +2019,19 @@ BOOL GuiArchiveCanSelectSameHash(GuiApp* app)
 	return app != NULL && app->archive != NULL && GuiArchiveGetReferenceFileViewItem(app, NULL) != NULL;
 }
 
+BOOL GuiArchiveCanSelectSameFileType(GuiApp* app)
+{
+	return app != NULL && app->archive != NULL && GuiArchiveGetReferenceFileViewItem(app, NULL) != NULL;
+}
+
+BOOL GuiArchiveCanSelectSamePathAttr(GuiApp* app)
+{
+	return app != NULL
+		&& app->archive != NULL
+		&& GuiIsPathPackType(app->packType)
+		&& GuiArchiveGetReferenceFileViewItem(app, NULL) != NULL;
+}
+
 BOOL GuiArchiveCanSelectDuplicateFiles(GuiApp* app)
 {
 	size_t i;
@@ -2204,6 +2217,116 @@ BOOL GuiArchiveSelectSameHash(GuiApp* app)
 			if ( firstSelected < 0 ) {
 				firstSelected = (int)i;
 			}
+		}
+	}
+
+	if ( refIndex >= 0 ) {
+		ListView_SetItemState(app->list, refIndex, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, refIndex);
+		ListView_EnsureVisible(app->list, refIndex, FALSE);
+	} else if ( firstSelected >= 0 ) {
+		ListView_SetItemState(app->list, firstSelected, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, firstSelected);
+		ListView_EnsureVisible(app->list, firstSelected, FALSE);
+	}
+
+	GuiSetMenuState(app);
+	GuiUpdateStatus(app);
+	return TRUE;
+}
+
+BOOL GuiArchiveSelectSameFileType(GuiApp* app)
+{
+	GuiViewItem* refViewItem;
+	const GuiArchiveItem* refItem;
+	uint8_t refFileType;
+	int refIndex;
+	size_t i;
+	int firstSelected;
+
+	if ( !GuiArchiveCanSelectSameFileType(app) ) {
+		MessageBoxW(app != NULL ? app->window : NULL, L"请选择一个文件作为 File Type 参考。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	refViewItem = GuiArchiveGetReferenceFileViewItem(app, &refIndex);
+	if ( refViewItem == NULL || refViewItem->sourceIndex >= app->itemCount ) {
+		return FALSE;
+	}
+	refItem = &app->items[refViewItem->sourceIndex];
+	refFileType = GuiEntryFileType(refItem->flag);
+
+	firstSelected = -1;
+	ListView_SetItemState(app->list, -1, 0, LVIS_SELECTED);
+	for ( i = 0; i < app->viewCount; ++i ) {
+		const GuiViewItem* viewItem;
+		const GuiArchiveItem* item;
+
+		viewItem = &app->viewItems[i];
+		if ( viewItem->kind != GUI_VIEW_ITEM_FILE || viewItem->sourceIndex >= app->itemCount ) {
+			continue;
+		}
+		item = &app->items[viewItem->sourceIndex];
+		if ( GuiEntryFileType(item->flag) != refFileType ) {
+			continue;
+		}
+		ListView_SetItemState(app->list, (int)i, LVIS_SELECTED, LVIS_SELECTED);
+		if ( firstSelected < 0 ) {
+			firstSelected = (int)i;
+		}
+	}
+
+	if ( refIndex >= 0 ) {
+		ListView_SetItemState(app->list, refIndex, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, refIndex);
+		ListView_EnsureVisible(app->list, refIndex, FALSE);
+	} else if ( firstSelected >= 0 ) {
+		ListView_SetItemState(app->list, firstSelected, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, firstSelected);
+		ListView_EnsureVisible(app->list, firstSelected, FALSE);
+	}
+
+	GuiSetMenuState(app);
+	GuiUpdateStatus(app);
+	return TRUE;
+}
+
+BOOL GuiArchiveSelectSamePathAttr(GuiApp* app)
+{
+	GuiViewItem* refViewItem;
+	const GuiArchiveItem* refItem;
+	int refIndex;
+	size_t i;
+	int firstSelected;
+
+	if ( !GuiArchiveCanSelectSamePathAttr(app) ) {
+		MessageBoxW(app != NULL ? app->window : NULL, L"请选择 path 包中的一个文件作为 Platform Attr 参考。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	refViewItem = GuiArchiveGetReferenceFileViewItem(app, &refIndex);
+	if ( refViewItem == NULL || refViewItem->sourceIndex >= app->itemCount ) {
+		return FALSE;
+	}
+	refItem = &app->items[refViewItem->sourceIndex];
+
+	firstSelected = -1;
+	ListView_SetItemState(app->list, -1, 0, LVIS_SELECTED);
+	for ( i = 0; i < app->viewCount; ++i ) {
+		const GuiViewItem* viewItem;
+		const GuiArchiveItem* item;
+
+		viewItem = &app->viewItems[i];
+		if ( viewItem->kind != GUI_VIEW_ITEM_FILE || viewItem->sourceIndex >= app->itemCount ) {
+			continue;
+		}
+		item = &app->items[viewItem->sourceIndex];
+		if ( item->attr != refItem->attr ) {
+			continue;
+		}
+		ListView_SetItemState(app->list, (int)i, LVIS_SELECTED, LVIS_SELECTED);
+		if ( firstSelected < 0 ) {
+			firstSelected = (int)i;
 		}
 	}
 
