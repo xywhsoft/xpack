@@ -54,7 +54,7 @@ static const GuiFileTypeName arrGuiFileTypeNames[] = {
 
 static LONG g_openTempSequence = 0;
 
-#define GUI_ARCHIVE_COLUMN_COUNT 8
+#define GUI_ARCHIVE_COLUMN_COUNT 9
 #define XPKGUI_INLINE_VIEW_LIMIT (8ull * 1024ull * 1024ull)
 
 static BOOL GuiPathMatchFolderPrefix(const WCHAR* fullPath, const WCHAR* folder, const WCHAR** remainderOut);
@@ -550,6 +550,7 @@ static BOOL GuiAddViewParentItem(GuiApp* app)
 	item.sourceIndex = (size_t)-1;
 	wcsncpy_s(item.name, _countof(item.name), L"..", _TRUNCATE);
 	wcsncpy_s(item.methodText, _countof(item.methodText), L"Up", _TRUNCATE);
+	wcsncpy_s(item.fileTypeText, _countof(item.fileTypeText), L"-", _TRUNCATE);
 	GuiGetParentViewPath(app->currentFolder, item.fullPath, _countof(item.fullPath));
 	return GuiAppendViewItem(app, &item);
 }
@@ -568,6 +569,7 @@ static BOOL GuiAddViewDirectoryItem(GuiApp* app, const WCHAR* childName, const W
 	_snwprintf_s(item.name, _countof(item.name), _TRUNCATE, L"%s/", childName);
 	wcsncpy_s(item.fullPath, _countof(item.fullPath), fullPath, _TRUNCATE);
 	wcsncpy_s(item.methodText, _countof(item.methodText), L"Dir", _TRUNCATE);
+	wcsncpy_s(item.fileTypeText, _countof(item.fileTypeText), L"Folder", _TRUNCATE);
 	return GuiAppendViewItem(app, &item);
 }
 
@@ -592,6 +594,7 @@ static BOOL GuiAddViewFileItem(GuiApp* app, size_t sourceIndex, const WCHAR* dis
 	wcsncpy_s(item.sizeText, _countof(item.sizeText), src->sizeText, _TRUNCATE);
 	wcsncpy_s(item.packedText, _countof(item.packedText), src->packedText, _TRUNCATE);
 	wcsncpy_s(item.methodText, _countof(item.methodText), src->methodText, _TRUNCATE);
+	wcsncpy_s(item.fileTypeText, _countof(item.fileTypeText), src->fileTypeText, _TRUNCATE);
 	wcsncpy_s(item.modifiedText, _countof(item.modifiedText), src->modifiedText, _TRUNCATE);
 	wcsncpy_s(item.idText, _countof(item.idText), src->idText, _TRUNCATE);
 	wcsncpy_s(item.hashText, _countof(item.hashText), src->hashText, _TRUNCATE);
@@ -654,6 +657,7 @@ static int GuiEnumArchiveCallback(xpkObject xpk, uint32_t pos, const void* info,
 	GuiFormatUInt64(item->fileSize, item->sizeText, _countof(item->sizeText));
 	GuiFormatUInt64(item->packedSize, item->packedText, _countof(item->packedText));
 	wcsncpy_s(item->methodText, _countof(item->methodText), arrGuiMethodNames[item->flag & XPK_FLAG_COMP_MASK], _TRUNCATE);
+	GuiFormatFileType(GuiEntryFileType(item->flag), item->fileTypeText, _countof(item->fileTypeText));
 	GuiFormatTime(item->modifyTime, item->modifiedText, _countof(item->modifiedText));
 	_snwprintf_s(item->hashText, _countof(item->hashText), _TRUNCATE, L"0x%08X", item->fileHash);
 	return XPK_OK;
@@ -679,8 +683,8 @@ static BOOL GuiLoadArchiveItems(GuiApp* app)
 static void GuiRefreshColumns(GuiApp* app)
 {
 	LVCOLUMNW col;
-	static const int widths[] = { 340, 110, 110, 120, 170, 90, 110, 100 };
-	static const WCHAR* names[] = { L"Name / Path", L"Size", L"Packed", L"Method", L"Modified", L"ID", L"Hash", L"Attr" };
+	static const int widths[] = { 340, 110, 110, 120, 120, 170, 90, 110, 100 };
+	static const WCHAR* names[] = { L"Name / Path", L"Size", L"Packed", L"Method", L"File Type", L"Modified", L"ID", L"Hash", L"Attr" };
 	int i;
 
 	if ( app->list == NULL ) {
@@ -884,19 +888,22 @@ static int __cdecl GuiArchiveItemCompare(void* context, const void* leftPtr, con
 			cmp = GuiCompareTextInsensitive(left->methodText, right->methodText);
 			break;
 		case 4:
-			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			cmp = GuiCompareTextInsensitive(left->fileTypeText, right->fileTypeText);
 			break;
 		case 5:
+			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			break;
+		case 6:
 			if ( left->fileIndex != 0 || right->fileIndex != 0 ) {
 				cmp = GuiCompareSigned64(left->fileIndex, right->fileIndex);
 			} else {
 				cmp = GuiCompareUnsigned64(left->pos, right->pos);
 			}
 			break;
-		case 6:
+		case 7:
 			cmp = GuiCompareUnsigned64(left->fileHash, right->fileHash);
 			break;
-		case 7:
+		case 8:
 			cmp = GuiCompareUnsigned64(left->attr, right->attr);
 			break;
 		default:
@@ -1006,19 +1013,22 @@ static int __cdecl GuiViewItemCompare(void* context, const void* leftPtr, const 
 			cmp = GuiCompareTextInsensitive(left->methodText, right->methodText);
 			break;
 		case 4:
-			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			cmp = GuiCompareTextInsensitive(left->fileTypeText, right->fileTypeText);
 			break;
 		case 5:
+			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			break;
+		case 6:
 			if ( left->fileIndex != 0 || right->fileIndex != 0 ) {
 				cmp = GuiCompareSigned64(left->fileIndex, right->fileIndex);
 			} else {
 				cmp = GuiCompareUnsigned64(left->pos, right->pos);
 			}
 			break;
-		case 6:
+		case 7:
 			cmp = GuiCompareUnsigned64(left->fileHash, right->fileHash);
 			break;
-		case 7:
+		case 8:
 			cmp = GuiCompareUnsigned64(left->attr, right->attr);
 			break;
 		default:
@@ -1299,10 +1309,11 @@ static BOOL GuiRenderArchiveView(GuiApp* app)
 			ListView_SetItemText(app->list, (int)i, 1, app->viewItems[i].sizeText);
 			ListView_SetItemText(app->list, (int)i, 2, app->viewItems[i].packedText);
 			ListView_SetItemText(app->list, (int)i, 3, app->viewItems[i].methodText);
-			ListView_SetItemText(app->list, (int)i, 4, app->viewItems[i].modifiedText);
-			ListView_SetItemText(app->list, (int)i, 5, app->viewItems[i].idText);
-			ListView_SetItemText(app->list, (int)i, 6, app->viewItems[i].hashText);
-			ListView_SetItemText(app->list, (int)i, 7, app->viewItems[i].attrText);
+			ListView_SetItemText(app->list, (int)i, 4, app->viewItems[i].fileTypeText);
+			ListView_SetItemText(app->list, (int)i, 5, app->viewItems[i].modifiedText);
+			ListView_SetItemText(app->list, (int)i, 6, app->viewItems[i].idText);
+			ListView_SetItemText(app->list, (int)i, 7, app->viewItems[i].hashText);
+			ListView_SetItemText(app->list, (int)i, 8, app->viewItems[i].attrText);
 		}
 		GuiRestoreViewSelection(app, selectedSnapshot, selectedCount, &focusedSnapshot, hasFocused);
 		GuiUpdateSortHeader(app);
@@ -1997,10 +2008,11 @@ static BOOL GuiViewItemMatchesSelectionPattern(const GuiViewItem* item, const WC
 	fields[0] = item->name;
 	fields[1] = item->fullPath;
 	fields[2] = item->methodText;
-	fields[3] = item->idText;
-	fields[4] = item->hashText;
-	fields[5] = item->attrText;
-	fields[6] = item->modifiedText;
+	fields[3] = item->fileTypeText;
+	fields[4] = item->idText;
+	fields[5] = item->hashText;
+	fields[6] = item->attrText;
+	fields[7] = item->modifiedText;
 	return GuiTextListMatchesFilter(patternText, fields, _countof(fields));
 }
 
@@ -2015,6 +2027,11 @@ BOOL GuiArchiveCanSelectSameExtension(GuiApp* app)
 }
 
 BOOL GuiArchiveCanSelectSameHash(GuiApp* app)
+{
+	return app != NULL && app->archive != NULL && GuiArchiveGetReferenceFileViewItem(app, NULL) != NULL;
+}
+
+BOOL GuiArchiveCanSelectSameMethod(GuiApp* app)
 {
 	return app != NULL && app->archive != NULL && GuiArchiveGetReferenceFileViewItem(app, NULL) != NULL;
 }
@@ -2217,6 +2234,60 @@ BOOL GuiArchiveSelectSameHash(GuiApp* app)
 			if ( firstSelected < 0 ) {
 				firstSelected = (int)i;
 			}
+		}
+	}
+
+	if ( refIndex >= 0 ) {
+		ListView_SetItemState(app->list, refIndex, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, refIndex);
+		ListView_EnsureVisible(app->list, refIndex, FALSE);
+	} else if ( firstSelected >= 0 ) {
+		ListView_SetItemState(app->list, firstSelected, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, firstSelected);
+		ListView_EnsureVisible(app->list, firstSelected, FALSE);
+	}
+
+	GuiSetMenuState(app);
+	GuiUpdateStatus(app);
+	return TRUE;
+}
+
+BOOL GuiArchiveSelectSameMethod(GuiApp* app)
+{
+	GuiViewItem* refViewItem;
+	const GuiArchiveItem* refItem;
+	int refIndex;
+	size_t i;
+	int firstSelected;
+
+	if ( !GuiArchiveCanSelectSameMethod(app) ) {
+		MessageBoxW(app != NULL ? app->window : NULL, L"请选择一个文件作为压缩方法参考。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	refViewItem = GuiArchiveGetReferenceFileViewItem(app, &refIndex);
+	if ( refViewItem == NULL || refViewItem->sourceIndex >= app->itemCount ) {
+		return FALSE;
+	}
+	refItem = &app->items[refViewItem->sourceIndex];
+
+	firstSelected = -1;
+	ListView_SetItemState(app->list, -1, 0, LVIS_SELECTED);
+	for ( i = 0; i < app->viewCount; ++i ) {
+		const GuiViewItem* viewItem;
+		const GuiArchiveItem* item;
+
+		viewItem = &app->viewItems[i];
+		if ( viewItem->kind != GUI_VIEW_ITEM_FILE || viewItem->sourceIndex >= app->itemCount ) {
+			continue;
+		}
+		item = &app->items[viewItem->sourceIndex];
+		if ( _wcsicmp(item->methodText, refItem->methodText) != 0 ) {
+			continue;
+		}
+		ListView_SetItemState(app->list, (int)i, LVIS_SELECTED, LVIS_SELECTED);
+		if ( firstSelected < 0 ) {
+			firstSelected = (int)i;
 		}
 	}
 

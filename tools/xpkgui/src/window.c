@@ -351,6 +351,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	BOOL canSelectByPattern;
 	BOOL canSelectSameExt;
 	BOOL canSelectSameHash;
+	BOOL canSelectSameMethod;
 	BOOL canSelectSameFileType;
 	BOOL canSelectSamePathAttr;
 	BOOL canSelectDuplicates;
@@ -396,6 +397,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	canSelectByPattern = GuiArchiveCanSelectByPattern(app);
 	canSelectSameExt = GuiArchiveCanSelectSameExtension(app);
 	canSelectSameHash = GuiArchiveCanSelectSameHash(app);
+	canSelectSameMethod = GuiArchiveCanSelectSameMethod(app);
 	canSelectSameFileType = GuiArchiveCanSelectSameFileType(app);
 	canSelectSamePathAttr = GuiArchiveCanSelectSamePathAttr(app);
 	canSelectDuplicates = GuiArchiveCanSelectDuplicateFiles(app);
@@ -409,7 +411,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		return;
 	}
 
-	if ( canOpen || canView || canEditText || canShowInExplorer || canEdit || canReplace || canDuplicate || canEditInfoExt || canExtract || canDelete || allowRename || canSetFileIndex || canSetFileType || canSetPathAttr || canVerifySelection || canCopy || canCopyHash || canShowProperties || canSelectByPattern || canSelectSameExt || canSelectSameHash || canSelectSameFileType || canSelectSamePathAttr || canSelectDuplicates || canSelectDuplicateCopies || canDeleteDuplicateCopies || canInvertSelection || canLocateInTree ) {
+	if ( canOpen || canView || canEditText || canShowInExplorer || canEdit || canReplace || canDuplicate || canEditInfoExt || canExtract || canDelete || allowRename || canSetFileIndex || canSetFileType || canSetPathAttr || canVerifySelection || canCopy || canCopyHash || canShowProperties || canSelectByPattern || canSelectSameExt || canSelectSameHash || canSelectSameMethod || canSelectSameFileType || canSelectSamePathAttr || canSelectDuplicates || canSelectDuplicateCopies || canDeleteDuplicateCopies || canInvertSelection || canLocateInTree ) {
 		if ( canOpen ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_OPEN, L"Open");
 			AppendMenuW(menu, MF_STRING, ID_ACTION_OPEN_WITH, L"Open With...");
@@ -480,6 +482,9 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		if ( canSelectSameHash ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_SELECT_SAME_HASH, L"Select Same Hash");
 		}
+		if ( canSelectSameMethod ) {
+			AppendMenuW(menu, MF_STRING, ID_EDIT_SELECT_SAME_METHOD, L"Select Same Method");
+		}
 		if ( canSelectSameFileType ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_SELECT_SAME_FILETYPE, L"Select Same File Type");
 		}
@@ -540,6 +545,7 @@ void GuiSetMenuState(GuiApp* app)
 	BOOL canSelectByPattern;
 	BOOL canSelectSameExt;
 	BOOL canSelectSameHash;
+	BOOL canSelectSameMethod;
 	BOOL canSelectSameFileType;
 	BOOL canSelectSamePathAttr;
 	BOOL canSelectDuplicates;
@@ -583,6 +589,7 @@ void GuiSetMenuState(GuiApp* app)
 	canSelectByPattern = hasArchive && GuiArchiveCanSelectByPattern(app);
 	canSelectSameExt = hasArchive && GuiArchiveCanSelectSameExtension(app);
 	canSelectSameHash = hasArchive && GuiArchiveCanSelectSameHash(app);
+	canSelectSameMethod = hasArchive && GuiArchiveCanSelectSameMethod(app);
 	canSelectSameFileType = hasArchive && GuiArchiveCanSelectSameFileType(app);
 	canSelectSamePathAttr = hasArchive && GuiArchiveCanSelectSamePathAttr(app);
 	canSelectDuplicates = hasArchive && GuiArchiveCanSelectDuplicateFiles(app);
@@ -602,6 +609,7 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_BY_PATTERN, MF_BYCOMMAND | (canSelectByPattern ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_EXT, MF_BYCOMMAND | (canSelectSameExt ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_HASH, MF_BYCOMMAND | (canSelectSameHash ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_METHOD, MF_BYCOMMAND | (canSelectSameMethod ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_FILETYPE, MF_BYCOMMAND | (canSelectSameFileType ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_ATTR, MF_BYCOMMAND | (canSelectSamePathAttr ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_DUPLICATES, MF_BYCOMMAND | (canSelectDuplicates ? MF_ENABLED : MF_GRAYED));
@@ -1083,6 +1091,9 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					return 0;
 				case ID_EDIT_SELECT_SAME_HASH:
 					GuiArchiveSelectSameHash(app);
+					return 0;
+				case ID_EDIT_SELECT_SAME_METHOD:
+					GuiArchiveSelectSameMethod(app);
 					return 0;
 				case ID_EDIT_SELECT_SAME_FILETYPE:
 					GuiArchiveSelectSameFileType(app);
