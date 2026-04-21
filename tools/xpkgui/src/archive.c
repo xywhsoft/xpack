@@ -71,6 +71,39 @@ static void GuiBuildDuplicateLeafName(const WCHAR* sourceName, UINT copyIndex, W
 static BOOL GuiBuildRenameTargetPath(GuiApp* app, const WCHAR* inputValue, WCHAR* targetPath, size_t cchTargetPath);
 static BOOL GuiSelectViewItemByFullPath(GuiApp* app, GuiViewItemKind kind, const WCHAR* fullPath);
 
+static const WCHAR* arrGuiArchiveColumnNames[GUI_ARCHIVE_COLUMN_COUNT] = {
+	L"Name / Path",
+	L"Size",
+	L"Packed",
+	L"Ratio",
+	L"Method",
+	L"File Type",
+	L"Modified",
+	L"ID",
+	L"Hash",
+	L"Attr"
+};
+
+static const WCHAR* GuiArchiveGetViewItemColumnText(const GuiViewItem* item, int logicalColumn)
+{
+	if ( item == NULL ) {
+		return L"";
+	}
+	switch ( logicalColumn ) {
+		case 0: return item->name;
+		case 1: return item->sizeText;
+		case 2: return item->packedText;
+		case 3: return item->ratioText;
+		case 4: return item->methodText;
+		case 5: return item->fileTypeText;
+		case 6: return item->modifiedText;
+		case 7: return item->idText;
+		case 8: return item->hashText;
+		case 9: return item->attrText;
+		default: return L"";
+	}
+}
+
 static void GuiBuildExtractOutputPath(xpkPackType packType, const WCHAR* destPath, const GuiArchiveItem* item, WCHAR* outPath, size_t cchOutPath)
 {
 	size_t i;
@@ -201,6 +234,9 @@ static BOOL GuiLaunchArchiveInNewGui(HWND owner, const WCHAR* archivePath)
 
 	_snwprintf_s(parameters, _countof(parameters), _TRUNCATE, L"\"%s\"", archivePath);
 	shellResult = (INT_PTR)ShellExecuteW(owner, L"open", exePath, parameters, NULL, SW_SHOWNORMAL);
+	if ( shellResult <= 32 ) {
+		SetLastError((DWORD)shellResult);
+	}
 	return shellResult > 32;
 }
 
@@ -220,6 +256,7 @@ static BOOL GuiShowOpenWithDialogForPath(HWND owner, const WCHAR* path)
 
 	hr = SHOpenWithDialog(owner, &openAsInfo);
 	if ( hr == HRESULT_FROM_WIN32(ERROR_CANCELLED) ) {
+		SetLastError(ERROR_CANCELLED);
 		return FALSE;
 	}
 	if ( FAILED(hr) ) {
@@ -233,6 +270,7 @@ static BOOL GuiShowOpenWithDialogForPath(HWND owner, const WCHAR* path)
 			path,
 			(unsigned long)hr);
 		MessageBoxW(owner, text, XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		SetLastError(HRESULT_CODE(hr));
 		return FALSE;
 	}
 	return TRUE;
@@ -279,7 +317,14 @@ static BOOL GuiOpenExtractedPath(HWND owner, const WCHAR* path)
 	if ( shellResult > 32 ) {
 		return TRUE;
 	}
-	return GuiShowOpenWithDialogForPath(owner, path);
+	SetLastError((DWORD)shellResult);
+	if ( GuiShowOpenWithDialogForPath(owner, path) ) {
+		return TRUE;
+	}
+	if ( GetLastError() != ERROR_CANCELLED ) {
+		GuiShowSystemErrorDetail(owner, L"启动外部程序失败", L"已提取临时文件，但系统无法用默认程序打开，也无法完成“打开方式”回退。", path, GetLastError());
+	}
+	return FALSE;
 }
 
 static BOOL GuiGetFileStamp(const WCHAR* path, WIN32_FILE_ATTRIBUTE_DATA* stampOut)
@@ -685,8 +730,8 @@ static BOOL GuiLoadArchiveItems(GuiApp* app)
 static void GuiRefreshColumns(GuiApp* app)
 {
 	LVCOLUMNW col;
-	static const WCHAR* names[] = { L"Name / Path", L"Size", L"Packed", L"Ratio", L"Method", L"File Type", L"Modified", L"ID", L"Hash", L"Attr" };
 	int i;
+	int visibleIndex;
 
 	if ( app->list == NULL ) {
 		return;
@@ -698,11 +743,16 @@ static void GuiRefreshColumns(GuiApp* app)
 
 	ZeroMemory(&col, sizeof(col));
 	col.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
-	for ( i = 0; i < (int)_countof(names); ++i ) {
-		col.pszText = (LPWSTR)names[i];
+	visibleIndex = 0;
+	for ( i = 0; i < GUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		if ( !GuiIsArchiveColumnVisible(app, i) ) {
+			continue;
+		}
+		col.pszText = (LPWSTR)arrGuiArchiveColumnNames[i];
 		col.cx = app->columnWidths[i] > 0 ? app->columnWidths[i] : 80;
-		col.iSubItem = i;
-		ListView_InsertColumn(app->list, i, &col);
+		col.iSubItem = visibleIndex;
+		ListView_InsertColumn(app->list, visibleIndex, &col);
+		visibleIndex++;
 	}
 }
 
@@ -974,18 +1024,23 @@ static void GuiUpdateSortHeader(GuiApp* app)
 	}
 
 	for ( i = 0; i < GUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		int visibleIndex;
 		HDITEMW item;
 
+		visibleIndex = GuiLogicalColumnToVisible(app, i);
+		if ( visibleIndex < 0 ) {
+			continue;
+		}
 		ZeroMemory(&item, sizeof(item));
 		item.mask = HDI_FORMAT;
-		if ( !SendMessageW(header, HDM_GETITEMW, (WPARAM)i, (LPARAM)&item) ) {
+		if ( !SendMessageW(header, HDM_GETITEMW, (WPARAM)visibleIndex, (LPARAM)&item) ) {
 			continue;
 		}
 		item.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
 		if ( i == app->sortColumn ) {
 			item.fmt |= app->sortAscending ? HDF_SORTUP : HDF_SORTDOWN;
 		}
-		SendMessageW(header, HDM_SETITEMW, (WPARAM)i, (LPARAM)&item);
+		SendMessageW(header, HDM_SETITEMW, (WPARAM)visibleIndex, (LPARAM)&item);
 	}
 }
 
@@ -1336,15 +1391,18 @@ static BOOL GuiRenderArchiveView(GuiApp* app)
 			item.pszText = app->viewItems[i].name;
 			item.lParam = (LPARAM)i;
 			ListView_InsertItem(app->list, &item);
-			ListView_SetItemText(app->list, (int)i, 1, app->viewItems[i].sizeText);
-			ListView_SetItemText(app->list, (int)i, 2, app->viewItems[i].packedText);
-			ListView_SetItemText(app->list, (int)i, 3, app->viewItems[i].ratioText);
-			ListView_SetItemText(app->list, (int)i, 4, app->viewItems[i].methodText);
-			ListView_SetItemText(app->list, (int)i, 5, app->viewItems[i].fileTypeText);
-			ListView_SetItemText(app->list, (int)i, 6, app->viewItems[i].modifiedText);
-			ListView_SetItemText(app->list, (int)i, 7, app->viewItems[i].idText);
-			ListView_SetItemText(app->list, (int)i, 8, app->viewItems[i].hashText);
-			ListView_SetItemText(app->list, (int)i, 9, app->viewItems[i].attrText);
+			{
+				int logicalColumn;
+
+				for ( logicalColumn = 1; logicalColumn < GUI_ARCHIVE_COLUMN_COUNT; ++logicalColumn ) {
+					int visibleColumn;
+
+					visibleColumn = GuiLogicalColumnToVisible(app, logicalColumn);
+					if ( visibleColumn >= 0 ) {
+						ListView_SetItemText(app->list, (int)i, visibleColumn, (LPWSTR)GuiArchiveGetViewItemColumnText(&app->viewItems[i], logicalColumn));
+					}
+				}
+			}
 		}
 		GuiRestoreViewSelection(app, selectedSnapshot, selectedCount, &focusedSnapshot, hasFocused);
 		GuiUpdateSortHeader(app);
@@ -1666,8 +1724,33 @@ BOOL GuiArchiveReadOptions(GuiApp* app, GuiArchiveOptions* options)
 
 BOOL GuiArchiveApplyOptions(GuiApp* app, const GuiArchiveOptions* options, BOOL saveNow)
 {
+	BOOL packTypeChanged;
+	BOOL solidChanged;
+	BOOL volumeChanged;
+
 	if ( app->archive == NULL || options == NULL ) {
 		return FALSE;
+	}
+
+	packTypeChanged = (options->packType != app->packType);
+	solidChanged = (options->solidMode != app->solidMode);
+	volumeChanged = (options->volumeSize != app->volumeSize);
+	if ( saveNow && app->window != NULL && app->itemCount > 0 && (packTypeChanged || solidChanged || volumeChanged) ) {
+		WCHAR text[1024];
+
+		_snwprintf_s(
+			text,
+			_countof(text),
+			_TRUNCATE,
+			L"将保存归档布局相关变更：\r\n\r\n"
+			L"%s%s%s"
+			L"\r\nPack Type 会改变条目语义；Solid / Volume 布局变更通常还需要执行 Rebuild 才会反映到物理文件。\r\n\r\n是否继续保存？",
+			packTypeChanged ? L"- Pack Type\r\n" : L"",
+			solidChanged ? L"- Solid Layout\r\n" : L"",
+			volumeChanged ? L"- Volume Size\r\n" : L"");
+		if ( MessageBoxW(app->window, text, XPKGUI_APP_TITLE, MB_YESNO | MB_ICONWARNING) != IDYES ) {
+			return FALSE;
+		}
 	}
 
 	if ( xpkSetPackType(app->archive, options->packType) != XPK_OK ) return FALSE;
@@ -1790,7 +1873,14 @@ BOOL GuiArchiveCreateWithOptions(GuiApp* app, const GuiArchiveOptions* options)
 
 BOOL GuiArchiveSave(GuiApp* app)
 {
+	DWORD attr;
+
 	if ( app->archive == NULL ) {
+		return FALSE;
+	}
+	attr = (app->archivePath[0] != L'\0') ? GetFileAttributesW(app->archivePath) : INVALID_FILE_ATTRIBUTES;
+	if ( attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY) ) {
+		GuiShowSystemErrorDetail(app->window, L"保存归档失败", L"归档文件是只读文件，xpkgui 不会尝试覆盖它。", app->archivePath, ERROR_ACCESS_DENIED);
 		return FALSE;
 	}
 	if ( xpkSave(app->archive) != XPK_OK ) {
@@ -4352,38 +4442,29 @@ static BOOL GuiAppendTsvSeparator(WCHAR** textBuf, size_t* len, size_t* cap)
 	return GuiAppendWideText(textBuf, len, cap, L"\t");
 }
 
-static BOOL GuiAppendViewItemDetailsTsvRow(WCHAR** textBuf, size_t* len, size_t* cap, const GuiViewItem* item)
+static BOOL GuiAppendViewItemDetailsTsvRow(GuiApp* app, WCHAR** textBuf, size_t* len, size_t* cap, const GuiViewItem* item)
 {
-	const WCHAR* kindText;
+	int logicalColumn;
+	BOOL appended;
 
 	if ( item == NULL || !GuiArchiveCanCopyViewItem(item) ) {
 		return TRUE;
 	}
 
-	kindText = (item->kind == GUI_VIEW_ITEM_DIR) ? L"Dir" : L"File";
-	if ( !GuiAppendTsvCell(textBuf, len, cap, kindText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->name) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->fullPath[0] != L'\0' ? item->fullPath : item->name) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->sizeText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->packedText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->ratioText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->methodText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->fileTypeText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->modifiedText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->idText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	if ( !GuiAppendTsvCell(textBuf, len, cap, item->hashText) ) return FALSE;
-	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
-	return GuiAppendTsvCell(textBuf, len, cap, item->attrText);
+	appended = FALSE;
+	for ( logicalColumn = 0; logicalColumn < GUI_ARCHIVE_COLUMN_COUNT; ++logicalColumn ) {
+		if ( !GuiIsArchiveColumnVisible(app, logicalColumn) ) {
+			continue;
+		}
+		if ( appended && !GuiAppendTsvSeparator(textBuf, len, cap) ) {
+			return FALSE;
+		}
+		if ( !GuiAppendTsvCell(textBuf, len, cap, GuiArchiveGetViewItemColumnText(item, logicalColumn)) ) {
+			return FALSE;
+		}
+		appended = TRUE;
+	}
+	return TRUE;
 }
 
 static BOOL GuiArchiveBuildDetailsTsv(GuiApp* app, BOOL selectedOnly, WCHAR** outText)
@@ -4408,7 +4489,20 @@ static BOOL GuiArchiveBuildDetailsTsv(GuiApp* app, BOOL selectedOnly, WCHAR** ou
 	textLen = 0;
 	textCap = 0;
 	copied = FALSE;
-	ok = GuiAppendWideText(&textBuf, &textLen, &textCap, L"Kind\tName\tPath\tSize\tPacked\tRatio\tMethod\tFile Type\tModified\tID\tHash\tAttr");
+	ok = TRUE;
+	for ( i = 0; i < GUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		if ( !GuiIsArchiveColumnVisible(app, (int)i) ) {
+			continue;
+		}
+		if ( textLen > 0 && !GuiAppendTsvSeparator(&textBuf, &textLen, &textCap) ) {
+			ok = FALSE;
+			break;
+		}
+		if ( !GuiAppendTsvCell(&textBuf, &textLen, &textCap, arrGuiArchiveColumnNames[i]) ) {
+			ok = FALSE;
+			break;
+		}
+	}
 	if ( ok ) {
 		if ( selectedOnly ) {
 			index = -1;
@@ -4423,7 +4517,7 @@ static BOOL GuiArchiveBuildDetailsTsv(GuiApp* app, BOOL selectedOnly, WCHAR** ou
 				if ( !GuiArchiveCanCopyViewItem(viewItem) ) {
 					continue;
 				}
-				if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemDetailsTsvRow(&textBuf, &textLen, &textCap, viewItem) ) {
+				if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemDetailsTsvRow(app, &textBuf, &textLen, &textCap, viewItem) ) {
 					ok = FALSE;
 					break;
 				}
@@ -4434,7 +4528,7 @@ static BOOL GuiArchiveBuildDetailsTsv(GuiApp* app, BOOL selectedOnly, WCHAR** ou
 				if ( !GuiArchiveCanCopyViewItem(&app->viewItems[i]) ) {
 					continue;
 				}
-				if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemDetailsTsvRow(&textBuf, &textLen, &textCap, &app->viewItems[i]) ) {
+				if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemDetailsTsvRow(app, &textBuf, &textLen, &textCap, &app->viewItems[i]) ) {
 					ok = FALSE;
 					break;
 				}
@@ -5836,7 +5930,7 @@ static BOOL GuiArchiveExtractSingleSelectionToTemp(
 	}
 
 	if ( !GuiBuildOpenTempRootPath(app, tempRoot, cchTempRoot) ) {
-		GuiShowSystemError(app->window, L"创建临时目录失败", GetLastError());
+		GuiShowSystemErrorDetail(app->window, L"创建临时目录失败", L"无法为包内文件创建临时解压根目录。", NULL, GetLastError());
 		return FALSE;
 	}
 	GuiBuildExtractOutputPath(app->packType, tempRoot, item, outPath, cchOutPath);
@@ -5922,6 +6016,13 @@ BOOL GuiArchiveOpenSelection(GuiApp* app)
 	if ( !GuiArchiveExtractSingleSelectionToTemp(app, L"打开文件", tempRoot, _countof(tempRoot), outPath, _countof(outPath)) ) {
 		return FALSE;
 	}
+	if ( GuiPathIsXpkArchive(outPath) ) {
+		if ( !GuiLaunchArchiveInNewGui(app->window, outPath) ) {
+			GuiShowSystemErrorDetail(app->window, L"启动 xpkgui 失败", L"已提取内层 .xpk 到临时目录，但无法启动新的 xpkgui 进程。", outPath, GetLastError());
+			return FALSE;
+		}
+		return TRUE;
+	}
 	return GuiOpenExtractedPath(app->window, outPath);
 }
 
@@ -5950,11 +6051,11 @@ BOOL GuiArchiveEditSelection(GuiApp* app)
 	}
 	hadBeforeStamp = GuiGetFileStamp(outPath, &beforeStamp);
 	if ( !GuiLaunchPathWithNotepad(app->window, outPath) ) {
-		MessageBoxW(app->window, L"无法启动记事本打开该文件。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		GuiShowSystemErrorDetail(app->window, L"启动文本编辑器失败", L"文件已保留在临时目录，未写回归档。", outPath, GetLastError());
 		return FALSE;
 	}
 	if ( !GuiGetFileStamp(outPath, &afterStamp) ) {
-		MessageBoxW(app->window, L"编辑后的临时文件已不存在，未写回归档。", XPKGUI_APP_TITLE, MB_OK | MB_ICONWARNING);
+		GuiShowSystemErrorDetail(app->window, L"临时文件不存在", L"编辑后的临时文件已不存在，未写回归档。", outPath, GetLastError());
 		return FALSE;
 	}
 	if ( hadBeforeStamp && GuiFileStampEquals(&beforeStamp, &afterStamp) ) {
@@ -5963,7 +6064,19 @@ BOOL GuiArchiveEditSelection(GuiApp* app)
 	if ( MessageBoxW(app->window, L"检测到文件已修改，是否写回归档？", XPKGUI_APP_TITLE, MB_YESNO | MB_ICONQUESTION) != IDYES ) {
 		return TRUE;
 	}
-	return GuiArchiveReplaceItemFromPath(app, &itemCopy, outPath, L"回写条目");
+	if ( !GuiArchiveReplaceItemFromPath(app, &itemCopy, outPath, L"回写条目") ) {
+		WCHAR text[1024];
+
+		_snwprintf_s(
+			text,
+			_countof(text),
+			_TRUNCATE,
+			L"外部编辑后的文件没有成功写回归档。\n\n临时文件已保留，可手工复制或稍后用 Replace 重试：\n%s",
+			outPath);
+		MessageBoxW(app->window, text, XPKGUI_APP_TITLE, MB_OK | MB_ICONWARNING);
+		return FALSE;
+	}
+	return TRUE;
 }
 
 BOOL GuiArchiveReplaceSelection(GuiApp* app)
@@ -6425,6 +6538,16 @@ static GuiTaskResult GuiRunTaskDialog(GuiTaskState* task)
 	DeleteCriticalSection(&task->detailLock);
 	if ( ret == GUI_TASK_RESULT_FAILED && task->errorText[0] != L'\0' ) {
 		MessageBoxW(task->app != NULL ? task->app->window : NULL, task->errorText, XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+	} else if ( ret == GUI_TASK_RESULT_CANCELLED && !GuiIsSmokeMode() ) {
+		WCHAR message[512];
+
+		_snwprintf_s(
+			message,
+			_countof(message),
+			_TRUNCATE,
+			L"%s 已取消。\r\n\r\n已完成的文件操作不会自动回滚；未处理的条目已停止继续执行。",
+			task->title[0] != L'\0' ? task->title : L"任务");
+		MessageBoxW(task->app != NULL ? task->app->window : NULL, message, XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
 	}
 	return (GuiTaskResult)ret;
 }
@@ -6540,7 +6663,7 @@ BOOL GuiArchiveCreateFromSelection(GuiApp* app, int count, WCHAR** items, BOOL a
 		if ( !exitAfterCreate && !GuiArchiveOpenPath(app, options.archivePath, FALSE) ) {
 			return FALSE;
 		}
-		if ( exitAfterCreate ) {
+		if ( exitAfterCreate && !GuiIsSmokeMode() ) {
 			MessageBoxW(app->window, L"压缩包创建完成。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
 		}
 		return TRUE;
@@ -7921,20 +8044,135 @@ BOOL GuiArchiveBuild(GuiApp* app)
 	return result == GUI_TASK_RESULT_SUCCESS;
 }
 
+typedef struct GuiArchivePropertyTotals {
+	xpkPackType packType;
+	uint64_t totalSize;
+	uint64_t totalPacked;
+} GuiArchivePropertyTotals;
+
+static int GuiArchivePropertyTotalsCallback(xpkObject xpk, uint32_t pos, const void* info, void* userData)
+{
+	GuiArchivePropertyTotals* totals;
+
+	(void)xpk;
+	(void)pos;
+
+	totals = (GuiArchivePropertyTotals*)userData;
+	if ( totals == NULL || info == NULL ) {
+		return XPK_ERR_PARAM;
+	}
+
+	if ( totals->packType == XPK_PACK_INDEX ) {
+		const xpkFileInfoIndex* pInfo;
+
+		pInfo = (const xpkFileInfoIndex*)info;
+		totals->totalSize += pInfo->fileSize;
+		totals->totalPacked += pInfo->dataSize;
+	} else if ( totals->packType == XPK_PACK_LINUX || totals->packType == XPK_PACK_WIN32 ) {
+		const xpkFileInfoPath* pInfo;
+
+		pInfo = (const xpkFileInfoPath*)info;
+		totals->totalSize += pInfo->fileSize;
+		totals->totalPacked += pInfo->dataSize;
+	} else {
+		const xpkFileInfo* pInfo;
+
+		pInfo = (const xpkFileInfo*)info;
+		totals->totalSize += pInfo->fileSize;
+		totals->totalPacked += pInfo->dataSize;
+	}
+	return XPK_OK;
+}
+
+static uint64_t GuiQueryFileSizeOrZero(const WCHAR* path)
+{
+	WIN32_FILE_ATTRIBUTE_DATA attrData;
+
+	if ( path == NULL || path[0] == L'\0' || !GetFileAttributesExW(path, GetFileExInfoStandard, &attrData) ) {
+		return 0;
+	}
+	return (((uint64_t)attrData.nFileSizeHigh) << 32) | (uint64_t)attrData.nFileSizeLow;
+}
+
+static void GuiFormatPercent(uint64_t value, uint64_t total, WCHAR* buf, size_t cchBuf)
+{
+	double percent;
+
+	if ( buf == NULL || cchBuf == 0 ) {
+		return;
+	}
+	if ( total == 0 ) {
+		wcsncpy_s(buf, cchBuf, L"-", _TRUNCATE);
+		return;
+	}
+	percent = ((double)value * 100.0) / (double)total;
+	_snwprintf_s(buf, cchBuf, _TRUNCATE, L"%.1f%%", percent);
+}
+
 static BOOL GuiShowPropertiesCore(const WCHAR* archivePath, xpkObject archive, xpkPackType packType, uint8_t defComp, uint8_t metaComp, uint8_t infoComp, uint32_t infoExtSize, uint32_t volumeSize, BOOL solidMode)
 {
 	xpkStat statInfo;
-	WCHAR message[2048];
+	GuiArchivePropertyTotals totals;
+	uint64_t physicalSize;
+	uint64_t headerTableBytes;
+	WCHAR totalSizeText[64];
+	WCHAR packedText[64];
+	WCHAR physicalText[64];
+	WCHAR liveText[64];
+	WCHAR holesText[64];
+	WCHAR metaText[64];
+	WCHAR tableText[64];
+	WCHAR headerTableText[64];
+	WCHAR ratioText[32];
+	WCHAR holePercentText[32];
+	WCHAR message[3072];
 
 	if ( xpkStatGet(archive, &statInfo) != XPK_OK ) {
 		return FALSE;
 	}
+	ZeroMemory(&totals, sizeof(totals));
+	totals.packType = packType;
+	if ( xpkEach(archive, GuiArchivePropertyTotalsCallback, &totals) != XPK_OK ) {
+		return FALSE;
+	}
+
+	physicalSize = GuiQueryFileSizeOrZero(archivePath);
+	headerTableBytes = XPK_HEAD_SIZE + statInfo.metaBytes + statInfo.entryTableBytes;
+	GuiFormatUInt64(totals.totalSize, totalSizeText, _countof(totalSizeText));
+	GuiFormatUInt64(totals.totalPacked, packedText, _countof(packedText));
+	GuiFormatUInt64(physicalSize, physicalText, _countof(physicalText));
+	GuiFormatUInt64(statInfo.liveDataBytes, liveText, _countof(liveText));
+	GuiFormatUInt64(statInfo.holeBytes, holesText, _countof(holesText));
+	GuiFormatUInt64(statInfo.metaBytes, metaText, _countof(metaText));
+	GuiFormatUInt64(statInfo.entryTableBytes, tableText, _countof(tableText));
+	GuiFormatUInt64(headerTableBytes, headerTableText, _countof(headerTableText));
+	GuiFormatRatio(totals.totalPacked, totals.totalSize, ratioText, _countof(ratioText));
+	GuiFormatPercent(statInfo.holeBytes, statInfo.liveDataBytes + statInfo.holeBytes, holePercentText, _countof(holePercentText));
 
 	_snwprintf_s(
 		message,
 		_countof(message),
 		_TRUNCATE,
-		L"Path: %s\nPack Type: %s\nDefault Comp: %u\nMeta Comp: %u\nInfo Comp: %u\nInfoExt Size: %u\nSolid Mode: %s\nVolume Size: %u\n\nVisible Entries: %u\nLive Data Bytes: %llu\nHole Bytes: %llu\nMeta Bytes: %llu\nEntry Table Bytes: %llu",
+		L"Path: %s\n"
+		L"Pack Type: %s\n"
+		L"Default Comp: %u\n"
+		L"Meta Comp: %u\n"
+		L"Info Comp: %u\n"
+		L"InfoExt Size: %u\n"
+		L"Solid Mode: %s\n"
+		L"Volume Size: %u\n"
+		L"\n"
+		L"Visible Entries: %u\n"
+		L"Total Size: %s\n"
+		L"Total Packed: %s\n"
+		L"Compression Ratio: %s\n"
+		L"Physical Size: %s\n"
+		L"\n"
+		L"Live Data: %s\n"
+		L"Holes: %s (%s)\n"
+		L"Metadata: %s\n"
+		L"Entry Table: %s\n"
+		L"Header + Meta + Table: %s",
 		archivePath,
 		GuiPackTypeLabel(packType),
 		(unsigned)defComp,
@@ -7944,10 +8182,16 @@ static BOOL GuiShowPropertiesCore(const WCHAR* archivePath, xpkObject archive, x
 		solidMode ? L"On" : L"Off",
 		(unsigned)volumeSize,
 		(unsigned)statInfo.fileCount,
-		(unsigned long long)statInfo.liveDataBytes,
-		(unsigned long long)statInfo.holeBytes,
-		(unsigned long long)statInfo.metaBytes,
-		(unsigned long long)statInfo.entryTableBytes);
+		totalSizeText,
+		packedText,
+		ratioText,
+		physicalText,
+		liveText,
+		holesText,
+		holePercentText,
+		metaText,
+		tableText,
+		headerTableText);
 
 	if ( !GuiIsSmokeMode() ) {
 		MessageBoxW(NULL, message, XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
@@ -8361,7 +8605,7 @@ BOOL GuiArchiveEditSelectionText(GuiApp* app)
 			prompt,
 			_countof(prompt),
 			_TRUNCATE,
-			L"当前文件较大（%s），不直接在 GUI 内编辑。请改用 Edit / Open / Extract。",
+			L"当前文件较大（%s），不直接在 GUI 内编辑。请改用 Edit Externally / Open / Extract。",
 			sizeText);
 		MessageBoxW(app->window, prompt, XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
 		return FALSE;

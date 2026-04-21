@@ -23,6 +23,9 @@ echo Registering Explorer shell extension...
 regsvr32 /s "%DLL_PATH%"
 if errorlevel 1 (
 	echo [ERROR] regsvr32 failed for %DLL_PATH%
+	echo [ERROR] Exit code: %ERRORLEVEL%
+	echo [HINT] Close Explorer windows, make sure the DLL exists and matches x64, then retry.
+	echo [HINT] For a visible COM registration error dialog, run: regsvr32 "%DLL_PATH%"
 	exit /b 1
 )
 

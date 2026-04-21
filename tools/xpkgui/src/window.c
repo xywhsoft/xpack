@@ -11,6 +11,22 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 static LRESULT CALLBACK GuiNavPathEditProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR idSubclass, DWORD_PTR refData);
 static LRESULT CALLBACK GuiFilterEditProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR idSubclass, DWORD_PTR refData);
 
+static void GuiAddToolTip(GuiApp* app, HWND control, const WCHAR* text)
+{
+	TOOLINFOW toolInfo;
+
+	if ( app == NULL || app->toolTip == NULL || control == NULL || text == NULL ) {
+		return;
+	}
+	ZeroMemory(&toolInfo, sizeof(toolInfo));
+	toolInfo.cbSize = sizeof(toolInfo);
+	toolInfo.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+	toolInfo.hwnd = app->window;
+	toolInfo.uId = (UINT_PTR)control;
+	toolInfo.lpszText = (LPWSTR)text;
+	SendMessageW(app->toolTip, TTM_ADDTOOLW, 0, (LPARAM)&toolInfo);
+}
+
 static void GuiFocusEditControl(HWND edit)
 {
 	if ( edit != NULL ) {
@@ -33,7 +49,7 @@ static void GuiShowKeyboardShortcuts(HWND hwnd)
 		L"  Enter / Double-click    Open selected file or folder\r\n"
 		L"  F2    Rename selected item\r\n"
 		L"  F3    View selected file\r\n"
-		L"  F4    Edit selected file\r\n"
+		L"  F4    Edit selected file externally\r\n"
 		L"  Delete    Delete selected items\r\n"
 		L"  Alt+Enter    Properties\r\n\r\n"
 		L"Selection and Copy\r\n"
@@ -289,6 +305,9 @@ static void GuiLayoutMainWindow(GuiApp* app)
 	int filterLeft;
 	int filterWidth;
 	int rowGap;
+	int statusParts[5];
+	int statusWidth;
+	int listHeight;
 
 	if ( app == NULL || app->window == NULL || app->list == NULL || app->status == NULL || app->filterEdit == NULL || app->filterClear == NULL ||
 		app->navBack == NULL || app->navForward == NULL || app->navRoot == NULL || app->navUp == NULL || app->navPath == NULL || app->navGo == NULL ||
@@ -299,6 +318,13 @@ static void GuiLayoutMainWindow(GuiApp* app)
 	GetClientRect(app->window, &rcClient);
 	SendMessageW(app->status, WM_SIZE, 0, 0);
 	GetWindowRect(app->status, &rcStatus);
+	statusWidth = rcClient.right;
+	statusParts[0] = statusWidth > 0 ? statusWidth / 5 : 160;
+	statusParts[1] = statusWidth > 0 ? (statusWidth * 2) / 5 : 320;
+	statusParts[2] = statusWidth > 0 ? (statusWidth * 3) / 5 : 520;
+	statusParts[3] = statusWidth > 0 ? (statusWidth * 4) / 5 : 760;
+	statusParts[4] = -1;
+	SendMessageW(app->status, SB_SETPARTS, _countof(statusParts), (LPARAM)statusParts);
 
 	showNav = GuiShouldShowNavigation(app);
 	showFilter = GuiShouldShowFilter(app);
@@ -361,7 +387,15 @@ static void GuiLayoutMainWindow(GuiApp* app)
 		MoveWindow(app->filterClear, filterLeft + filterWidth + margin, filterRowTop, filterClearWidth, navControlHeight, TRUE);
 	}
 
-	MoveWindow(app->list, 0, listTop, rcClient.right, rcClient.bottom - listTop - (rcStatus.bottom - rcStatus.top), TRUE);
+	listHeight = rcClient.bottom - listTop - (rcStatus.bottom - rcStatus.top);
+	if ( listHeight < 0 ) {
+		listHeight = 0;
+	}
+	MoveWindow(app->list, 0, listTop, rcClient.right, listHeight, TRUE);
+	if ( app->emptyState != NULL ) {
+		MoveWindow(app->emptyState, 0, listTop + 8, rcClient.right, 32, TRUE);
+		SetWindowPos(app->emptyState, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+	}
 }
 
 void GuiUpdateNavigationBar(GuiApp* app)
@@ -423,6 +457,7 @@ void GuiUpdateNavigationBar(GuiApp* app)
 	}
 
 	GuiLayoutMainWindow(app);
+	GuiUpdateEmptyState(app);
 }
 
 static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
@@ -534,7 +569,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 			AppendMenuW(menu, MF_STRING, ID_ACTION_EDIT_TEXT, L"Edit Text...");
 		}
 		if ( canEdit ) {
-			AppendMenuW(menu, MF_STRING, ID_ACTION_EDIT, L"Edit\tF4");
+			AppendMenuW(menu, MF_STRING, ID_ACTION_EDIT, L"Edit Externally\tF4");
 		}
 		if ( canReplace ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_REPLACE, L"Replace...");
@@ -705,6 +740,9 @@ void GuiSetMenuState(GuiApp* app)
 	BOOL canFocusFilter;
 	BOOL canClearFilter;
 	BOOL canFocusPath;
+	BOOL canExtractToolbar;
+	BOOL canVerifyToolbar;
+	BOOL canInfoToolbar;
 
 	if ( app->window == NULL ) {
 		return;
@@ -760,6 +798,9 @@ void GuiSetMenuState(GuiApp* app)
 	canFocusFilter = hasArchive && app->filterEdit != NULL && IsWindowEnabled(app->filterEdit);
 	canClearFilter = canFocusFilter && app->filterText[0] != L'\0';
 	canFocusPath = hasArchive && GuiShouldShowNavigation(app) && !app->flatView && app->navPath != NULL && IsWindowEnabled(app->navPath);
+	canExtractToolbar = hasArchive && (canExtract || app->itemCount > 0);
+	canVerifyToolbar = hasArchive && (canVerifySelection || app->itemCount > 0);
+	canInfoToolbar = hasArchive;
 
 	EnableMenuItem(hMenu, ID_FILE_CLOSE, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_FILE_SAVE, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
@@ -839,14 +880,19 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_VIEW_RESET_SORT, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_VIEW_AUTO_SIZE_COLUMNS, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_VIEW_RESET_COLUMNS, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_GRID_LINES, MF_BYCOMMAND | MF_ENABLED);
+	EnableMenuItem(hMenu, ID_VIEW_FULL_ROW_SELECT, MF_BYCOMMAND | MF_ENABLED);
+	EnableMenuItem(hMenu, ID_VIEW_COLUMNS, MF_BYCOMMAND | MF_ENABLED);
 	CheckMenuItem(hMenu, ID_VIEW_FLAT, MF_BYCOMMAND | (app->flatView ? MF_CHECKED : MF_UNCHECKED));
+	CheckMenuItem(hMenu, ID_VIEW_GRID_LINES, MF_BYCOMMAND | (app->showGridLines ? MF_CHECKED : MF_UNCHECKED));
+	CheckMenuItem(hMenu, ID_VIEW_FULL_ROW_SELECT, MF_BYCOMMAND | (app->fullRowSelect ? MF_CHECKED : MF_UNCHECKED));
 
 	if ( app->actNew != NULL ) EnableWindow(app->actNew, TRUE);
 	if ( app->actOpen != NULL ) EnableWindow(app->actOpen, TRUE);
 	if ( app->actAdd != NULL ) EnableWindow(app->actAdd, TRUE);
-	if ( app->actExtract != NULL ) EnableWindow(app->actExtract, hasArchive);
-	if ( app->actVerify != NULL ) EnableWindow(app->actVerify, hasArchive);
-	if ( app->actInfo != NULL ) EnableWindow(app->actInfo, hasArchive);
+	if ( app->actExtract != NULL ) EnableWindow(app->actExtract, canExtractToolbar);
+	if ( app->actVerify != NULL ) EnableWindow(app->actVerify, canVerifyToolbar);
+	if ( app->actInfo != NULL ) EnableWindow(app->actInfo, canInfoToolbar);
 	DrawMenuBar(app->window);
 }
 
@@ -1196,6 +1242,17 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				app->instance,
 				NULL);
 
+			app->emptyState = CreateWindowExW(
+				0,
+				L"Static",
+				L"",
+				WS_CHILD | SS_CENTER,
+				0, 0, 100, 32,
+				hwnd,
+				NULL,
+				app->instance,
+				NULL);
+
 			app->list = CreateWindowExW(
 				WS_EX_CLIENTEDGE,
 				WC_LISTVIEWW,
@@ -1206,7 +1263,7 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				(HMENU)IDC_MAIN_LIST,
 				app->instance,
 				NULL);
-			ListView_SetExtendedListViewStyle(app->list, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
+			GuiApplyListViewStyle(app);
 
 			app->status = CreateWindowExW(
 				0,
@@ -1219,8 +1276,48 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				app->instance,
 				NULL);
 
+			app->toolTip = CreateWindowExW(
+				WS_EX_TOPMOST,
+				TOOLTIPS_CLASSW,
+				NULL,
+				WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
+				CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+				hwnd,
+				NULL,
+				app->instance,
+				NULL);
+			if ( app->toolTip != NULL ) {
+				SetWindowPos(app->toolTip, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+				GuiAddToolTip(app, app->actNew, L"Create a new xPack archive");
+				GuiAddToolTip(app, app->actOpen, L"Open an existing .xpk archive");
+				GuiAddToolTip(app, app->actAdd, L"Add files or folders; creates an archive when none is open");
+				GuiAddToolTip(app, app->actExtract, L"Extract selected items, or all items when nothing is selected");
+				GuiAddToolTip(app, app->actVerify, L"Verify selected items, or the whole archive when nothing is selected");
+				GuiAddToolTip(app, app->actInfo, L"Show selected item or archive properties");
+				GuiAddToolTip(app, app->navBack, L"Go back in package navigation history");
+				GuiAddToolTip(app, app->navForward, L"Go forward in package navigation history");
+				GuiAddToolTip(app, app->navRoot, L"Go to package root");
+				GuiAddToolTip(app, app->navUp, L"Go to parent package folder");
+				GuiAddToolTip(app, app->navGo, L"Open the package path typed in the path box");
+				GuiAddToolTip(app, app->filterEdit, L"Filter current view. Supports multiple keywords and * / ? wildcards");
+				GuiAddToolTip(app, app->filterClear, L"Clear the current filter");
+			}
+			SendMessageW(app->filterEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Filter: keywords, * and ?");
+			SendMessageW(app->navPath, EM_SETCUEBANNER, TRUE, (LPARAM)L"Package path");
+
 			DragAcceptFiles(hwnd, TRUE);
 			GuiArchiveRefreshView(app);
+			return 0;
+		}
+		case WM_GETMINMAXINFO:
+		{
+			MINMAXINFO* info;
+
+			info = (MINMAXINFO*)lParam;
+			if ( info != NULL ) {
+				info->ptMinTrackSize.x = 760;
+				info->ptMinTrackSize.y = 480;
+			}
 			return 0;
 		}
 		case WM_SIZE:
@@ -1521,7 +1618,7 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					GuiShowSettingsFile(hwnd);
 					return 0;
 				case ID_TOOLS_RESET_UI_PREFS:
-					if ( MessageBoxW(hwnd, L"将重置窗口位置、列表列宽、排序和 New... 默认归档配置。\r\n\r\n最近归档列表不会被清空。\r\n\r\n是否继续？", XPKGUI_APP_TITLE, MB_YESNO | MB_ICONQUESTION) == IDYES ) {
+					if ( MessageBoxW(hwnd, L"将重置窗口位置、列表列宽、排序、列表显示偏好和 New... 默认归档配置。\r\n\r\n最近归档列表不会被清空。\r\n\r\n是否继续？", XPKGUI_APP_TITLE, MB_YESNO | MB_ICONQUESTION) == IDYES ) {
 						if ( GuiResetUiPreferences(app) ) {
 							MessageBoxW(hwnd, L"UI 偏好已重置。窗口位置会在下次启动时恢复默认。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
 						} else {
@@ -1558,6 +1655,37 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_VIEW_RESET_COLUMNS:
 					GuiResetColumnWidths(app);
 					return 0;
+				case ID_VIEW_GRID_LINES:
+					app->showGridLines = !app->showGridLines;
+					GuiApplyListViewStyle(app);
+					GuiSaveListViewSettings(app);
+					GuiSetMenuState(app);
+					return 0;
+				case ID_VIEW_FULL_ROW_SELECT:
+					app->fullRowSelect = !app->fullRowSelect;
+					GuiApplyListViewStyle(app);
+					GuiSaveListViewSettings(app);
+					GuiSetMenuState(app);
+					return 0;
+				case ID_VIEW_COLUMNS:
+				{
+					GuiColumnsDialogState state;
+					int i;
+
+					for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+						state.visibleColumns[i] = GuiIsArchiveColumnVisible(app, i);
+					}
+					if ( GuiRunColumnsDialog(hwnd, &state) ) {
+						GuiCaptureColumnWidths(app);
+						for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+							app->visibleColumns[i] = state.visibleColumns[i];
+						}
+						app->visibleColumns[0] = TRUE;
+						GuiSaveColumnVisibility(app);
+						GuiArchiveRefreshView(app);
+					}
+					return 0;
+				}
 				case ID_VIEW_FOCUS_FILTER:
 					GuiFocusEditControl(app->filterEdit);
 					return 0;
@@ -1651,8 +1779,15 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 							return 0;
 						}
 						case LVN_COLUMNCLICK:
-							GuiArchiveToggleSort(app, ((const NMLISTVIEW*)lParam)->iSubItem);
+						{
+							int logicalColumn;
+
+							logicalColumn = GuiVisibleColumnToLogical(app, ((const NMLISTVIEW*)lParam)->iSubItem);
+							if ( logicalColumn >= 0 ) {
+								GuiArchiveToggleSort(app, logicalColumn);
+							}
 							return 0;
+						}
 						case LVN_KEYDOWN:
 						{
 							const NMLVKEYDOWN* key;
@@ -1696,6 +1831,8 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 		case WM_DESTROY:
 			GuiCaptureColumnWidths(app);
 			GuiSaveColumnWidths(app);
+			GuiSaveColumnVisibility(app);
+			GuiSaveListViewSettings(app);
 			GuiSaveSortSettings(app);
 			if ( !app->skipWindowPlacementSave ) {
 				GuiSaveWindowPlacement(hwnd);

@@ -19,6 +19,7 @@ extern char* xrtTimeToStr(xtime iTime, int iFormat);
 extern void xrtFree(void* pMem);
 
 static const int g_defaultColumnWidths[XPKGUI_ARCHIVE_COLUMN_COUNT] = { 340, 110, 110, 90, 120, 120, 170, 90, 110, 100 };
+static const ULONGLONG XPKGUI_TEMP_ROOT_MAX_AGE_100NS = 7ull * 24ull * 60ull * 60ull * 10000000ull;
 
 BOOL GuiIsSmokeMode(void)
 {
@@ -53,6 +54,67 @@ static void GuiSetDefaultColumnWidths(GuiApp* app)
 	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
 		app->columnWidths[i] = g_defaultColumnWidths[i];
 	}
+}
+
+void GuiSetDefaultColumnVisibility(GuiApp* app)
+{
+	int i;
+
+	if ( app == NULL ) {
+		return;
+	}
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		app->visibleColumns[i] = TRUE;
+	}
+}
+
+BOOL GuiIsArchiveColumnVisible(const GuiApp* app, int logicalColumn)
+{
+	if ( app == NULL || logicalColumn < 0 || logicalColumn >= XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		return FALSE;
+	}
+	if ( logicalColumn == 0 ) {
+		return TRUE;
+	}
+	return app->visibleColumns[logicalColumn] != FALSE;
+}
+
+int GuiLogicalColumnToVisible(const GuiApp* app, int logicalColumn)
+{
+	int i;
+	int visible;
+
+	if ( !GuiIsArchiveColumnVisible(app, logicalColumn) ) {
+		return -1;
+	}
+	visible = 0;
+	for ( i = 0; i < logicalColumn; ++i ) {
+		if ( GuiIsArchiveColumnVisible(app, i) ) {
+			visible++;
+		}
+	}
+	return visible;
+}
+
+int GuiVisibleColumnToLogical(const GuiApp* app, int visibleColumn)
+{
+	int i;
+	int visible;
+
+	if ( app == NULL || visibleColumn < 0 ) {
+		return -1;
+	}
+	visible = 0;
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		if ( !GuiIsArchiveColumnVisible(app, i) ) {
+			continue;
+		}
+		if ( visible == visibleColumn ) {
+			return i;
+		}
+		visible++;
+	}
+	return -1;
 }
 
 static BOOL GuiBuildSettingsIniPath(WCHAR* pathBuf, size_t cchPathBuf)
@@ -312,6 +374,34 @@ BOOL GuiLoadColumnWidths(GuiApp* app)
 	return TRUE;
 }
 
+BOOL GuiLoadColumnVisibility(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	int columnCount;
+	int i;
+
+	if ( app == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	columnCount = GetPrivateProfileIntW(L"Columns", L"ColumnCount", 0, iniPath);
+	if ( columnCount != XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		return TRUE;
+	}
+
+	app->visibleColumns[0] = TRUE;
+	for ( i = 1; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		WCHAR key[32];
+
+		_snwprintf_s(key, _countof(key), _TRUNCATE, L"Visible%d", i);
+		app->visibleColumns[i] = GetPrivateProfileIntW(L"Columns", key, app->visibleColumns[i] ? 1 : 0, iniPath) != 0;
+	}
+	return TRUE;
+}
+
 void GuiCaptureColumnWidths(GuiApp* app)
 {
 	int i;
@@ -320,12 +410,39 @@ void GuiCaptureColumnWidths(GuiApp* app)
 		return;
 	}
 	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		int visibleIndex;
 		int width;
 
-		width = ListView_GetColumnWidth(app->list, i);
+		visibleIndex = GuiLogicalColumnToVisible(app, i);
+		if ( visibleIndex < 0 ) {
+			continue;
+		}
+		width = ListView_GetColumnWidth(app->list, visibleIndex);
 		if ( width >= 40 && width <= 2000 ) {
 			app->columnWidths[i] = width;
 		}
+	}
+}
+
+void GuiSaveColumnVisibility(const GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	WCHAR countValue[32];
+	int i;
+
+	if ( app == NULL || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return;
+	}
+
+	_snwprintf_s(countValue, _countof(countValue), _TRUNCATE, L"%d", XPKGUI_ARCHIVE_COLUMN_COUNT);
+	WritePrivateProfileStringW(L"Columns", L"ColumnCount", countValue, iniPath);
+	WritePrivateProfileStringW(L"Columns", L"Visible0", L"1", iniPath);
+
+	for ( i = 1; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		WCHAR key[32];
+
+		_snwprintf_s(key, _countof(key), _TRUNCATE, L"Visible%d", i);
+		WritePrivateProfileStringW(L"Columns", key, app->visibleColumns[i] ? L"1" : L"0", iniPath);
 	}
 }
 
@@ -357,22 +474,24 @@ void GuiSaveColumnWidths(const GuiApp* app)
 
 void GuiResetColumnWidths(GuiApp* app)
 {
-	WCHAR iniPath[MAX_PATH];
-	static const WCHAR emptySection[] = { L'\0', L'\0' };
 	int i;
 
 	if ( app == NULL ) {
 		return;
 	}
 	GuiSetDefaultColumnWidths(app);
-	if ( GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
-		WritePrivateProfileSectionW(L"Columns", emptySection, iniPath);
-	}
 	if ( app->list != NULL && IsWindow(app->list) ) {
 		for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
-			ListView_SetColumnWidth(app->list, i, app->columnWidths[i]);
+			int visibleIndex;
+
+			visibleIndex = GuiLogicalColumnToVisible(app, i);
+			if ( visibleIndex >= 0 ) {
+				ListView_SetColumnWidth(app->list, visibleIndex, app->columnWidths[i]);
+			}
 		}
 	}
+	GuiSaveColumnWidths(app);
+	GuiSaveColumnVisibility(app);
 }
 
 void GuiAutoSizeColumnWidths(GuiApp* app)
@@ -383,10 +502,60 @@ void GuiAutoSizeColumnWidths(GuiApp* app)
 		return;
 	}
 	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
-		ListView_SetColumnWidth(app->list, i, LVSCW_AUTOSIZE_USEHEADER);
+		if ( GuiIsArchiveColumnVisible(app, i) ) {
+			ListView_SetColumnWidth(app->list, GuiLogicalColumnToVisible(app, i), LVSCW_AUTOSIZE_USEHEADER);
+		}
 	}
 	GuiCaptureColumnWidths(app);
 	GuiSaveColumnWidths(app);
+}
+
+void GuiApplyListViewStyle(GuiApp* app)
+{
+	DWORD style;
+
+	if ( app == NULL || app->list == NULL || !IsWindow(app->list) ) {
+		return;
+	}
+
+	style = LVS_EX_DOUBLEBUFFER;
+	if ( app->fullRowSelect ) {
+		style |= LVS_EX_FULLROWSELECT;
+	}
+	if ( app->showGridLines ) {
+		style |= LVS_EX_GRIDLINES;
+	}
+	ListView_SetExtendedListViewStyle(app->list, style);
+}
+
+BOOL GuiLoadListViewSettings(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+
+	if ( app == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	app->showGridLines = GetPrivateProfileIntW(L"ListView", L"ShowGridLines", app->showGridLines ? 1 : 0, iniPath) != 0;
+	app->fullRowSelect = GetPrivateProfileIntW(L"ListView", L"FullRowSelect", app->fullRowSelect ? 1 : 0, iniPath) != 0;
+	app->listViewSettingsInitialized = TRUE;
+	GuiApplyListViewStyle(app);
+	return TRUE;
+}
+
+void GuiSaveListViewSettings(const GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+
+	if ( app == NULL || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return;
+	}
+
+	WritePrivateProfileStringW(L"ListView", L"ShowGridLines", app->showGridLines ? L"1" : L"0", iniPath);
+	WritePrivateProfileStringW(L"ListView", L"FullRowSelect", app->fullRowSelect ? L"1" : L"0", iniPath);
 }
 
 BOOL GuiLoadSortSettings(GuiApp* app)
@@ -518,14 +687,24 @@ BOOL GuiResetUiPreferences(GuiApp* app)
 	WritePrivateProfileSectionW(L"ArchiveDefaults", emptySection, iniPath);
 
 	GuiSetDefaultColumnWidths(app);
+	GuiSetDefaultColumnVisibility(app);
 	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
 		if ( app->list != NULL && IsWindow(app->list) ) {
-			ListView_SetColumnWidth(app->list, i, app->columnWidths[i]);
+			int visibleIndex;
+
+			visibleIndex = GuiLogicalColumnToVisible(app, i);
+			if ( visibleIndex >= 0 ) {
+				ListView_SetColumnWidth(app->list, visibleIndex, app->columnWidths[i]);
+			}
 		}
 	}
 	app->sortColumn = 0;
 	app->sortAscending = TRUE;
 	app->sortInitialized = TRUE;
+	app->showGridLines = TRUE;
+	app->fullRowSelect = TRUE;
+	app->listViewSettingsInitialized = TRUE;
+	GuiApplyListViewStyle(app);
 	app->skipWindowPlacementSave = TRUE;
 
 	if ( app->archive == NULL ) {
@@ -537,6 +716,7 @@ BOOL GuiResetUiPreferences(GuiApp* app)
 		app->volumeSize = 0;
 		app->writePolicy = XPK_WRITE_BUFFERED;
 		app->solidMode = FALSE;
+		GuiArchiveRefreshView(app);
 	} else {
 		GuiArchiveRefreshView(app);
 	}
@@ -568,6 +748,102 @@ BOOL GuiShowSettingsFile(HWND owner)
 	return TRUE;
 }
 
+static BOOL GuiFileTimeOlderThan(const FILETIME* fileTime, const FILETIME* nowTime, ULONGLONG maxAge100ns)
+{
+	ULARGE_INTEGER t;
+	ULARGE_INTEGER now;
+
+	if ( fileTime == NULL || nowTime == NULL ) {
+		return FALSE;
+	}
+	t.LowPart = fileTime->dwLowDateTime;
+	t.HighPart = fileTime->dwHighDateTime;
+	now.LowPart = nowTime->dwLowDateTime;
+	now.HighPart = nowTime->dwHighDateTime;
+	return now.QuadPart > t.QuadPart && (now.QuadPart - t.QuadPart) > maxAge100ns;
+}
+
+static BOOL GuiDeleteDirectoryTreeBestEffort(const WCHAR* dirPath)
+{
+	WCHAR pattern[MAX_PATH];
+	WCHAR childPath[MAX_PATH];
+	WIN32_FIND_DATAW data;
+	HANDLE find;
+
+	if ( dirPath == NULL || dirPath[0] == L'\0' ) {
+		return FALSE;
+	}
+
+	_snwprintf_s(pattern, _countof(pattern), _TRUNCATE, L"%s\\*", dirPath);
+	find = FindFirstFileW(pattern, &data);
+	if ( find != INVALID_HANDLE_VALUE ) {
+		do {
+			if ( wcscmp(data.cFileName, L".") == 0 || wcscmp(data.cFileName, L"..") == 0 ) {
+				continue;
+			}
+			_snwprintf_s(childPath, _countof(childPath), _TRUNCATE, L"%s\\%s", dirPath, data.cFileName);
+			if ( childPath[0] == L'\0' ) {
+				continue;
+			}
+			if ( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
+				(void)GuiDeleteDirectoryTreeBestEffort(childPath);
+			} else {
+				(void)SetFileAttributesW(childPath, FILE_ATTRIBUTE_NORMAL);
+				(void)DeleteFileW(childPath);
+			}
+		} while ( FindNextFileW(find, &data) );
+		FindClose(find);
+	}
+
+	(void)SetFileAttributesW(dirPath, FILE_ATTRIBUTE_NORMAL);
+	return RemoveDirectoryW(dirPath);
+}
+
+void GuiCleanupStaleTempRoots(void)
+{
+	WCHAR tempPath[MAX_PATH];
+	WCHAR rootPath[MAX_PATH];
+	WCHAR pattern[MAX_PATH];
+	WCHAR childPath[MAX_PATH];
+	DWORD cchTemp;
+	WIN32_FIND_DATAW data;
+	HANDLE find;
+	FILETIME nowTime;
+
+	cchTemp = GetTempPathW(_countof(tempPath), tempPath);
+	if ( cchTemp == 0 || cchTemp >= _countof(tempPath) ) {
+		return;
+	}
+	_snwprintf_s(rootPath, _countof(rootPath), _TRUNCATE, L"%sxpkgui-open", tempPath);
+	if ( rootPath[0] == L'\0' ) {
+		return;
+	}
+	_snwprintf_s(pattern, _countof(pattern), _TRUNCATE, L"%s\\*", rootPath);
+	GetSystemTimeAsFileTime(&nowTime);
+
+	find = FindFirstFileW(pattern, &data);
+	if ( find == INVALID_HANDLE_VALUE ) {
+		return;
+	}
+	do {
+		const FILETIME* timeToCheck;
+
+		if ( wcscmp(data.cFileName, L".") == 0 || wcscmp(data.cFileName, L"..") == 0 ) {
+			continue;
+		}
+		if ( (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 ) {
+			continue;
+		}
+		timeToCheck = (data.ftCreationTime.dwLowDateTime != 0 || data.ftCreationTime.dwHighDateTime != 0) ? &data.ftCreationTime : &data.ftLastWriteTime;
+		if ( !GuiFileTimeOlderThan(timeToCheck, &nowTime, XPKGUI_TEMP_ROOT_MAX_AGE_100NS) ) {
+			continue;
+		}
+		_snwprintf_s(childPath, _countof(childPath), _TRUNCATE, L"%s\\%s", rootPath, data.cFileName);
+		(void)GuiDeleteDirectoryTreeBestEffort(childPath);
+	} while ( FindNextFileW(find, &data) );
+	FindClose(find);
+}
+
 static void GuiFreeLaunchInputs(GuiApp* app)
 {
 	int i;
@@ -593,6 +869,11 @@ void GuiAppInitDefaults(GuiApp* app)
 	app->solidMode = FALSE;
 	app->currentFolder[0] = L'\0';
 	app->flatView = FALSE;
+	if ( !app->listViewSettingsInitialized ) {
+		app->showGridLines = TRUE;
+		app->fullRowSelect = TRUE;
+		app->listViewSettingsInitialized = TRUE;
+	}
 	if ( !app->sortInitialized ) {
 		app->sortColumn = 0;
 		app->sortAscending = TRUE;
@@ -601,6 +882,9 @@ void GuiAppInitDefaults(GuiApp* app)
 		app->sortColumn = 0;
 	}
 	GuiApplyDefaultColumnWidths(app);
+	if ( !app->visibleColumns[0] ) {
+		GuiSetDefaultColumnVisibility(app);
+	}
 	app->navHistoryCount = 0;
 	app->navHistoryIndex = 0;
 	app->navHistoryLocked = FALSE;
@@ -789,8 +1073,11 @@ BOOL GuiSetClipboardText(HWND owner, const WCHAR* text)
 
 void GuiUpdateStatus(GuiApp* app)
 {
-	WCHAR status[768];
-	WCHAR viewText[128];
+	WCHAR pane0[160];
+	WCHAR pane1[160];
+	WCHAR pane2[192];
+	WCHAR pane3[192];
+	WCHAR pane4[256];
 	WCHAR selSizeText[64];
 	WCHAR selPackedText[64];
 	WCHAR selRatioText[32];
@@ -807,18 +1094,22 @@ void GuiUpdateStatus(GuiApp* app)
 
 	if ( app->archive == NULL ) {
 		SendMessageW(app->status, SB_SETTEXTW, 0, (LPARAM)L"Ready");
+		SendMessageW(app->status, SB_SETTEXTW, 1, (LPARAM)L"");
+		SendMessageW(app->status, SB_SETTEXTW, 2, (LPARAM)L"");
+		SendMessageW(app->status, SB_SETTEXTW, 3, (LPARAM)L"");
+		SendMessageW(app->status, SB_SETTEXTW, 4, (LPARAM)L"");
 		return;
 	}
 
 	pathPack = (app->packType == XPK_PACK_LINUX || app->packType == XPK_PACK_WIN32);
 	if ( pathPack ) {
 		if ( app->flatView ) {
-			_snwprintf_s(viewText, _countof(viewText), _TRUNCATE, L" | view=flat");
+			wcsncpy_s(pane4, _countof(pane4), L"view=flat", _TRUNCATE);
 		} else {
-			_snwprintf_s(viewText, _countof(viewText), _TRUNCATE, L" | view=/%s", app->currentFolder);
+			_snwprintf_s(pane4, _countof(pane4), _TRUNCATE, L"view=/%s", app->currentFolder);
 		}
 	} else {
-		viewText[0] = L'\0';
+		pane4[0] = L'\0';
 	}
 
 	selectedRows = GuiArchiveSelectedCount(app);
@@ -833,27 +1124,75 @@ void GuiUpdateStatus(GuiApp* app)
 	ZeroMemory(&statInfo, sizeof(statInfo));
 	if ( xpkStatGet(app->archive, &statInfo) == XPK_OK ) {
 		_snwprintf_s(
-			status,
-			_countof(status),
+			pane0,
+			_countof(pane0),
 			_TRUNCATE,
-			L"type=%d | entries=%u | shown=%u | sel=%u rows/%u files | selSize=%s | selPacked=%s | selRatio=%s | live=%llu | holes=%llu | meta=%llu | table=%llu%s",
+			L"type=%d entries=%u shown=%u",
 			(int)app->packType,
 			statInfo.fileCount,
-			(unsigned)app->viewCount,
+			(unsigned)app->viewCount);
+		_snwprintf_s(
+			pane1,
+			_countof(pane1),
+			_TRUNCATE,
+			L"sel=%u rows/%u files",
 			(unsigned)selectedRows,
-			(unsigned)selectedFiles,
+			(unsigned)selectedFiles);
+		_snwprintf_s(
+			pane2,
+			_countof(pane2),
+			_TRUNCATE,
+			L"size=%s packed=%s ratio=%s",
 			selSizeText,
 			selPackedText,
-			selRatioText,
+			selRatioText);
+		_snwprintf_s(
+			pane3,
+			_countof(pane3),
+			_TRUNCATE,
+			L"live=%llu holes=%llu meta=%llu table=%llu",
 			(unsigned long long)statInfo.liveDataBytes,
 			(unsigned long long)statInfo.holeBytes,
 			(unsigned long long)statInfo.metaBytes,
-			(unsigned long long)statInfo.entryTableBytes,
-			viewText);
+			(unsigned long long)statInfo.entryTableBytes);
+		SendMessageW(app->status, SB_SETTEXTW, 0, (LPARAM)pane0);
+		SendMessageW(app->status, SB_SETTEXTW, 1, (LPARAM)pane1);
+		SendMessageW(app->status, SB_SETTEXTW, 2, (LPARAM)pane2);
+		SendMessageW(app->status, SB_SETTEXTW, 3, (LPARAM)pane3);
+		SendMessageW(app->status, SB_SETTEXTW, 4, (LPARAM)pane4);
 	} else {
-		_snwprintf_s(status, _countof(status), _TRUNCATE, L"%S", xpkLastErrorMessage(app->archive));
+		_snwprintf_s(pane0, _countof(pane0), _TRUNCATE, L"%S", xpkLastErrorMessage(app->archive));
+		SendMessageW(app->status, SB_SETTEXTW, 0, (LPARAM)pane0);
+		SendMessageW(app->status, SB_SETTEXTW, 1, (LPARAM)L"");
+		SendMessageW(app->status, SB_SETTEXTW, 2, (LPARAM)L"");
+		SendMessageW(app->status, SB_SETTEXTW, 3, (LPARAM)L"");
+		SendMessageW(app->status, SB_SETTEXTW, 4, (LPARAM)L"");
 	}
-	SendMessageW(app->status, SB_SETTEXTW, 0, (LPARAM)status);
+}
+
+void GuiUpdateEmptyState(GuiApp* app)
+{
+	const WCHAR* text;
+
+	if ( app == NULL || app->emptyState == NULL ) {
+		return;
+	}
+
+	text = NULL;
+	if ( app->archive == NULL ) {
+		text = L"No archive open. Use New, Open, or drag files here.";
+	} else if ( app->viewCount == 0 && app->filterText[0] != L'\0' ) {
+		text = L"No items match the current filter.";
+	} else if ( app->viewCount == 0 ) {
+		text = L"This folder is empty.";
+	}
+
+	if ( text == NULL ) {
+		ShowWindow(app->emptyState, SW_HIDE);
+		return;
+	}
+	SetWindowTextW(app->emptyState, text);
+	ShowWindow(app->emptyState, SW_SHOW);
 }
 
 static BOOL GuiIsArchiveFormatErrorText(const char* sError)
@@ -865,11 +1204,26 @@ static BOOL GuiIsArchiveFormatErrorText(const char* sError)
 		(strcmp(sError, "invalid xpk package format") == 0);
 }
 
+static const WCHAR* GuiArchiveErrorCategory(const char* sError)
+{
+	if ( GuiIsArchiveFormatErrorText(sError) ) {
+		return L"格式错误";
+	}
+	if ( sError != NULL && (strstr(sError, "file") != NULL || strstr(sError, "path") != NULL || strstr(sError, "open") != NULL || strstr(sError, "write") != NULL || strstr(sError, "read") != NULL) ) {
+		return L"IO 错误";
+	}
+	if ( sError != NULL && strstr(sError, "cancel") != NULL ) {
+		return L"用户取消";
+	}
+	return L"xPack API 状态错误";
+}
+
 static void GuiShowArchiveErrorInternal(GuiApp* app, const WCHAR* actionText, const WCHAR* archivePath)
 {
 	WCHAR text[1024];
 	WCHAR wideError[768];
 	const char* sError;
+	const WCHAR* category;
 
 	if ( app != NULL ) {
 		app->launchErrorShown = TRUE;
@@ -880,18 +1234,28 @@ static void GuiShowArchiveErrorInternal(GuiApp* app, const WCHAR* actionText, co
 		sError = "unknown error";
 	}
 	GuiWideFromUtf8(sError, wideError, _countof(wideError));
+	category = GuiArchiveErrorCategory(sError);
 	if ( archivePath != NULL && archivePath[0] != L'\0' ) {
-		_snwprintf_s(text, _countof(text), _TRUNCATE, L"%s失败。\n\n文件：%s\n错误：%s", actionText, archivePath, wideError);
+		_snwprintf_s(
+			text,
+			_countof(text),
+			_TRUNCATE,
+			L"%s失败。\n\n上下文：正在处理 xPack 归档\n文件：%s\n错误类型：%s\nxPack 错误：%s",
+			actionText,
+			archivePath,
+			category,
+			wideError);
 		if ( GuiIsArchiveFormatErrorText(sError) ) {
 			wcsncat_s(
 				text,
 				_countof(text),
-				L"\n\n提示：当前版本不兼容旧版/遗留 xpk 包。"
+				L"\n\n提示：这通常表示当前打开的文件不是新版 xpk 归档，或临时解压出的内层 .xpk 不是有效归档。"
+				L"当前版本不兼容旧版/遗留 xpk 包。"
 				L"如果这个文件来自旧工具或历史测试产物，请用当前 xPack 重新创建后再打开。",
 				_TRUNCATE);
 		}
 	} else {
-		_snwprintf_s(text, _countof(text), _TRUNCATE, L"%s失败。\n\n%s", actionText, wideError);
+		_snwprintf_s(text, _countof(text), _TRUNCATE, L"%s失败。\n\n错误类型：%s\nxPack 错误：%s", actionText, category, wideError);
 	}
 	MessageBoxW(app->window, text, XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
 }
@@ -908,14 +1272,41 @@ void GuiShowArchiveErrorPath(GuiApp* app, const WCHAR* actionText, const WCHAR* 
 
 void GuiShowSystemError(HWND hwnd, const WCHAR* title, DWORD err)
 {
+	GuiShowSystemErrorDetail(hwnd, title, NULL, NULL, err);
+}
+
+void GuiShowSystemErrorDetail(HWND hwnd, const WCHAR* title, const WCHAR* context, const WCHAR* path, DWORD err)
+{
 	WCHAR text[512];
+	WCHAR body[1024];
 	DWORD len;
 
 	len = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, 0, text, (DWORD)_countof(text), NULL);
 	if ( len == 0 ) {
 		_snwprintf_s(text, _countof(text), _TRUNCATE, L"系统错误 %lu", err);
 	}
-	MessageBoxW(hwnd, text, title, MB_OK | MB_ICONERROR);
+	_snwprintf_s(
+		body,
+		_countof(body),
+		_TRUNCATE,
+		L"%s%s%s%s%s%s错误码：%lu (0x%08lX)\n系统消息：%s",
+		(context != NULL && context[0] != L'\0') ? L"上下文：" : L"",
+		(context != NULL && context[0] != L'\0') ? context : L"",
+		(context != NULL && context[0] != L'\0') ? L"\n" : L"",
+		(path != NULL && path[0] != L'\0') ? L"路径：" : L"",
+		(path != NULL && path[0] != L'\0') ? path : L"",
+		(path != NULL && path[0] != L'\0') ? L"\n" : L"",
+		(unsigned long)err,
+		(unsigned long)err,
+		text);
+	if ( err == ERROR_ACCESS_DENIED || err == ERROR_SHARING_VIOLATION || err == ERROR_LOCK_VIOLATION || err == ERROR_WRITE_PROTECT ) {
+		wcsncat_s(
+			body,
+			_countof(body),
+			L"\n\n提示：请检查文件是否只读、是否被其他程序占用，或当前用户是否有写入权限。",
+			_TRUNCATE);
+	}
+	MessageBoxW(hwnd, body, title, MB_OK | MB_ICONERROR);
 }
 
 BOOL GuiOpenArchiveDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf)

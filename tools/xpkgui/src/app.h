@@ -134,6 +134,10 @@ typedef struct GuiTextEditorDialogState {
 	BOOL readOnly;
 } GuiTextEditorDialogState;
 
+typedef struct GuiColumnsDialogState {
+	BOOL visibleColumns[XPKGUI_ARCHIVE_COLUMN_COUNT];
+} GuiColumnsDialogState;
+
 typedef struct GuiBrowseHistoryEntry {
 	WCHAR folder[XPKGUI_ITEM_TEXT];
 	BOOL flatView;
@@ -157,7 +161,9 @@ typedef struct GuiApp {
 	HWND filterEdit;
 	HWND filterClear;
 	HWND list;
+	HWND emptyState;
 	HWND status;
+	HWND toolTip;
 
 	xpkObject archive;
 	xpkPackType packType;
@@ -179,10 +185,14 @@ typedef struct GuiApp {
 	WCHAR currentFolder[XPKGUI_ITEM_TEXT];
 	WCHAR filterText[XPKGUI_ITEM_TEXT];
 	BOOL flatView;
+	BOOL showGridLines;
+	BOOL fullRowSelect;
+	BOOL listViewSettingsInitialized;
 	int sortColumn;
 	BOOL sortAscending;
 	BOOL sortInitialized;
 	int columnWidths[XPKGUI_ARCHIVE_COLUMN_COUNT];
+	BOOL visibleColumns[XPKGUI_ARCHIVE_COLUMN_COUNT];
 	GuiBrowseHistoryEntry navHistory[XPKGUI_MAX_NAV_HISTORY];
 	UINT navHistoryCount;
 	UINT navHistoryIndex;
@@ -214,10 +224,12 @@ void GuiFormatRatio(uint64_t packedSize, uint64_t fileSize, WCHAR* buf, size_t c
 void GuiFormatTime(xtime value, WCHAR* buf, size_t cchBuf);
 void GuiUpdateTitle(GuiApp* app);
 void GuiUpdateStatus(GuiApp* app);
+void GuiUpdateEmptyState(GuiApp* app);
 BOOL GuiSetClipboardText(HWND owner, const WCHAR* text);
 void GuiShowArchiveError(GuiApp* app, const WCHAR* actionText);
 void GuiShowArchiveErrorPath(GuiApp* app, const WCHAR* actionText, const WCHAR* archivePath);
 void GuiShowSystemError(HWND hwnd, const WCHAR* title, DWORD err);
+void GuiShowSystemErrorDetail(HWND hwnd, const WCHAR* title, const WCHAR* context, const WCHAR* path, DWORD err);
 BOOL GuiLoadRecentArchives(GuiApp* app);
 BOOL GuiRememberRecentArchive(GuiApp* app, const WCHAR* archivePath);
 BOOL GuiClearRecentArchives(GuiApp* app);
@@ -229,12 +241,22 @@ void GuiCaptureColumnWidths(GuiApp* app);
 void GuiSaveColumnWidths(const GuiApp* app);
 void GuiResetColumnWidths(GuiApp* app);
 void GuiAutoSizeColumnWidths(GuiApp* app);
+BOOL GuiLoadColumnVisibility(GuiApp* app);
+void GuiSaveColumnVisibility(const GuiApp* app);
+void GuiSetDefaultColumnVisibility(GuiApp* app);
+BOOL GuiIsArchiveColumnVisible(const GuiApp* app, int logicalColumn);
+int GuiLogicalColumnToVisible(const GuiApp* app, int logicalColumn);
+int GuiVisibleColumnToLogical(const GuiApp* app, int visibleColumn);
+void GuiApplyListViewStyle(GuiApp* app);
+BOOL GuiLoadListViewSettings(GuiApp* app);
+void GuiSaveListViewSettings(const GuiApp* app);
 BOOL GuiLoadSortSettings(GuiApp* app);
 void GuiSaveSortSettings(const GuiApp* app);
 BOOL GuiLoadArchiveDefaults(GuiApp* app);
 void GuiSaveArchiveDefaults(const GuiArchiveOptions* options);
 BOOL GuiResetUiPreferences(GuiApp* app);
 BOOL GuiShowSettingsFile(HWND owner);
+void GuiCleanupStaleTempRoots(void);
 
 BOOL GuiOpenArchiveDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf);
 BOOL GuiSaveArchiveDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf);
@@ -251,6 +273,7 @@ BOOL GuiSuggestExtractFolderPath(const WCHAR* archivePath, WCHAR* pathBuf, DWORD
 BOOL GuiRunInputDialog(HWND hwnd, GuiInputDialogState* state);
 BOOL GuiRunArchiveConfigDialog(HWND hwnd, GuiArchiveConfigDialogState* state);
 BOOL GuiRunTextEditorDialog(HWND hwnd, GuiTextEditorDialogState* state);
+BOOL GuiRunColumnsDialog(HWND hwnd, GuiColumnsDialogState* state);
 
 BOOL GuiArchiveOpenPath(GuiApp* app, const WCHAR* archivePath, BOOL readonly);
 BOOL GuiArchiveCreateWithOptions(GuiApp* app, const GuiArchiveOptions* options);

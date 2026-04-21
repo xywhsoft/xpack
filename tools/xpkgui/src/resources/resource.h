@@ -17,6 +17,7 @@
 #define IDD_INPUT_DIALOG           2002
 #define IDD_TASK_PROGRESS          2003
 #define IDD_TEXT_EDITOR            2004
+#define IDD_COLUMNS_DIALOG         2005
 
 #define IDC_CFG_ARCHIVE_PATH       3001
 #define IDC_CFG_BROWSE             3002
@@ -38,6 +39,17 @@
 
 #define IDC_TEXT_PROMPT            3301
 #define IDC_TEXT_VALUE             3302
+
+#define IDC_COL_NAME               3400
+#define IDC_COL_SIZE               3401
+#define IDC_COL_PACKED             3402
+#define IDC_COL_RATIO              3403
+#define IDC_COL_METHOD             3404
+#define IDC_COL_FILE_TYPE          3405
+#define IDC_COL_MODIFIED           3406
+#define IDC_COL_ID                 3407
+#define IDC_COL_HASH               3408
+#define IDC_COL_ATTR               3409
 
 #define ID_FILE_NEW                40001
 #define ID_FILE_OPEN               40002
@@ -133,6 +145,9 @@
 #define ID_VIEW_AUTO_SIZE_COLUMNS  40311
 #define ID_VIEW_RESET_COLUMNS      40312
 #define ID_VIEW_RESET_SORT         40313
+#define ID_VIEW_GRID_LINES         40314
+#define ID_VIEW_FULL_ROW_SELECT    40315
+#define ID_VIEW_COLUMNS            40316
 #define ID_HELP_ABOUT              40401
 #define ID_HELP_KEYBOARD_SHORTCUTS 40402
 #define ID_HELP_COMMAND_LINE       40403
