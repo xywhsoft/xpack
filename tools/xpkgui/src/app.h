@@ -26,9 +26,11 @@
 #define XPKGUI_MAX_RECENT_ARCHIVES 10
 #define XPKGUI_MAX_NAV_HISTORY 64
 #define XPKGUI_MAX_TEMP_PATH 1024
+#define XPKGUI_ARCHIVE_COLUMN_COUNT 10
 
 typedef enum GuiLaunchCommand {
 	GUI_LAUNCH_NONE = 0,
+	GUI_LAUNCH_HELP,
 	GUI_LAUNCH_OPEN,
 	GUI_LAUNCH_SHELL_ADD,
 	GUI_LAUNCH_SHELL_ADD_AUTO,
@@ -62,6 +64,7 @@ typedef struct GuiArchiveItem {
 	WCHAR name[XPKGUI_ITEM_TEXT];
 	WCHAR sizeText[64];
 	WCHAR packedText[64];
+	WCHAR ratioText[32];
 	WCHAR methodText[48];
 	WCHAR fileTypeText[48];
 	WCHAR modifiedText[64];
@@ -90,6 +93,7 @@ typedef struct GuiViewItem {
 	WCHAR fullPath[XPKGUI_ITEM_TEXT];
 	WCHAR sizeText[64];
 	WCHAR packedText[64];
+	WCHAR ratioText[32];
 	WCHAR methodText[48];
 	WCHAR fileTypeText[48];
 	WCHAR modifiedText[64];
@@ -177,6 +181,8 @@ typedef struct GuiApp {
 	BOOL flatView;
 	int sortColumn;
 	BOOL sortAscending;
+	BOOL sortInitialized;
+	int columnWidths[XPKGUI_ARCHIVE_COLUMN_COUNT];
 	GuiBrowseHistoryEntry navHistory[XPKGUI_MAX_NAV_HISTORY];
 	UINT navHistoryCount;
 	UINT navHistoryIndex;
@@ -185,6 +191,8 @@ typedef struct GuiApp {
 	UINT recentArchiveCount;
 	BOOL launchErrorShown;
 	BOOL archiveChangePromptActive;
+	BOOL skipWindowPlacementSave;
+	int exitCode;
 	FILETIME archiveWriteTime;
 	uint64_t archiveFileSize;
 
@@ -198,9 +206,11 @@ void GuiAppCloseArchive(GuiApp* app);
 int GuiParseCommandLineArgs(GuiApp* app, int argc, WCHAR** argv);
 int GuiAppRun(GuiApp* app, int nCmdShow);
 
+BOOL GuiIsSmokeMode(void);
 BOOL GuiUtf8FromWide(const WCHAR* src, char* dst, size_t dstCount);
 BOOL GuiWideFromUtf8(const char* src, WCHAR* dst, size_t dstCount);
 void GuiFormatUInt64(uint64_t value, WCHAR* buf, size_t cchBuf);
+void GuiFormatRatio(uint64_t packedSize, uint64_t fileSize, WCHAR* buf, size_t cchBuf);
 void GuiFormatTime(xtime value, WCHAR* buf, size_t cchBuf);
 void GuiUpdateTitle(GuiApp* app);
 void GuiUpdateStatus(GuiApp* app);
@@ -212,6 +222,19 @@ BOOL GuiLoadRecentArchives(GuiApp* app);
 BOOL GuiRememberRecentArchive(GuiApp* app, const WCHAR* archivePath);
 BOOL GuiClearRecentArchives(GuiApp* app);
 const WCHAR* GuiGetRecentArchivePath(const GuiApp* app, UINT commandId);
+BOOL GuiLoadWindowPlacement(RECT* rectOut, BOOL* maximizedOut);
+void GuiSaveWindowPlacement(HWND hwnd);
+BOOL GuiLoadColumnWidths(GuiApp* app);
+void GuiCaptureColumnWidths(GuiApp* app);
+void GuiSaveColumnWidths(const GuiApp* app);
+void GuiResetColumnWidths(GuiApp* app);
+void GuiAutoSizeColumnWidths(GuiApp* app);
+BOOL GuiLoadSortSettings(GuiApp* app);
+void GuiSaveSortSettings(const GuiApp* app);
+BOOL GuiLoadArchiveDefaults(GuiApp* app);
+void GuiSaveArchiveDefaults(const GuiArchiveOptions* options);
+BOOL GuiResetUiPreferences(GuiApp* app);
+BOOL GuiShowSettingsFile(HWND owner);
 
 BOOL GuiOpenArchiveDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf);
 BOOL GuiSaveArchiveDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf);
@@ -235,9 +258,12 @@ BOOL GuiArchiveRefreshView(GuiApp* app);
 BOOL GuiArchiveReloadFromDisk(GuiApp* app);
 BOOL GuiArchiveCheckExternalChanges(GuiApp* app);
 void GuiArchiveToggleSort(GuiApp* app, int column);
+void GuiArchiveResetSort(GuiApp* app);
 BOOL GuiArchiveCanExtractSelection(GuiApp* app);
 BOOL GuiArchiveCanDeleteSelection(GuiApp* app);
 BOOL GuiArchiveCanRenameSelection(GuiApp* app);
+BOOL GuiArchiveCanMoveSelection(GuiApp* app);
+BOOL GuiArchiveCanCopyToSelection(GuiApp* app);
 BOOL GuiArchiveCanSetSelectionFileIndex(GuiApp* app);
 BOOL GuiArchiveCanSetSelectionFileType(GuiApp* app);
 BOOL GuiArchiveCanSetSelectionPathAttr(GuiApp* app);
@@ -252,6 +278,9 @@ BOOL GuiArchiveCanReplaceSelection(GuiApp* app);
 BOOL GuiArchiveCanDuplicateSelection(GuiApp* app);
 BOOL GuiArchiveCanEditSelectionInfoExt(GuiApp* app);
 BOOL GuiArchiveCanCopySelection(GuiApp* app);
+BOOL GuiArchiveCanCopyVisibleDetails(GuiApp* app);
+BOOL GuiArchiveCanCopySelectionHashes(GuiApp* app);
+BOOL GuiArchiveCanCopyVisibleHashes(GuiApp* app);
 BOOL GuiArchiveCanSelectByPattern(GuiApp* app);
 BOOL GuiArchiveCanSelectSameExtension(GuiApp* app);
 BOOL GuiArchiveCanSelectSameHash(GuiApp* app);
@@ -288,8 +317,20 @@ BOOL GuiArchiveImportSelectionInfoExt(GuiApp* app);
 BOOL GuiArchiveExportSelectionInfoExt(GuiApp* app);
 BOOL GuiArchiveClearSelectionInfoExt(GuiApp* app);
 BOOL GuiArchiveCopySelectionPaths(GuiApp* app);
+BOOL GuiArchiveCopyVisiblePaths(GuiApp* app);
+BOOL GuiArchiveExportSelectionPaths(GuiApp* app);
+BOOL GuiArchiveExportVisiblePaths(GuiApp* app);
+BOOL GuiArchiveCopySelectionDetails(GuiApp* app);
+BOOL GuiArchiveCopyVisibleDetails(GuiApp* app);
+BOOL GuiArchiveExportSelectionDetails(GuiApp* app);
+BOOL GuiArchiveExportVisibleDetails(GuiApp* app);
 BOOL GuiArchiveCopySelectionHash(GuiApp* app);
+BOOL GuiArchiveCopySelectionHashes(GuiApp* app);
+BOOL GuiArchiveCopyVisibleHashes(GuiApp* app);
+BOOL GuiArchiveExportSelectionHashes(GuiApp* app);
+BOOL GuiArchiveExportVisibleHashes(GuiApp* app);
 BOOL GuiArchiveSelectByPattern(GuiApp* app);
+BOOL GuiArchiveDeselectByPattern(GuiApp* app);
 BOOL GuiArchiveSelectSameExtension(GuiApp* app);
 BOOL GuiArchiveSelectSameHash(GuiApp* app);
 BOOL GuiArchiveSelectSameMethod(GuiApp* app);
@@ -303,6 +344,9 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app);
 BOOL GuiArchiveReadOptions(GuiApp* app, GuiArchiveOptions* options);
 BOOL GuiArchiveApplyOptions(GuiApp* app, const GuiArchiveOptions* options, BOOL saveNow);
 BOOL GuiArchiveSave(GuiApp* app);
+BOOL GuiArchiveSaveAs(GuiApp* app);
+BOOL GuiArchiveShowArchiveInExplorer(GuiApp* app);
+BOOL GuiArchiveCopyArchivePath(GuiApp* app);
 BOOL GuiArchiveBuild(GuiApp* app);
 BOOL GuiArchivePromptNew(GuiApp* app, const WCHAR* suggestedPath, GuiArchiveOptions* optionsOut);
 BOOL GuiArchivePromptSettings(GuiApp* app, GuiArchiveOptions* optionsOut);
@@ -315,6 +359,8 @@ BOOL GuiArchiveExtractPath(const WCHAR* archivePath, const WCHAR* destPath);
 BOOL GuiArchiveExtractPathTask(const WCHAR* archivePath, const WCHAR* destPath, BOOL* cancelledOut);
 BOOL GuiArchiveRemoveSelection(GuiApp* app);
 BOOL GuiArchiveRenameSelection(GuiApp* app);
+BOOL GuiArchiveMoveSelection(GuiApp* app);
+BOOL GuiArchiveCopyToSelection(GuiApp* app);
 BOOL GuiArchiveSetSelectionFileIndex(GuiApp* app);
 BOOL GuiArchiveSetSelectionFileType(GuiApp* app);
 BOOL GuiArchiveSetSelectionPathAttr(GuiApp* app);

@@ -19,9 +19,85 @@ static void GuiFocusEditControl(HWND edit)
 	}
 }
 
+static void GuiShowKeyboardShortcuts(HWND hwnd)
+{
+	MessageBoxW(
+		hwnd,
+		L"File\r\n"
+		L"  Ctrl+N    New archive\r\n"
+		L"  Ctrl+O    Open archive\r\n"
+		L"  Ctrl+S    Save archive\r\n"
+		L"  Ctrl+Shift+S    Save As\r\n"
+		L"  Ctrl+W    Close archive\r\n\r\n"
+		L"Archive Items\r\n"
+		L"  Enter / Double-click    Open selected file or folder\r\n"
+		L"  F2    Rename selected item\r\n"
+		L"  F3    View selected file\r\n"
+		L"  F4    Edit selected file\r\n"
+		L"  Delete    Delete selected items\r\n"
+		L"  Alt+Enter    Properties\r\n\r\n"
+		L"Selection and Copy\r\n"
+		L"  Ctrl+A    Select all visible items\r\n"
+		L"  Ctrl+Shift+A    Deselect all visible items\r\n"
+		L"  Ctrl+C    Copy selected names or paths\r\n\r\n"
+		L"Navigation and View\r\n"
+		L"  Alt+Left / Alt+Right    Back / Forward\r\n"
+		L"  Alt+Up    Parent folder\r\n"
+		L"  Alt+Home    Root folder\r\n"
+		L"  Backspace    Parent folder when the list is focused\r\n"
+		L"  F5    Refresh from disk\r\n"
+		L"  Ctrl+F    Focus filter\r\n"
+		L"  Esc    Clear filter\r\n"
+		L"  Ctrl+L    Focus package path\r\n"
+		L"  Ctrl+Num+    Auto size columns",
+		XPKGUI_APP_TITLE,
+		MB_OK | MB_ICONINFORMATION);
+}
+
+static void GuiShowCommandLineHelp(HWND hwnd)
+{
+	MessageBoxW(
+		hwnd,
+		L"Usage\r\n"
+		L"  xpkgui.exe\r\n"
+		L"  xpkgui.exe <archive.xpk>\r\n"
+		L"  xpkgui.exe /? | /help\r\n\r\n"
+		L"Shell Integration Commands\r\n"
+		L"  /shell-add <file-or-folder> [...]\r\n"
+		L"      Open the New archive dialog using the selected inputs.\r\n"
+		L"  /shell-add-auto <file-or-folder> [...]\r\n"
+		L"      Create an archive automatically beside the selected inputs.\r\n"
+		L"  /extract <archive.xpk> [dest-folder]\r\n"
+		L"      Extract to a chosen or specified folder.\r\n"
+		L"  /extract-auto <archive.xpk>\r\n"
+		L"      Extract to a unique same-name folder beside the archive.\r\n"
+		L"  /extract-here <archive.xpk>\r\n"
+		L"      Extract beside the archive.\r\n"
+		L"  /verify <archive.xpk>\r\n"
+		L"      Verify the archive.\r\n"
+		L"  /properties <archive.xpk>\r\n"
+		L"      Show archive properties.",
+		XPKGUI_APP_TITLE,
+		MB_OK | MB_ICONINFORMATION);
+}
+
+static void GuiClearFilter(GuiApp* app, BOOL focusFilter)
+{
+	if ( app == NULL || app->filterEdit == NULL || !IsWindowEnabled(app->filterEdit) ) {
+		return;
+	}
+
+	SetWindowTextW(app->filterEdit, L"");
+	if ( focusFilter ) {
+		GuiFocusEditControl(app->filterEdit);
+	}
+}
+
 static void GuiSelectAllVisibleItems(GuiApp* app)
 {
 	int itemCount;
+	int firstSelected;
+	int i;
 
 	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
 		return;
@@ -32,11 +108,34 @@ static void GuiSelectAllVisibleItems(GuiApp* app)
 		return;
 	}
 
-	ListView_SetItemState(app->list, -1, LVIS_SELECTED, LVIS_SELECTED);
-	if ( ListView_GetNextItem(app->list, -1, LVNI_FOCUSED) < 0 ) {
-		ListView_SetItemState(app->list, 0, LVIS_FOCUSED, LVIS_FOCUSED);
-		ListView_SetSelectionMark(app->list, 0);
+	firstSelected = -1;
+	ListView_SetItemState(app->list, -1, 0, LVIS_SELECTED | LVIS_FOCUSED);
+	for ( i = 0; i < itemCount && i < (int)app->viewCount; ++i ) {
+		if ( app->viewItems[i].kind == GUI_VIEW_ITEM_PARENT ) {
+			continue;
+		}
+		ListView_SetItemState(app->list, i, LVIS_SELECTED, LVIS_SELECTED);
+		if ( firstSelected < 0 ) {
+			firstSelected = i;
+		}
 	}
+	if ( firstSelected >= 0 ) {
+		ListView_SetItemState(app->list, firstSelected, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, firstSelected);
+	}
+	SetFocus(app->list);
+	GuiSetMenuState(app);
+	GuiUpdateStatus(app);
+}
+
+static void GuiDeselectAllVisibleItems(GuiApp* app)
+{
+	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
+		return;
+	}
+
+	ListView_SetItemState(app->list, -1, 0, LVIS_SELECTED);
+	ListView_SetSelectionMark(app->list, -1);
 	SetFocus(app->list);
 	GuiSetMenuState(app);
 	GuiUpdateStatus(app);
@@ -336,12 +435,17 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	BOOL canExtract;
 	BOOL canDelete;
 	BOOL allowRename;
+	BOOL canMove;
+	BOOL canCopyTo;
 	BOOL canSetFileIndex;
 	BOOL canSetFileType;
 	BOOL canSetPathAttr;
 	BOOL canVerifySelection;
 	BOOL canCopy;
+	BOOL canCopyVisibleDetails;
 	BOOL canCopyHash;
+	BOOL canCopyHashes;
+	BOOL canCopyVisibleHashes;
 	BOOL canShowProperties;
 	BOOL canShowInExplorer;
 	BOOL canEdit;
@@ -358,6 +462,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	BOOL canSelectDuplicateCopies;
 	BOOL canDeleteDuplicateCopies;
 	BOOL canInvertSelection;
+	BOOL canSelectVisible;
 	BOOL canLocateInTree;
 
 	if ( app == NULL ) {
@@ -387,12 +492,17 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	canExtract = GuiArchiveCanExtractSelection(app);
 	canDelete = GuiArchiveCanDeleteSelection(app);
 	allowRename = GuiArchiveCanRenameSelection(app);
+	canMove = GuiArchiveCanMoveSelection(app);
+	canCopyTo = GuiArchiveCanCopyToSelection(app);
 	canSetFileIndex = GuiArchiveCanSetSelectionFileIndex(app);
 	canSetFileType = GuiArchiveCanSetSelectionFileType(app);
 	canSetPathAttr = GuiArchiveCanSetSelectionPathAttr(app);
 	canVerifySelection = GuiArchiveCanVerifySelection(app);
 	canCopy = GuiArchiveCanCopySelection(app);
+	canCopyVisibleDetails = GuiArchiveCanCopyVisibleDetails(app);
 	canCopyHash = GuiArchiveCanCopySelectionHash(app);
+	canCopyHashes = GuiArchiveCanCopySelectionHashes(app);
+	canCopyVisibleHashes = GuiArchiveCanCopyVisibleHashes(app);
 	canShowProperties = canCopy;
 	canSelectByPattern = GuiArchiveCanSelectByPattern(app);
 	canSelectSameExt = GuiArchiveCanSelectSameExtension(app);
@@ -404,6 +514,7 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 	canSelectDuplicateCopies = GuiArchiveCanSelectDuplicateCopies(app);
 	canDeleteDuplicateCopies = GuiArchiveCanDeleteDuplicateCopies(app);
 	canInvertSelection = GuiArchiveCanInvertSelection(app);
+	canSelectVisible = hasArchive && app->viewCount > 0;
 	canLocateInTree = GuiArchiveCanLocateInTree(app);
 
 	menu = CreatePopupMenu();
@@ -411,19 +522,19 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		return;
 	}
 
-	if ( canOpen || canView || canEditText || canShowInExplorer || canEdit || canReplace || canDuplicate || canEditInfoExt || canExtract || canDelete || allowRename || canSetFileIndex || canSetFileType || canSetPathAttr || canVerifySelection || canCopy || canCopyHash || canShowProperties || canSelectByPattern || canSelectSameExt || canSelectSameHash || canSelectSameMethod || canSelectSameFileType || canSelectSamePathAttr || canSelectDuplicates || canSelectDuplicateCopies || canDeleteDuplicateCopies || canInvertSelection || canLocateInTree ) {
+	if ( canOpen || canView || canEditText || canShowInExplorer || canEdit || canReplace || canDuplicate || canEditInfoExt || canExtract || canDelete || allowRename || canMove || canCopyTo || canSetFileIndex || canSetFileType || canSetPathAttr || canVerifySelection || canCopy || canCopyVisibleDetails || canCopyHash || canCopyHashes || canCopyVisibleHashes || canShowProperties || canSelectByPattern || canSelectSameExt || canSelectSameHash || canSelectSameMethod || canSelectSameFileType || canSelectSamePathAttr || canSelectDuplicates || canSelectDuplicateCopies || canDeleteDuplicateCopies || canInvertSelection || canSelectVisible || canLocateInTree ) {
 		if ( canOpen ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_OPEN, L"Open");
 			AppendMenuW(menu, MF_STRING, ID_ACTION_OPEN_WITH, L"Open With...");
 		}
 		if ( canView ) {
-			AppendMenuW(menu, MF_STRING, ID_ACTION_VIEW, L"View");
+			AppendMenuW(menu, MF_STRING, ID_ACTION_VIEW, L"View\tF3");
 		}
 		if ( canEditText ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_EDIT_TEXT, L"Edit Text...");
 		}
 		if ( canEdit ) {
-			AppendMenuW(menu, MF_STRING, ID_ACTION_EDIT, L"Edit");
+			AppendMenuW(menu, MF_STRING, ID_ACTION_EDIT, L"Edit\tF4");
 		}
 		if ( canReplace ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_REPLACE, L"Replace...");
@@ -450,10 +561,16 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 			AppendMenuW(menu, MF_STRING, ID_ACTION_VERIFY, L"Verify Selected");
 		}
 		if ( canDelete ) {
-			AppendMenuW(menu, MF_STRING, ID_ACTION_DELETE, L"Delete");
+			AppendMenuW(menu, MF_STRING, ID_ACTION_DELETE, L"Delete\tDelete");
 		}
 		if ( allowRename ) {
-			AppendMenuW(menu, MF_STRING, ID_ACTION_RENAME, L"Rename...");
+			AppendMenuW(menu, MF_STRING, ID_ACTION_RENAME, L"Rename...\tF2");
+		}
+		if ( canCopyTo ) {
+			AppendMenuW(menu, MF_STRING, ID_ACTION_COPY_TO, L"Copy To...");
+		}
+		if ( canMove ) {
+			AppendMenuW(menu, MF_STRING, ID_ACTION_MOVE_TO, L"Move To...");
 		}
 		if ( canSetFileIndex ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_SET_FILE_INDEX, L"Set FileIndex...");
@@ -466,15 +583,40 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		}
 		if ( canCopy ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_PATHS, L"Copy Selected Names/Paths");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_EXPORT_PATHS, L"Export Selected Names/Paths...");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_DETAILS, L"Copy Selected Details");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_EXPORT_DETAILS, L"Export Selected Details...");
+		}
+		if ( canCopyVisibleDetails ) {
+			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_VISIBLE_PATHS, L"Copy Visible Names/Paths");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_EXPORT_VISIBLE_PATHS, L"Export Visible Names/Paths...");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_VISIBLE_DETAILS, L"Copy Visible List Details");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_EXPORT_VISIBLE_DETAILS, L"Export Visible List Details...");
 		}
 		if ( canCopyHash ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_HASH, L"Copy Entry Hash");
 		}
+		if ( canCopyHashes ) {
+			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_HASHES, L"Copy Selected Hashes");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_EXPORT_HASHES, L"Export Selected Hashes...");
+		}
+		if ( canCopyVisibleHashes ) {
+			AppendMenuW(menu, MF_STRING, ID_EDIT_COPY_VISIBLE_HASHES, L"Copy Visible Hashes");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_EXPORT_VISIBLE_HASHES, L"Export Visible Hashes...");
+		}
 		if ( canShowProperties ) {
 			AppendMenuW(menu, MF_STRING, ID_ACTION_PROPERTIES, L"Properties");
 		}
+		if ( canSelectVisible ) {
+			AppendMenuW(menu, MF_STRING, ID_VIEW_SELECT_ALL, L"Select All");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_DESELECT_ALL, L"Deselect All");
+		}
+		if ( canInvertSelection ) {
+			AppendMenuW(menu, MF_STRING, ID_EDIT_INVERT_SELECTION, L"Invert Selection");
+		}
 		if ( canSelectByPattern ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_SELECT_BY_PATTERN, L"Select By Pattern...");
+			AppendMenuW(menu, MF_STRING, ID_EDIT_DESELECT_BY_PATTERN, L"Deselect By Pattern...");
 		}
 		if ( canSelectSameExt ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_SELECT_SAME_EXT, L"Select Same Extension");
@@ -499,9 +641,6 @@ static void GuiShowListContextMenu(GuiApp* app, int itemIndex, POINT ptScreen)
 		}
 		if ( canDeleteDuplicateCopies ) {
 			AppendMenuW(menu, MF_STRING, ID_EDIT_DELETE_DUP_COPIES, L"Delete Duplicate Copies...");
-		}
-		if ( canInvertSelection ) {
-			AppendMenuW(menu, MF_STRING, ID_EDIT_INVERT_SELECTION, L"Invert Selection");
 		}
 		AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
 	}
@@ -530,12 +669,17 @@ void GuiSetMenuState(GuiApp* app)
 	BOOL canExtract;
 	BOOL canDelete;
 	BOOL canRename;
+	BOOL canMove;
+	BOOL canCopyTo;
 	BOOL canSetFileIndex;
 	BOOL canSetFileType;
 	BOOL canSetPathAttr;
 	BOOL canVerifySelection;
 	BOOL canCopy;
+	BOOL canCopyVisibleDetails;
 	BOOL canCopyHash;
+	BOOL canCopyHashes;
+	BOOL canCopyVisibleHashes;
 	BOOL canShowProperties;
 	BOOL canShowInExplorer;
 	BOOL canEdit;
@@ -552,9 +696,15 @@ void GuiSetMenuState(GuiApp* app)
 	BOOL canSelectDuplicateCopies;
 	BOOL canDeleteDuplicateCopies;
 	BOOL canInvertSelection;
+	BOOL canSelectVisible;
 	BOOL canLocateInTree;
 	BOOL canBrowseBack;
 	BOOL canBrowseForward;
+	BOOL canBrowseParent;
+	BOOL canBrowseRoot;
+	BOOL canFocusFilter;
+	BOOL canClearFilter;
+	BOOL canFocusPath;
 
 	if ( app->window == NULL ) {
 		return;
@@ -579,12 +729,17 @@ void GuiSetMenuState(GuiApp* app)
 	canExtract = hasArchive && GuiArchiveCanExtractSelection(app);
 	canDelete = hasArchive && GuiArchiveCanDeleteSelection(app);
 	canRename = hasArchive && GuiArchiveCanRenameSelection(app);
+	canMove = hasArchive && GuiArchiveCanMoveSelection(app);
+	canCopyTo = hasArchive && GuiArchiveCanCopyToSelection(app);
 	canSetFileIndex = hasArchive && GuiArchiveCanSetSelectionFileIndex(app);
 	canSetFileType = hasArchive && GuiArchiveCanSetSelectionFileType(app);
 	canSetPathAttr = hasArchive && GuiArchiveCanSetSelectionPathAttr(app);
 	canVerifySelection = hasArchive && GuiArchiveCanVerifySelection(app);
 	canCopy = hasArchive && GuiArchiveCanCopySelection(app);
+	canCopyVisibleDetails = hasArchive && GuiArchiveCanCopyVisibleDetails(app);
 	canCopyHash = hasArchive && GuiArchiveCanCopySelectionHash(app);
+	canCopyHashes = hasArchive && GuiArchiveCanCopySelectionHashes(app);
+	canCopyVisibleHashes = hasArchive && GuiArchiveCanCopyVisibleHashes(app);
 	canShowProperties = hasArchive && GuiArchiveCanCopySelection(app);
 	canSelectByPattern = hasArchive && GuiArchiveCanSelectByPattern(app);
 	canSelectSameExt = hasArchive && GuiArchiveCanSelectSameExtension(app);
@@ -596,17 +751,38 @@ void GuiSetMenuState(GuiApp* app)
 	canSelectDuplicateCopies = hasArchive && GuiArchiveCanSelectDuplicateCopies(app);
 	canDeleteDuplicateCopies = hasArchive && GuiArchiveCanDeleteDuplicateCopies(app);
 	canInvertSelection = hasArchive && GuiArchiveCanInvertSelection(app);
+	canSelectVisible = hasArchive && app->viewCount > 0;
 	canLocateInTree = hasArchive && GuiArchiveCanLocateInTree(app);
 	canBrowseBack = hasArchive && GuiArchiveCanBrowseBack(app);
 	canBrowseForward = hasArchive && GuiArchiveCanBrowseForward(app);
+	canBrowseParent = hasArchive && GuiShouldShowNavigation(app) && !app->flatView && app->currentFolder[0] != L'\0';
+	canBrowseRoot = canBrowseParent;
+	canFocusFilter = hasArchive && app->filterEdit != NULL && IsWindowEnabled(app->filterEdit);
+	canClearFilter = canFocusFilter && app->filterText[0] != L'\0';
+	canFocusPath = hasArchive && GuiShouldShowNavigation(app) && !app->flatView && app->navPath != NULL && IsWindowEnabled(app->navPath);
 
 	EnableMenuItem(hMenu, ID_FILE_CLOSE, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_FILE_SAVE, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_FILE_SAVE_AS, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_FILE_REBUILD, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_FILE_PROPERTIES, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_FILE_SHOW_ARCHIVE_IN_EXPLORER, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_FILE_COPY_ARCHIVE_PATH, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_COPY_PATHS, MF_BYCOMMAND | (canCopy ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_COPY_VISIBLE_PATHS, MF_BYCOMMAND | (canCopyVisibleDetails ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_EXPORT_PATHS, MF_BYCOMMAND | (canCopy ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_EXPORT_VISIBLE_PATHS, MF_BYCOMMAND | (canCopyVisibleDetails ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_COPY_DETAILS, MF_BYCOMMAND | (canCopy ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_COPY_VISIBLE_DETAILS, MF_BYCOMMAND | (canCopyVisibleDetails ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_EXPORT_DETAILS, MF_BYCOMMAND | (canCopy ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_EXPORT_VISIBLE_DETAILS, MF_BYCOMMAND | (canCopyVisibleDetails ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_COPY_HASH, MF_BYCOMMAND | (canCopyHash ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_COPY_HASHES, MF_BYCOMMAND | (canCopyHashes ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_COPY_VISIBLE_HASHES, MF_BYCOMMAND | (canCopyVisibleHashes ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_EXPORT_HASHES, MF_BYCOMMAND | (canCopyHashes ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_EXPORT_VISIBLE_HASHES, MF_BYCOMMAND | (canCopyVisibleHashes ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_BY_PATTERN, MF_BYCOMMAND | (canSelectByPattern ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_DESELECT_BY_PATTERN, MF_BYCOMMAND | (canSelectByPattern ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_EXT, MF_BYCOMMAND | (canSelectSameExt ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_HASH, MF_BYCOMMAND | (canSelectSameHash ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_SAME_METHOD, MF_BYCOMMAND | (canSelectSameMethod ? MF_ENABLED : MF_GRAYED));
@@ -616,6 +792,11 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_EDIT_SELECT_DUP_COPIES, MF_BYCOMMAND | (canSelectDuplicateCopies ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_DELETE_DUP_COPIES, MF_BYCOMMAND | (canDeleteDuplicateCopies ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_EDIT_INVERT_SELECTION, MF_BYCOMMAND | (canInvertSelection ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_SELECT_ALL, MF_BYCOMMAND | (canSelectVisible ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_EDIT_DESELECT_ALL, MF_BYCOMMAND | (canSelectVisible ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_FOCUS_FILTER, MF_BYCOMMAND | (canFocusFilter ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_CLEAR_FILTER, MF_BYCOMMAND | (canClearFilter ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_FOCUS_PATH, MF_BYCOMMAND | (canFocusPath ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_OPEN, MF_BYCOMMAND | (canOpen ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_OPEN_WITH, MF_BYCOMMAND | (canOpen ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_VIEW, MF_BYCOMMAND | (canView ? MF_ENABLED : MF_GRAYED));
@@ -637,6 +818,8 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_ACTION_EXTRACT_ALL, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_DELETE, MF_BYCOMMAND | (canDelete ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_RENAME, MF_BYCOMMAND | (canRename ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_ACTION_COPY_TO, MF_BYCOMMAND | (canCopyTo ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_ACTION_MOVE_TO, MF_BYCOMMAND | (canMove ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_SET_FILE_INDEX, MF_BYCOMMAND | (canSetFileIndex ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_SET_FILE_TYPE, MF_BYCOMMAND | (canSetFileType ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_ACTION_SET_PATH_ATTR, MF_BYCOMMAND | (canSetPathAttr ? MF_ENABLED : MF_GRAYED));
@@ -649,8 +832,13 @@ void GuiSetMenuState(GuiApp* app)
 	EnableMenuItem(hMenu, ID_TOOLS_META_CLEAR, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_VIEW_BACK, MF_BYCOMMAND | (canBrowseBack ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_VIEW_FORWARD, MF_BYCOMMAND | (canBrowseForward ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_PARENT, MF_BYCOMMAND | (canBrowseParent ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_ROOT, MF_BYCOMMAND | (canBrowseRoot ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_VIEW_FLAT, MF_BYCOMMAND | ((hasArchive && (app->packType == XPK_PACK_LINUX || app->packType == XPK_PACK_WIN32)) ? MF_ENABLED : MF_GRAYED));
 	EnableMenuItem(hMenu, ID_VIEW_LOCATE_IN_TREE, MF_BYCOMMAND | (canLocateInTree ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_RESET_SORT, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_AUTO_SIZE_COLUMNS, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
+	EnableMenuItem(hMenu, ID_VIEW_RESET_COLUMNS, MF_BYCOMMAND | (hasArchive ? MF_ENABLED : MF_GRAYED));
 	CheckMenuItem(hMenu, ID_VIEW_FLAT, MF_BYCOMMAND | (app->flatView ? MF_CHECKED : MF_UNCHECKED));
 
 	if ( app->actNew != NULL ) EnableWindow(app->actNew, TRUE);
@@ -667,11 +855,19 @@ BOOL GuiRunImmediateLaunch(GuiApp* app)
 	WCHAR destPath[MAX_PATH];
 	BOOL ok;
 	BOOL cancelled;
+	BOOL smokeMode;
+
+	smokeMode = GuiIsSmokeMode();
 
 	switch ( app->launch.command ) {
+		case GUI_LAUNCH_HELP:
+			GuiShowCommandLineHelp(NULL);
+			app->exitCode = 0;
+			return TRUE;
 		case GUI_LAUNCH_SHELL_EXTRACT:
 			if ( app->launch.destPath[0] == L'\0' ) {
 				if ( !GuiPickFolderDialog(NULL, destPath, _countof(destPath), L"选择解压目录") ) {
+					app->exitCode = 2;
 					return TRUE;
 				}
 			} else {
@@ -680,21 +876,32 @@ BOOL GuiRunImmediateLaunch(GuiApp* app)
 			cancelled = FALSE;
 			ok = GuiArchiveExtractPathTask(app->launch.archivePath, destPath, &cancelled);
 			if ( cancelled ) {
+				app->exitCode = 2;
 				return TRUE;
 			}
-			MessageBoxW(NULL, ok ? L"解压完成。" : L"解压失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			app->exitCode = ok ? 0 : 1;
+			if ( !smokeMode ) {
+				MessageBoxW(NULL, ok ? L"解压完成。" : L"解压失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			}
 			return TRUE;
 		case GUI_LAUNCH_SHELL_EXTRACT_AUTO:
 			if ( !GuiSuggestExtractFolderPath(app->launch.archivePath, destPath, _countof(destPath), TRUE) ) {
-				MessageBoxW(NULL, L"无法生成目标目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+				app->exitCode = 1;
+				if ( !smokeMode ) {
+					MessageBoxW(NULL, L"无法生成目标目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+				}
 				return TRUE;
 			}
 			cancelled = FALSE;
 			ok = GuiArchiveExtractPathTask(app->launch.archivePath, destPath, &cancelled);
 			if ( cancelled ) {
+				app->exitCode = 2;
 				return TRUE;
 			}
-			MessageBoxW(NULL, ok ? L"解压完成。" : L"解压失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			app->exitCode = ok ? 0 : 1;
+			if ( !smokeMode ) {
+				MessageBoxW(NULL, ok ? L"解压完成。" : L"解压失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			}
 			return TRUE;
 		case GUI_LAUNCH_SHELL_EXTRACT_HERE:
 			wcsncpy_s(destPath, _countof(destPath), app->launch.archivePath, _TRUNCATE);
@@ -702,20 +909,30 @@ BOOL GuiRunImmediateLaunch(GuiApp* app)
 			cancelled = FALSE;
 			ok = GuiArchiveExtractPathTask(app->launch.archivePath, destPath, &cancelled);
 			if ( cancelled ) {
+				app->exitCode = 2;
 				return TRUE;
 			}
-			MessageBoxW(NULL, ok ? L"解压完成。" : L"解压失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			app->exitCode = ok ? 0 : 1;
+			if ( !smokeMode ) {
+				MessageBoxW(NULL, ok ? L"解压完成。" : L"解压失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			}
 			return TRUE;
 		case GUI_LAUNCH_SHELL_VERIFY:
 			cancelled = FALSE;
 			ok = GuiArchiveVerifyPathTask(app->launch.archivePath, &cancelled);
 			if ( cancelled ) {
+				app->exitCode = 2;
 				return TRUE;
 			}
-			MessageBoxW(NULL, ok ? L"校验通过。" : L"校验失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			app->exitCode = ok ? 0 : 1;
+			if ( !smokeMode ) {
+				MessageBoxW(NULL, ok ? L"校验通过。" : L"校验失败。", XPKGUI_APP_TITLE, MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONERROR));
+			}
 			return TRUE;
 		case GUI_LAUNCH_SHELL_PROPERTIES:
-			if ( !GuiArchiveShowPropertiesPath(app->launch.archivePath) ) {
+			ok = GuiArchiveShowPropertiesPath(app->launch.archivePath);
+			app->exitCode = ok ? 0 : 1;
+			if ( !ok && !smokeMode ) {
 				MessageBoxW(NULL, L"读取属性失败。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
 			}
 			return TRUE;
@@ -1064,11 +1281,20 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_FILE_SAVE:
 					GuiArchiveSave(app);
 					return 0;
+				case ID_FILE_SAVE_AS:
+					GuiArchiveSaveAs(app);
+					return 0;
 				case ID_FILE_REBUILD:
 					GuiArchiveBuild(app);
 					return 0;
 				case ID_FILE_PROPERTIES:
 					GuiArchiveShowProperties(app);
+					return 0;
+				case ID_FILE_SHOW_ARCHIVE_IN_EXPLORER:
+					GuiArchiveShowArchiveInExplorer(app);
+					return 0;
+				case ID_FILE_COPY_ARCHIVE_PATH:
+					GuiArchiveCopyArchivePath(app);
 					return 0;
 				case ID_FILE_EXIT:
 					DestroyWindow(hwnd);
@@ -1080,11 +1306,47 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_EDIT_COPY_PATHS:
 					GuiArchiveCopySelectionPaths(app);
 					return 0;
+				case ID_EDIT_COPY_VISIBLE_PATHS:
+					GuiArchiveCopyVisiblePaths(app);
+					return 0;
+				case ID_EDIT_EXPORT_PATHS:
+					GuiArchiveExportSelectionPaths(app);
+					return 0;
+				case ID_EDIT_EXPORT_VISIBLE_PATHS:
+					GuiArchiveExportVisiblePaths(app);
+					return 0;
+				case ID_EDIT_COPY_DETAILS:
+					GuiArchiveCopySelectionDetails(app);
+					return 0;
+				case ID_EDIT_COPY_VISIBLE_DETAILS:
+					GuiArchiveCopyVisibleDetails(app);
+					return 0;
+				case ID_EDIT_EXPORT_DETAILS:
+					GuiArchiveExportSelectionDetails(app);
+					return 0;
+				case ID_EDIT_EXPORT_VISIBLE_DETAILS:
+					GuiArchiveExportVisibleDetails(app);
+					return 0;
 				case ID_EDIT_COPY_HASH:
 					GuiArchiveCopySelectionHash(app);
 					return 0;
+				case ID_EDIT_COPY_HASHES:
+					GuiArchiveCopySelectionHashes(app);
+					return 0;
+				case ID_EDIT_COPY_VISIBLE_HASHES:
+					GuiArchiveCopyVisibleHashes(app);
+					return 0;
+				case ID_EDIT_EXPORT_HASHES:
+					GuiArchiveExportSelectionHashes(app);
+					return 0;
+				case ID_EDIT_EXPORT_VISIBLE_HASHES:
+					GuiArchiveExportVisibleHashes(app);
+					return 0;
 				case ID_EDIT_SELECT_BY_PATTERN:
 					GuiArchiveSelectByPattern(app);
+					return 0;
+				case ID_EDIT_DESELECT_BY_PATTERN:
+					GuiArchiveDeselectByPattern(app);
 					return 0;
 				case ID_EDIT_SELECT_SAME_EXT:
 					GuiArchiveSelectSameExtension(app);
@@ -1113,6 +1375,9 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_EDIT_INVERT_SELECTION:
 					GuiArchiveInvertSelection(app);
 					return 0;
+				case ID_EDIT_DESELECT_ALL:
+					GuiDeselectAllVisibleItems(app);
+					return 0;
 				case ID_ACTION_OPEN:
 					GuiArchiveOpenSelection(app);
 					return 0;
@@ -1133,6 +1398,12 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					return 0;
 				case ID_ACTION_SET_FILE_INDEX:
 					GuiArchiveSetSelectionFileIndex(app);
+					return 0;
+				case ID_ACTION_MOVE_TO:
+					GuiArchiveMoveSelection(app);
+					return 0;
+				case ID_ACTION_COPY_TO:
+					GuiArchiveCopyToSelection(app);
 					return 0;
 				case ID_ACTION_ADD_EMPTY:
 					GuiArchiveAddEmptyEntry(app);
@@ -1246,6 +1517,18 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_TOOLS_META_CLEAR:
 					GuiArchiveMetaClear(app);
 					return 0;
+				case ID_TOOLS_SHOW_SETTINGS_FILE:
+					GuiShowSettingsFile(hwnd);
+					return 0;
+				case ID_TOOLS_RESET_UI_PREFS:
+					if ( MessageBoxW(hwnd, L"将重置窗口位置、列表列宽、排序和 New... 默认归档配置。\r\n\r\n最近归档列表不会被清空。\r\n\r\n是否继续？", XPKGUI_APP_TITLE, MB_YESNO | MB_ICONQUESTION) == IDYES ) {
+						if ( GuiResetUiPreferences(app) ) {
+							MessageBoxW(hwnd, L"UI 偏好已重置。窗口位置会在下次启动时恢复默认。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+						} else {
+							MessageBoxW(hwnd, L"重置 UI 偏好失败。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+						}
+					}
+					return 0;
 				case ID_VIEW_REFRESH:
 					GuiArchiveReloadFromDisk(app);
 					return 0;
@@ -1255,6 +1538,9 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_VIEW_FORWARD:
 					GuiArchiveBrowseForward(app);
 					return 0;
+				case ID_VIEW_ROOT:
+					GuiArchiveBrowseRoot(app);
+					return 0;
 				case ID_VIEW_FLAT:
 					if ( app->archive != NULL && (app->packType == XPK_PACK_LINUX || app->packType == XPK_PACK_WIN32) ) {
 						GuiArchiveToggleFlatView(app);
@@ -1263,8 +1549,20 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				case ID_VIEW_LOCATE_IN_TREE:
 					GuiArchiveLocateInTree(app);
 					return 0;
+				case ID_VIEW_RESET_SORT:
+					GuiArchiveResetSort(app);
+					return 0;
+				case ID_VIEW_AUTO_SIZE_COLUMNS:
+					GuiAutoSizeColumnWidths(app);
+					return 0;
+				case ID_VIEW_RESET_COLUMNS:
+					GuiResetColumnWidths(app);
+					return 0;
 				case ID_VIEW_FOCUS_FILTER:
 					GuiFocusEditControl(app->filterEdit);
+					return 0;
+				case ID_VIEW_CLEAR_FILTER:
+					GuiClearFilter(app, FALSE);
 					return 0;
 				case ID_VIEW_FOCUS_PATH:
 					if ( GuiShouldShowNavigation(app) && !app->flatView && IsWindowEnabled(app->navPath) ) {
@@ -1289,8 +1587,7 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					return 0;
 				case IDC_FILTER_CLEAR:
 					if ( HIWORD(wParam) == BN_CLICKED ) {
-						SetWindowTextW(app->filterEdit, L"");
-						SetFocus(app->filterEdit);
+						GuiClearFilter(app, TRUE);
 					}
 					return 0;
 				case IDC_NAV_ROOT:
@@ -1326,6 +1623,12 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					return 0;
 				case ID_HELP_ABOUT:
 					MessageBoxW(hwnd, L"xpkgui\n\nWindows-only xPack archive manager with Explorer shell integration.", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+					return 0;
+				case ID_HELP_KEYBOARD_SHORTCUTS:
+					GuiShowKeyboardShortcuts(hwnd);
+					return 0;
+				case ID_HELP_COMMAND_LINE:
+					GuiShowCommandLineHelp(hwnd);
 					return 0;
 			}
 			break;
@@ -1391,6 +1694,12 @@ static LRESULT CALLBACK GuiMainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			}
 			break;
 		case WM_DESTROY:
+			GuiCaptureColumnWidths(app);
+			GuiSaveColumnWidths(app);
+			GuiSaveSortSettings(app);
+			if ( !app->skipWindowPlacementSave ) {
+				GuiSaveWindowPlacement(hwnd);
+			}
 			PostQuitMessage(0);
 			return 0;
 	}
@@ -1403,8 +1712,11 @@ int GuiAppRun(GuiApp* app, int nCmdShow)
 	INITCOMMONCONTROLSEX icc;
 	HWND hwnd;
 	HACCEL hAccel;
-	ACCEL accels[11];
+	ACCEL accels[20];
 	MSG msg;
+	RECT savedWindowRect;
+	BOOL hasSavedWindowRect;
+	BOOL savedWindowMaximized;
 
 	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	icc.dwSize = sizeof(icc);
@@ -1413,7 +1725,7 @@ int GuiAppRun(GuiApp* app, int nCmdShow)
 
 	if ( GuiRunImmediateLaunch(app) ) {
 		CoUninitialize();
-		return 0;
+		return app->exitCode;
 	}
 
 	ZeroMemory(&wc, sizeof(wc));
@@ -1425,16 +1737,17 @@ int GuiAppRun(GuiApp* app, int nCmdShow)
 	wc.hIcon = LoadIconW(NULL, IDI_APPLICATION);
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 	RegisterClassExW(&wc);
+	hasSavedWindowRect = GuiLoadWindowPlacement(&savedWindowRect, &savedWindowMaximized);
 
 	hwnd = CreateWindowExW(
 		0,
 		XPKGUI_MAIN_CLASS,
 		XPKGUI_APP_TITLE,
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		1200,
-		760,
+		hasSavedWindowRect ? savedWindowRect.left : CW_USEDEFAULT,
+		hasSavedWindowRect ? savedWindowRect.top : CW_USEDEFAULT,
+		hasSavedWindowRect ? (savedWindowRect.right - savedWindowRect.left) : 1200,
+		hasSavedWindowRect ? (savedWindowRect.bottom - savedWindowRect.top) : 760,
 		NULL,
 		LoadMenuW(app->instance, MAKEINTRESOURCEW(IDR_MAIN_MENU)),
 		app->instance,
@@ -1477,9 +1790,36 @@ int GuiAppRun(GuiApp* app, int nCmdShow)
 	accels[10].fVirt = FVIRTKEY;
 	accels[10].key = VK_F5;
 	accels[10].cmd = ID_VIEW_REFRESH;
+	accels[11].fVirt = FCONTROL | FVIRTKEY;
+	accels[11].key = 'N';
+	accels[11].cmd = ID_FILE_NEW;
+	accels[12].fVirt = FCONTROL | FVIRTKEY;
+	accels[12].key = 'O';
+	accels[12].cmd = ID_FILE_OPEN;
+	accels[13].fVirt = FCONTROL | FVIRTKEY;
+	accels[13].key = 'S';
+	accels[13].cmd = ID_FILE_SAVE;
+	accels[14].fVirt = FCONTROL | FSHIFT | FVIRTKEY;
+	accels[14].key = 'S';
+	accels[14].cmd = ID_FILE_SAVE_AS;
+	accels[15].fVirt = FCONTROL | FVIRTKEY;
+	accels[15].key = 'W';
+	accels[15].cmd = ID_FILE_CLOSE;
+	accels[16].fVirt = FCONTROL | FSHIFT | FVIRTKEY;
+	accels[16].key = 'A';
+	accels[16].cmd = ID_EDIT_DESELECT_ALL;
+	accels[17].fVirt = FVIRTKEY;
+	accels[17].key = VK_ESCAPE;
+	accels[17].cmd = ID_VIEW_CLEAR_FILTER;
+	accels[18].fVirt = FALT | FVIRTKEY;
+	accels[18].key = VK_HOME;
+	accels[18].cmd = ID_VIEW_ROOT;
+	accels[19].fVirt = FCONTROL | FVIRTKEY;
+	accels[19].key = VK_ADD;
+	accels[19].cmd = ID_VIEW_AUTO_SIZE_COLUMNS;
 	hAccel = CreateAcceleratorTableW(accels, (int)_countof(accels));
 
-	ShowWindow(hwnd, nCmdShow);
+	ShowWindow(hwnd, (hasSavedWindowRect && savedWindowMaximized && nCmdShow != SW_SHOWMINIMIZED && nCmdShow != SW_MINIMIZE) ? SW_SHOWMAXIMIZED : nCmdShow);
 	UpdateWindow(hwnd);
 	app->launchErrorShown = FALSE;
 	if ( !GuiHandleGuiLaunch(app) ) {

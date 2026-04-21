@@ -16,6 +16,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 	app.instance = hInstance;
 	GuiAppInitDefaults(&app);
 	GuiLoadRecentArchives(&app);
+	GuiLoadColumnWidths(&app);
+	GuiLoadSortSettings(&app);
 
 	argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	if ( argv == NULL ) {

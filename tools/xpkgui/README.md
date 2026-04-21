@@ -6,12 +6,13 @@
 - Explorer 壳扩展是 `release/x64/xpkgui_shext.dll`
 - 工程源码在 `tools/xpkgui`
 - 构建脚本、安装脚本都放在 `tools/xpkgui`
+- 后续开发进度跟踪在 `tools/xpkgui/XPKGUI_SPEC.md`
 
 ## 当前覆盖范围
 
 GUI 目前已经把 xPack 的核心归档能力接进来了：
 
-- 打开、创建、保存、重构 `.xpk`
+- 打开、创建、保存、另存为、重构 `.xpk`
 - 文件/目录拖放添加
 - 支持 `core` / `index` / `linux` / `win32` pack type
 - 默认压缩、元数据压缩、信息区压缩、`infoExtSize`
@@ -29,14 +30,20 @@ GUI 目前已经把 xPack 的核心归档能力接进来了：
 - `Verify` 支持智能行为：有选区时校验选中条目/目录子树，无选区时校验整包；菜单里也已拆分为 `Verify Selected` 和 `Verify All`
 - 解压遇到已存在目标时会先提示，可选择全部覆盖、全部跳过或取消
 - 主窗口顶部提供常用动作栏，直接放出 `New / Open / Add / Extract / Verify / Info`；其中 `Add` 在无归档时会直接创建新包，`Extract / Info` 会按当前选区智能选择作用范围
+- `File` 菜单支持 `Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S / Ctrl+W`，并可直接在 Explorer 中定位当前归档文件或复制归档完整路径
 - 主列表支持按列排序，并且提供常用右键菜单
 - `linux` / `win32` 包支持按虚拟目录浏览，双击进入目录，`Backspace` 返回上级
 - `linux` / `win32` 包支持在目录视图和 `Flat View` 之间切换，且可将选中的平铺结果直接定位回目录树，方便全局搜索和批量操作
 - `linux` / `win32` 包支持对当前选区批量设置 `platformAttr`；目录会递归作用到整个子树，输入支持十进制和 `0x` 十六进制
 - 向 `index` 包添加内容时可指定起始 `fileIndex`；向 `linux` / `win32` 包添加内容时可指定包内根前缀，便于直接控制逻辑索引和入包路径
 - `index` 包支持对单个文件直接 `Set FileIndex...`，可把已有条目迁移到新的 `fileIndex`
-- 顶部导航栏支持 `Back / Forward / Root / Up / Go`，目录视图、`Flat View`、`Locate In Tree` 和手动路径跳转共用同一套浏览历史
+- 顶部导航栏和 `View` 菜单支持 `Back / Forward / Root / Up / Go`，目录视图、`Flat View`、`Locate In Tree` 和手动路径跳转共用同一套浏览历史
 - `File -> Recent Archives` 会持久化最近打开或创建的归档，下次启动仍可直接打开
+- 主窗口会持久化上次的位置、大小、最大化状态，以及主列表列宽、排序列和升/降序，写入当前用户的 `xpkgui.ini`
+- 列宽和排序偏好会记录当前列数；新增或调整列表列时，旧列宽/排序配置会自动回退默认，避免列宽和排序列错位
+- `View -> Reset Sort` 可恢复默认名称升序；`View -> Auto Size Columns` 可按当前内容自动调整列表列宽，`View -> Reset Columns` 可恢复默认列宽并清除持久化列宽设置
+- `New...` 使用的归档默认配置也会持久化到 `xpkgui.ini`，包括 pack type、压缩级别、`InfoExt Size`、`Volume Size`、写入策略和 `Solid Layout`
+- `Tools -> Show Settings File` 可在 Explorer 中定位当前用户的 `xpkgui.ini`；`Tools -> Reset UI Preferences...` 可清除窗口布局、列宽、排序和 `New...` 默认归档配置，最近归档列表会保留
 - 单个文件支持直接 `Open` 或 `Open With...`，都会先解压到临时目录再交给系统处理；如果包内文件本身是 `.xpk`，则 `Open` 会直接用新的 `xpkgui` 窗口打开；`Enter` / 双击文件也走同样逻辑
 - 单个文件支持 `View (F3)`：小文件可直接在 GUI 内按 UTF-8 文本或十六进制只读预览，方便快速查看内容而不跳出当前窗口
 - 单个文件支持 `Edit Text...`：小型 UTF-8 文本可直接在 GUI 内编辑并写回归档；非文本内容会退化为十六进制只读预览
@@ -45,33 +52,39 @@ GUI 目前已经把 xPack 的核心归档能力接进来了：
 - 单个文件支持 `Duplicate Entry...`：可直接复制为新条目；`index` 包会提示新的 `fileIndex`，`linux/win32` 包会提示新的包内路径，并尽量保留 `File Type`、`core InfoExt` 和 `path platformAttr`
 - 单个文件也支持 `Show In Explorer`，会先解压到临时目录，再让 Explorer 直接定位到该文件
 - 选中目录后可以直接解压整个子树；单个目录也支持整棵子树重命名
+- `linux/win32` 包支持把选中的文件或目录子树 `Copy To...` / `Move To...` 到另一个包内目录，多选时会自动合并被已选目录覆盖的子项；复制会尽量保留源条目的压缩级别、`File Type` 和 `platformAttr`
 - 选中项支持 `Properties` 查看条目或当前选区摘要；归档属性和选中项属性已区分
 - 单文件属性会显示 xPack 内建的条目 `Hash`；`linux/win32` 包还会显示创建/修改/访问时间
+- 主列表现在直接显示 `Ratio` 列，并支持按压缩率排序；过滤和按模式选择也会把 `Ratio` 纳入匹配字段
 - 主列表现在直接显示 `Hash` 列，并支持按 `Hash` 排序；过滤和按模式选择也会把 `Hash` 纳入匹配字段
 - 主列表现在也直接显示 `File Type` 列，并支持按 `File Type` 排序；过滤和按模式选择也会把它纳入匹配字段
 - 顶部导航栏支持 `Root / Up / Go`，路径框可直接输入包内目录并按 `Enter` 跳转
-- 顶部过滤框支持实时筛选当前视图，支持多关键词 AND 和 `*` / `?` 通配符
+- 顶部过滤框支持实时筛选当前视图，支持多关键词 AND 和 `*` / `?` 通配符；`View` 菜单可直接聚焦或清空过滤框
 - `Refresh / F5` 会从磁盘重新载入当前归档，并尽量保留当前目录、过滤条件、排序、平铺视图和浏览历史
 - 切回 `xpkgui` 窗口时，如果当前归档已被外部程序修改，会提示是否从磁盘重新载入
-- 状态栏会显示当前选中行对应的底层文件数量、原始大小和压缩后大小
-- 支持把当前选中条目的名称或包内路径批量复制到剪贴板；路径型包输出完整包内路径
-- 单选文件时也支持把条目的内建 `Hash` 直接复制到剪贴板
+- 状态栏会显示当前选中行对应的底层文件数量、原始大小、压缩后大小和压缩率；选区/目录/单文件属性里也会显示 Ratio
+- 支持把当前选中或当前可见条目的名称 / 包内路径批量复制到剪贴板，也可导出为 UTF-8 文本；路径型包输出完整包内路径
+- 支持把当前选中条目或当前可见列表的详细列信息复制为 TSV，也可直接导出为 UTF-8 TSV 文件，便于粘贴到表格、编辑器或问题复现记录中
+- 单选文件时也支持把条目的内建 `Hash` 直接复制到剪贴板；多选文件或当前可见文件可复制或导出 `Hash + 包内路径` UTF-8 TSV 清单
 - 排序、筛选、刷新以及平铺/目录视图切换时，会尽量保留当前选中项和焦点
-- 支持按当前文件扩展名、相同 `Hash + Size`、相同压缩方法、相同 `File Type` 快速扩选；`linux/win32` 包还支持按相同 `platformAttr` 扩选；也支持一键选出当前视图里的重复文件或仅选出重复副本，直接删除重复副本并默认保留每组排在最前的一个文件，以及对当前可见列表执行反选
-- 支持按模式批量选择当前可见条目，匹配语义与过滤框一致，支持通配符和多关键词
+- 支持按当前文件扩展名、相同 `Hash + Size`、相同压缩方法、相同 `File Type` 快速扩选；`linux/win32` 包还支持按相同 `platformAttr` 扩选；也支持一键选出当前视图里的重复文件或仅选出重复副本，直接删除重复副本并默认保留每组排在最前的一个文件，以及对当前可见列表执行全选、取消选择和反选
+- 支持按模式批量选择或取消选择当前可见条目，匹配语义与过滤框一致，支持通配符和多关键词
 - 列表支持 `F2` 重命名、`Delete` 删除、`Backspace` 返回上级目录
-- 快捷键支持 `F3` 查看、`F4` 编辑、`F5` 从磁盘重新载入当前归档、`Ctrl+F` 聚焦过滤框、`Ctrl+L` 聚焦路径栏、`Ctrl+A` 全选当前视图、`Ctrl+C` 复制选中名称/路径、`Alt+Enter` 查看选中项属性、`Alt+Up` 返回上级目录、`Alt+Left / Alt+Right` 浏览历史
+- `Help -> Keyboard Shortcuts` 可直接查看当前 GUI 支持的主要快捷键
+- `Help -> Command Line Usage` 可直接查看 `xpkgui.exe` 支持的 shell/脚本入口
+- 快捷键支持 `Ctrl+N` 新建、`Ctrl+O` 打开、`Ctrl+S` 保存、`Ctrl+Shift+S` 另存为、`Ctrl+W` 关闭、`F3` 查看、`F4` 编辑、`F5` 从磁盘重新载入当前归档、`Ctrl+F` 聚焦过滤框、`Esc` 清空过滤框、`Ctrl+L` 聚焦路径栏、`Ctrl+A` 全选当前视图中的真实文件/目录、`Ctrl+Shift+A` 取消当前视图选择、`Ctrl+C` 复制选中名称/路径、`Alt+Enter` 查看选中项属性、`Alt+Up` 返回上级目录、`Alt+Home` 返回根目录、`Alt+Left / Alt+Right` 浏览历史
 - 通过 Explorer / 命令行触发的解压与校验也复用同一套后台进度对话框
 
-Explorer 右键菜单复用了 `xpkgui.exe` 的命令行入口：
+Explorer 右键菜单复用了 `xpkgui.exe` 的命令行入口；`/?`、`/help`、`-help` 或 `--help` 会显示同一份用法说明：
 
-- `/shell-add`
-- `/shell-add-auto`
-- `/extract`
-- `/extract-auto`
-- `/extract-here`
-- `/verify`
-- `/properties`
+- `xpkgui.exe <archive.xpk>`：直接打开指定归档
+- `/shell-add <file-or-folder> [...]`：用选中项打开新建归档对话框
+- `/shell-add-auto <file-or-folder> [...]`：在选中项旁自动创建归档
+- `/extract <archive.xpk> [dest-folder]`：解压到选择或指定目录
+- `/extract-auto <archive.xpk>`：解压到归档旁的唯一同名目录
+- `/extract-here <archive.xpk>`：解压到归档所在目录
+- `/verify <archive.xpk>`：校验归档
+- `/properties <archive.xpk>`：显示归档属性
 
 ## 构建
 
@@ -92,6 +105,22 @@ tools\xpkgui\build_x64.bat
 
 - 这里默认使用 `clang-cl`，不是 `cl`。原因是当前 `xrt/xpack` 源码里仍有一部分对 MSVC C 前端不友好的实现，`clang-cl` 更稳。
 - GUI 主体会直接静态编进 `xpack.c` 和压缩后端，不依赖单独的 `xpack.dll`。
+
+## Smoke 验证
+
+在仓库根目录或任意位置执行：
+
+```bat
+tools\xpkgui\smoke_x64.bat
+```
+
+脚本会先构建 `xpkgui.exe` / `xpkgui_shext.dll`，然后执行静态检查、构建产物检查，用 `release\x64\xpkcon.exe` 生成 `core` / `index` / `linux` / `win32` 四类新包，并依次执行 `info`、`list`、`test` 和解压验证。
+
+脚本还会设置 `XPKGUI_SMOKE=1`，以非交互方式验证 `xpkgui.exe` 的 `/verify`、`/properties`、`/extract`、`/extract-auto`、`/extract-here`、`/shell-add-auto` 和未知参数返回码。
+
+临时输入、测试包和解压结果都放在：
+
+- `tools\xpkgui\obj\smoke`
 
 ## 安装与卸载
 

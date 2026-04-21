@@ -18,6 +18,43 @@
 extern char* xrtTimeToStr(xtime iTime, int iFormat);
 extern void xrtFree(void* pMem);
 
+static const int g_defaultColumnWidths[XPKGUI_ARCHIVE_COLUMN_COUNT] = { 340, 110, 110, 90, 120, 120, 170, 90, 110, 100 };
+
+BOOL GuiIsSmokeMode(void)
+{
+	WCHAR value[16];
+	DWORD cch;
+
+	cch = GetEnvironmentVariableW(L"XPKGUI_SMOKE", value, _countof(value));
+	return cch > 0 && cch < _countof(value) && value[0] != L'\0' && wcscmp(value, L"0") != 0;
+}
+
+static void GuiApplyDefaultColumnWidths(GuiApp* app)
+{
+	int i;
+
+	if ( app == NULL ) {
+		return;
+	}
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		if ( app->columnWidths[i] <= 0 ) {
+			app->columnWidths[i] = g_defaultColumnWidths[i];
+		}
+	}
+}
+
+static void GuiSetDefaultColumnWidths(GuiApp* app)
+{
+	int i;
+
+	if ( app == NULL ) {
+		return;
+	}
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		app->columnWidths[i] = g_defaultColumnWidths[i];
+	}
+}
+
 static BOOL GuiBuildSettingsIniPath(WCHAR* pathBuf, size_t cchPathBuf)
 {
 	WCHAR appData[MAX_PATH];
@@ -159,6 +196,378 @@ const WCHAR* GuiGetRecentArchivePath(const GuiApp* app, UINT commandId)
 	return app->recentArchives[index];
 }
 
+static BOOL GuiValidateWindowRect(const RECT* rc)
+{
+	RECT workArea;
+	HMONITOR monitor;
+	MONITORINFO mi;
+
+	if ( rc == NULL || rc->right <= rc->left || rc->bottom <= rc->top ) {
+		return FALSE;
+	}
+	if ( (rc->right - rc->left) < 640 || (rc->bottom - rc->top) < 400 ) {
+		return FALSE;
+	}
+
+	monitor = MonitorFromRect(rc, MONITOR_DEFAULTTONULL);
+	if ( monitor == NULL ) {
+		return FALSE;
+	}
+	ZeroMemory(&mi, sizeof(mi));
+	mi.cbSize = sizeof(mi);
+	if ( !GetMonitorInfoW(monitor, &mi) ) {
+		return FALSE;
+	}
+	if ( !IntersectRect(&workArea, rc, &mi.rcWork) ) {
+		return FALSE;
+	}
+	return TRUE;
+}
+
+BOOL GuiLoadWindowPlacement(RECT* rectOut, BOOL* maximizedOut)
+{
+	WCHAR iniPath[MAX_PATH];
+	RECT rc;
+	int maximized;
+
+	if ( rectOut == NULL || maximizedOut == NULL ) {
+		return FALSE;
+	}
+	ZeroMemory(rectOut, sizeof(*rectOut));
+	*maximizedOut = FALSE;
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	rc.left = GetPrivateProfileIntW(L"Window", L"Left", CW_USEDEFAULT, iniPath);
+	rc.top = GetPrivateProfileIntW(L"Window", L"Top", CW_USEDEFAULT, iniPath);
+	rc.right = GetPrivateProfileIntW(L"Window", L"Right", CW_USEDEFAULT, iniPath);
+	rc.bottom = GetPrivateProfileIntW(L"Window", L"Bottom", CW_USEDEFAULT, iniPath);
+	maximized = GetPrivateProfileIntW(L"Window", L"Maximized", 0, iniPath);
+	if ( !GuiValidateWindowRect(&rc) ) {
+		return FALSE;
+	}
+
+	*rectOut = rc;
+	*maximizedOut = (maximized != 0);
+	return TRUE;
+}
+
+void GuiSaveWindowPlacement(HWND hwnd)
+{
+	WCHAR iniPath[MAX_PATH];
+	WINDOWPLACEMENT placement;
+	WCHAR value[64];
+
+	if ( hwnd == NULL || !IsWindow(hwnd) || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return;
+	}
+
+	ZeroMemory(&placement, sizeof(placement));
+	placement.length = sizeof(placement);
+	if ( !GetWindowPlacement(hwnd, &placement) || !GuiValidateWindowRect(&placement.rcNormalPosition) ) {
+		return;
+	}
+
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%ld", placement.rcNormalPosition.left);
+	WritePrivateProfileStringW(L"Window", L"Left", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%ld", placement.rcNormalPosition.top);
+	WritePrivateProfileStringW(L"Window", L"Top", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%ld", placement.rcNormalPosition.right);
+	WritePrivateProfileStringW(L"Window", L"Right", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%ld", placement.rcNormalPosition.bottom);
+	WritePrivateProfileStringW(L"Window", L"Bottom", value, iniPath);
+	WritePrivateProfileStringW(L"Window", L"Maximized", placement.showCmd == SW_SHOWMAXIMIZED ? L"1" : L"0", iniPath);
+}
+
+BOOL GuiLoadColumnWidths(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	int columnCount;
+	int i;
+
+	if ( app == NULL ) {
+		return FALSE;
+	}
+	GuiApplyDefaultColumnWidths(app);
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	columnCount = GetPrivateProfileIntW(L"Columns", L"ColumnCount", 0, iniPath);
+	if ( columnCount != XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		return TRUE;
+	}
+
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		WCHAR key[32];
+		int value;
+
+		_snwprintf_s(key, _countof(key), _TRUNCATE, L"Column%d", i);
+		value = GetPrivateProfileIntW(L"Columns", key, app->columnWidths[i], iniPath);
+		if ( value >= 40 && value <= 2000 ) {
+			app->columnWidths[i] = value;
+		}
+	}
+	return TRUE;
+}
+
+void GuiCaptureColumnWidths(GuiApp* app)
+{
+	int i;
+
+	if ( app == NULL || app->list == NULL || !IsWindow(app->list) ) {
+		return;
+	}
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		int width;
+
+		width = ListView_GetColumnWidth(app->list, i);
+		if ( width >= 40 && width <= 2000 ) {
+			app->columnWidths[i] = width;
+		}
+	}
+}
+
+void GuiSaveColumnWidths(const GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	WCHAR countValue[32];
+	int i;
+
+	if ( app == NULL || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return;
+	}
+
+	_snwprintf_s(countValue, _countof(countValue), _TRUNCATE, L"%d", XPKGUI_ARCHIVE_COLUMN_COUNT);
+	WritePrivateProfileStringW(L"Columns", L"ColumnCount", countValue, iniPath);
+
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		WCHAR key[32];
+		WCHAR value[32];
+
+		if ( app->columnWidths[i] < 40 || app->columnWidths[i] > 2000 ) {
+			continue;
+		}
+		_snwprintf_s(key, _countof(key), _TRUNCATE, L"Column%d", i);
+		_snwprintf_s(value, _countof(value), _TRUNCATE, L"%d", app->columnWidths[i]);
+		WritePrivateProfileStringW(L"Columns", key, value, iniPath);
+	}
+}
+
+void GuiResetColumnWidths(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	static const WCHAR emptySection[] = { L'\0', L'\0' };
+	int i;
+
+	if ( app == NULL ) {
+		return;
+	}
+	GuiSetDefaultColumnWidths(app);
+	if ( GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		WritePrivateProfileSectionW(L"Columns", emptySection, iniPath);
+	}
+	if ( app->list != NULL && IsWindow(app->list) ) {
+		for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+			ListView_SetColumnWidth(app->list, i, app->columnWidths[i]);
+		}
+	}
+}
+
+void GuiAutoSizeColumnWidths(GuiApp* app)
+{
+	int i;
+
+	if ( app == NULL || app->list == NULL || !IsWindow(app->list) ) {
+		return;
+	}
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		ListView_SetColumnWidth(app->list, i, LVSCW_AUTOSIZE_USEHEADER);
+	}
+	GuiCaptureColumnWidths(app);
+	GuiSaveColumnWidths(app);
+}
+
+BOOL GuiLoadSortSettings(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	int columnCount;
+	int column;
+	int ascending;
+
+	if ( app == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	columnCount = GetPrivateProfileIntW(L"ListView", L"ColumnCount", 0, iniPath);
+	if ( columnCount != XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		app->sortColumn = 0;
+		app->sortAscending = TRUE;
+		app->sortInitialized = TRUE;
+		return TRUE;
+	}
+
+	column = GetPrivateProfileIntW(L"ListView", L"SortColumn", app->sortColumn, iniPath);
+	ascending = GetPrivateProfileIntW(L"ListView", L"SortAscending", app->sortAscending ? 1 : 0, iniPath);
+	if ( column >= 0 && column < XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		app->sortColumn = column;
+	}
+	app->sortAscending = (ascending != 0);
+	app->sortInitialized = TRUE;
+	return TRUE;
+}
+
+void GuiSaveSortSettings(const GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	WCHAR value[32];
+
+	if ( app == NULL || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return;
+	}
+
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%d", XPKGUI_ARCHIVE_COLUMN_COUNT);
+	WritePrivateProfileStringW(L"ListView", L"ColumnCount", value, iniPath);
+	if ( app->sortColumn >= 0 && app->sortColumn < XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		_snwprintf_s(value, _countof(value), _TRUNCATE, L"%d", app->sortColumn);
+		WritePrivateProfileStringW(L"ListView", L"SortColumn", value, iniPath);
+	}
+	WritePrivateProfileStringW(L"ListView", L"SortAscending", app->sortAscending ? L"1" : L"0", iniPath);
+}
+
+static int GuiClampInt(int value, int minValue, int maxValue)
+{
+	if ( value < minValue ) {
+		return minValue;
+	}
+	if ( value > maxValue ) {
+		return maxValue;
+	}
+	return value;
+}
+
+BOOL GuiLoadArchiveDefaults(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	int packType;
+
+	if ( app == NULL ) {
+		return FALSE;
+	}
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	packType = GetPrivateProfileIntW(L"ArchiveDefaults", L"PackType", app->packType, iniPath);
+	if ( packType >= XPK_PACK_CORE && packType <= XPK_PACK_WIN32 ) {
+		app->packType = (xpkPackType)packType;
+	}
+	app->defaultComp = (uint8_t)GuiClampInt(GetPrivateProfileIntW(L"ArchiveDefaults", L"DefaultComp", app->defaultComp, iniPath), 0, 15);
+	app->metaComp = (uint8_t)GuiClampInt(GetPrivateProfileIntW(L"ArchiveDefaults", L"MetaComp", app->metaComp, iniPath), 0, 15);
+	app->infoComp = (uint8_t)GuiClampInt(GetPrivateProfileIntW(L"ArchiveDefaults", L"InfoComp", app->infoComp, iniPath), 0, 15);
+	app->infoExtSize = (uint32_t)GuiClampInt(GetPrivateProfileIntW(L"ArchiveDefaults", L"InfoExtSize", app->infoExtSize, iniPath), 0, 1024 * 1024);
+	app->volumeSize = (uint32_t)GetPrivateProfileIntW(L"ArchiveDefaults", L"VolumeSize", app->volumeSize, iniPath);
+	app->writePolicy = GetPrivateProfileIntW(L"ArchiveDefaults", L"WritePolicy", app->writePolicy, iniPath) == XPK_WRITE_IMMEDIATE ? XPK_WRITE_IMMEDIATE : XPK_WRITE_BUFFERED;
+	app->solidMode = GetPrivateProfileIntW(L"ArchiveDefaults", L"SolidMode", app->solidMode ? 1 : 0, iniPath) != 0;
+	return TRUE;
+}
+
+void GuiSaveArchiveDefaults(const GuiArchiveOptions* options)
+{
+	WCHAR iniPath[MAX_PATH];
+	WCHAR value[32];
+
+	if ( options == NULL || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return;
+	}
+
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%d", (int)options->packType);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"PackType", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%u", options->defaultComp);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"DefaultComp", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%u", options->metaComp);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"MetaComp", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%u", options->infoComp);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"InfoComp", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%lu", (unsigned long)options->infoExtSize);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"InfoExtSize", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%lu", (unsigned long)options->volumeSize);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"VolumeSize", value, iniPath);
+	_snwprintf_s(value, _countof(value), _TRUNCATE, L"%u", options->writePolicy);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"WritePolicy", value, iniPath);
+	WritePrivateProfileStringW(L"ArchiveDefaults", L"SolidMode", options->solidMode ? L"1" : L"0", iniPath);
+}
+
+BOOL GuiResetUiPreferences(GuiApp* app)
+{
+	WCHAR iniPath[MAX_PATH];
+	static const WCHAR emptySection[] = { L'\0', L'\0' };
+	int i;
+
+	if ( app == NULL || !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		return FALSE;
+	}
+
+	WritePrivateProfileSectionW(L"Window", emptySection, iniPath);
+	WritePrivateProfileSectionW(L"Columns", emptySection, iniPath);
+	WritePrivateProfileSectionW(L"ListView", emptySection, iniPath);
+	WritePrivateProfileSectionW(L"ArchiveDefaults", emptySection, iniPath);
+
+	GuiSetDefaultColumnWidths(app);
+	for ( i = 0; i < XPKGUI_ARCHIVE_COLUMN_COUNT; ++i ) {
+		if ( app->list != NULL && IsWindow(app->list) ) {
+			ListView_SetColumnWidth(app->list, i, app->columnWidths[i]);
+		}
+	}
+	app->sortColumn = 0;
+	app->sortAscending = TRUE;
+	app->sortInitialized = TRUE;
+	app->skipWindowPlacementSave = TRUE;
+
+	if ( app->archive == NULL ) {
+		app->packType = XPK_PACK_WIN32;
+		app->defaultComp = 7;
+		app->metaComp = 7;
+		app->infoComp = 7;
+		app->infoExtSize = 0;
+		app->volumeSize = 0;
+		app->writePolicy = XPK_WRITE_BUFFERED;
+		app->solidMode = FALSE;
+	} else {
+		GuiArchiveRefreshView(app);
+	}
+	return TRUE;
+}
+
+BOOL GuiShowSettingsFile(HWND owner)
+{
+	WCHAR iniPath[MAX_PATH];
+	WCHAR parameters[MAX_PATH + 32];
+	INT_PTR shellResult;
+
+	if ( !GuiBuildSettingsIniPath(iniPath, _countof(iniPath)) ) {
+		GuiShowSystemError(owner, L"定位设置文件失败", GetLastError() != 0 ? GetLastError() : ERROR_PATH_NOT_FOUND);
+		return FALSE;
+	}
+
+	if ( PathFileExistsW(iniPath) ) {
+		_snwprintf_s(parameters, _countof(parameters), _TRUNCATE, L"/select,\"%s\"", iniPath);
+		shellResult = (INT_PTR)ShellExecuteW(owner, L"open", L"explorer.exe", parameters, NULL, SW_SHOWNORMAL);
+	} else {
+		PathRemoveFileSpecW(iniPath);
+		shellResult = (INT_PTR)ShellExecuteW(owner, L"open", iniPath, NULL, NULL, SW_SHOWNORMAL);
+	}
+	if ( shellResult <= 32 ) {
+		GuiShowSystemError(owner, L"打开设置位置失败", (DWORD)shellResult);
+		return FALSE;
+	}
+	return TRUE;
+}
+
 static void GuiFreeLaunchInputs(GuiApp* app)
 {
 	int i;
@@ -184,8 +593,14 @@ void GuiAppInitDefaults(GuiApp* app)
 	app->solidMode = FALSE;
 	app->currentFolder[0] = L'\0';
 	app->flatView = FALSE;
-	app->sortColumn = 0;
-	app->sortAscending = TRUE;
+	if ( !app->sortInitialized ) {
+		app->sortColumn = 0;
+		app->sortAscending = TRUE;
+		app->sortInitialized = TRUE;
+	} else if ( app->sortColumn < 0 || app->sortColumn >= XPKGUI_ARCHIVE_COLUMN_COUNT ) {
+		app->sortColumn = 0;
+	}
+	GuiApplyDefaultColumnWidths(app);
 	app->navHistoryCount = 0;
 	app->navHistoryIndex = 0;
 	app->navHistoryLocked = FALSE;
@@ -193,6 +608,7 @@ void GuiAppInitDefaults(GuiApp* app)
 	app->archiveChangePromptActive = FALSE;
 	ZeroMemory(&app->archiveWriteTime, sizeof(app->archiveWriteTime));
 	app->archiveFileSize = 0;
+	GuiLoadArchiveDefaults(app);
 }
 
 void GuiAppCloseArchive(GuiApp* app)
@@ -254,6 +670,21 @@ BOOL GuiWideFromUtf8(const char* src, WCHAR* dst, size_t dstCount)
 void GuiFormatUInt64(uint64_t value, WCHAR* buf, size_t cchBuf)
 {
 	_snwprintf_s(buf, cchBuf, _TRUNCATE, L"%llu", (unsigned long long)value);
+}
+
+void GuiFormatRatio(uint64_t packedSize, uint64_t fileSize, WCHAR* buf, size_t cchBuf)
+{
+	double ratio;
+
+	if ( buf == NULL || cchBuf == 0 ) {
+		return;
+	}
+	if ( fileSize == 0 ) {
+		wcsncpy_s(buf, cchBuf, L"n/a", _TRUNCATE);
+		return;
+	}
+	ratio = ((double)packedSize * 100.0) / (double)fileSize;
+	_snwprintf_s(buf, cchBuf, _TRUNCATE, L"%.1f%%", ratio);
 }
 
 void GuiFormatTime(xtime value, WCHAR* buf, size_t cchBuf)
@@ -362,6 +793,7 @@ void GuiUpdateStatus(GuiApp* app)
 	WCHAR viewText[128];
 	WCHAR selSizeText[64];
 	WCHAR selPackedText[64];
+	WCHAR selRatioText[32];
 	xpkStat statInfo;
 	BOOL pathPack;
 	uint32_t selectedRows;
@@ -396,6 +828,7 @@ void GuiUpdateStatus(GuiApp* app)
 	GuiArchiveGetSelectionSummary(app, &selectedFiles, &selectedSize, &selectedPacked);
 	GuiFormatUInt64(selectedSize, selSizeText, _countof(selSizeText));
 	GuiFormatUInt64(selectedPacked, selPackedText, _countof(selPackedText));
+	GuiFormatRatio(selectedPacked, selectedSize, selRatioText, _countof(selRatioText));
 
 	ZeroMemory(&statInfo, sizeof(statInfo));
 	if ( xpkStatGet(app->archive, &statInfo) == XPK_OK ) {
@@ -403,7 +836,7 @@ void GuiUpdateStatus(GuiApp* app)
 			status,
 			_countof(status),
 			_TRUNCATE,
-			L"type=%d | entries=%u | shown=%u | sel=%u rows/%u files | selSize=%s | selPacked=%s | live=%llu | holes=%llu | meta=%llu | table=%llu%s",
+			L"type=%d | entries=%u | shown=%u | sel=%u rows/%u files | selSize=%s | selPacked=%s | selRatio=%s | live=%llu | holes=%llu | meta=%llu | table=%llu%s",
 			(int)app->packType,
 			statInfo.fileCount,
 			(unsigned)app->viewCount,
@@ -411,6 +844,7 @@ void GuiUpdateStatus(GuiApp* app)
 			(unsigned)selectedFiles,
 			selSizeText,
 			selPackedText,
+			selRatioText,
 			(unsigned long long)statInfo.liveDataBytes,
 			(unsigned long long)statInfo.holeBytes,
 			(unsigned long long)statInfo.metaBytes,
@@ -776,7 +1210,14 @@ int GuiParseCommandLineArgs(GuiApp* app, int argc, WCHAR** argv)
 		return 0;
 	}
 
-	if ( _wcsicmp(argv[1], L"/shell-add") == 0 || _wcsicmp(argv[1], L"-shell-add") == 0 ) {
+	if ( _wcsicmp(argv[1], L"/?") == 0 ||
+		_wcsicmp(argv[1], L"-?") == 0 ||
+		_wcsicmp(argv[1], L"/help") == 0 ||
+		_wcsicmp(argv[1], L"-help") == 0 ||
+		_wcsicmp(argv[1], L"--help") == 0 ) {
+		app->launch.command = GUI_LAUNCH_HELP;
+		return 0;
+	} else if ( _wcsicmp(argv[1], L"/shell-add") == 0 || _wcsicmp(argv[1], L"-shell-add") == 0 ) {
 		app->launch.command = GUI_LAUNCH_SHELL_ADD;
 	} else if ( _wcsicmp(argv[1], L"/shell-add-auto") == 0 || _wcsicmp(argv[1], L"-shell-add-auto") == 0 ) {
 		app->launch.command = GUI_LAUNCH_SHELL_ADD_AUTO;
@@ -791,7 +1232,9 @@ int GuiParseCommandLineArgs(GuiApp* app, int argc, WCHAR** argv)
 	} else if ( _wcsicmp(argv[1], L"/properties") == 0 || _wcsicmp(argv[1], L"-properties") == 0 ) {
 		app->launch.command = GUI_LAUNCH_SHELL_PROPERTIES;
 	} else if ( argv[1][0] == L'/' || argv[1][0] == L'-' ) {
-		MessageBoxW(NULL, L"不支持的命令行参数。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		if ( !GuiIsSmokeMode() ) {
+			MessageBoxW(NULL, L"不支持的命令行参数。请使用 /? 查看帮助。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		}
 		return 2;
 	} else {
 		app->launch.command = GUI_LAUNCH_OPEN;
@@ -805,7 +1248,9 @@ int GuiParseCommandLineArgs(GuiApp* app, int argc, WCHAR** argv)
 		app->launch.command == GUI_LAUNCH_SHELL_VERIFY ||
 		app->launch.command == GUI_LAUNCH_SHELL_PROPERTIES ) {
 		if ( argc < 3 ) {
-			MessageBoxW(NULL, L"归档路径缺失。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			if ( !GuiIsSmokeMode() ) {
+				MessageBoxW(NULL, L"归档路径缺失。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			}
 			return 2;
 		}
 		wcsncpy_s(app->launch.archivePath, _countof(app->launch.archivePath), argv[2], _TRUNCATE);
@@ -817,7 +1262,9 @@ int GuiParseCommandLineArgs(GuiApp* app, int argc, WCHAR** argv)
 
 	app->launch.inputCount = argc - 2;
 	if ( app->launch.inputCount <= 0 || app->launch.inputCount > XPKGUI_MAX_INPUTS ) {
-		MessageBoxW(NULL, L"输入项数量无效。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		if ( !GuiIsSmokeMode() ) {
+			MessageBoxW(NULL, L"输入项数量无效。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		}
 		return 2;
 	}
 

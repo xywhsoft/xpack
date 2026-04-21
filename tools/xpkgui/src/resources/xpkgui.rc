@@ -7,17 +7,20 @@ IDR_MAIN_MENU MENU
 BEGIN
     POPUP "File"
     BEGIN
-        MENUITEM "New...", ID_FILE_NEW
-        MENUITEM "Open...", ID_FILE_OPEN
+        MENUITEM "New...\tCtrl+N", ID_FILE_NEW
+        MENUITEM "Open...\tCtrl+O", ID_FILE_OPEN
         POPUP "Recent Archives"
         BEGIN
             MENUITEM "(Empty)", 0, GRAYED
         END
-        MENUITEM "Close", ID_FILE_CLOSE
+        MENUITEM "Close\tCtrl+W", ID_FILE_CLOSE
         MENUITEM SEPARATOR
-        MENUITEM "Save", ID_FILE_SAVE
+        MENUITEM "Save\tCtrl+S", ID_FILE_SAVE
+        MENUITEM "Save As...\tCtrl+Shift+S", ID_FILE_SAVE_AS
         MENUITEM "Rebuild", ID_FILE_REBUILD
         MENUITEM "Archive Properties", ID_FILE_PROPERTIES
+        MENUITEM "Show Archive In Explorer", ID_FILE_SHOW_ARCHIVE_IN_EXPLORER
+        MENUITEM "Copy Archive Path", ID_FILE_COPY_ARCHIVE_PATH
         MENUITEM SEPARATOR
         MENUITEM "Exit", ID_FILE_EXIT
     END
@@ -39,8 +42,10 @@ BEGIN
         MENUITEM "Extract Selected...", ID_ACTION_EXTRACT
         MENUITEM "Extract All...", ID_ACTION_EXTRACT_ALL
         MENUITEM SEPARATOR
-        MENUITEM "Delete", ID_ACTION_DELETE
-        MENUITEM "Rename", ID_ACTION_RENAME
+        MENUITEM "Delete\tDelete", ID_ACTION_DELETE
+        MENUITEM "Rename\tF2", ID_ACTION_RENAME
+        MENUITEM "Copy To...", ID_ACTION_COPY_TO
+        MENUITEM "Move To...", ID_ACTION_MOVE_TO
         MENUITEM "Set FileIndex...", ID_ACTION_SET_FILE_INDEX
         MENUITEM "Set File Type...", ID_ACTION_SET_FILE_TYPE
         MENUITEM "Set Platform Attr...", ID_ACTION_SET_PATH_ATTR
@@ -56,8 +61,25 @@ BEGIN
     POPUP "Edit"
     BEGIN
         MENUITEM "Copy Selected Names/Paths\tCtrl+C", ID_EDIT_COPY_PATHS
+        MENUITEM "Copy Visible Names/Paths", ID_EDIT_COPY_VISIBLE_PATHS
+        MENUITEM "Export Selected Names/Paths...", ID_EDIT_EXPORT_PATHS
+        MENUITEM "Export Visible Names/Paths...", ID_EDIT_EXPORT_VISIBLE_PATHS
+        MENUITEM "Copy Selected Details", ID_EDIT_COPY_DETAILS
+        MENUITEM "Copy Visible List Details", ID_EDIT_COPY_VISIBLE_DETAILS
+        MENUITEM "Export Selected Details...", ID_EDIT_EXPORT_DETAILS
+        MENUITEM "Export Visible List Details...", ID_EDIT_EXPORT_VISIBLE_DETAILS
         MENUITEM "Copy Entry Hash", ID_EDIT_COPY_HASH
+        MENUITEM "Copy Selected Hashes", ID_EDIT_COPY_HASHES
+        MENUITEM "Copy Visible Hashes", ID_EDIT_COPY_VISIBLE_HASHES
+        MENUITEM "Export Selected Hashes...", ID_EDIT_EXPORT_HASHES
+        MENUITEM "Export Visible Hashes...", ID_EDIT_EXPORT_VISIBLE_HASHES
+        MENUITEM SEPARATOR
+        MENUITEM "Select All\tCtrl+A", ID_VIEW_SELECT_ALL
+        MENUITEM "Deselect All\tCtrl+Shift+A", ID_EDIT_DESELECT_ALL
+        MENUITEM "Invert Selection", ID_EDIT_INVERT_SELECTION
+        MENUITEM SEPARATOR
         MENUITEM "Select By Pattern...", ID_EDIT_SELECT_BY_PATTERN
+        MENUITEM "Deselect By Pattern...", ID_EDIT_DESELECT_BY_PATTERN
         MENUITEM "Select Same Extension", ID_EDIT_SELECT_SAME_EXT
         MENUITEM "Select Same Hash", ID_EDIT_SELECT_SAME_HASH
         MENUITEM "Select Same Method", ID_EDIT_SELECT_SAME_METHOD
@@ -66,7 +88,6 @@ BEGIN
         MENUITEM "Select Duplicate Files", ID_EDIT_SELECT_DUPLICATES
         MENUITEM "Select Duplicate Copies", ID_EDIT_SELECT_DUP_COPIES
         MENUITEM "Delete Duplicate Copies...", ID_EDIT_DELETE_DUP_COPIES
-        MENUITEM "Invert Selection", ID_EDIT_INVERT_SELECTION
     END
     POPUP "Tools"
     BEGIN
@@ -76,18 +97,34 @@ BEGIN
         MENUITEM "Import Meta...", ID_TOOLS_META_IMPORT
         MENUITEM "Export Meta...", ID_TOOLS_META_EXPORT
         MENUITEM "Clear Meta", ID_TOOLS_META_CLEAR
+        MENUITEM SEPARATOR
+        MENUITEM "Show Settings File", ID_TOOLS_SHOW_SETTINGS_FILE
+        MENUITEM "Reset UI Preferences...", ID_TOOLS_RESET_UI_PREFS
     END
     POPUP "View"
     BEGIN
         MENUITEM "Back\tAlt+Left", ID_VIEW_BACK
         MENUITEM "Forward\tAlt+Right", ID_VIEW_FORWARD
+        MENUITEM "Up\tAlt+Up", ID_VIEW_PARENT
+        MENUITEM "Root\tAlt+Home", ID_VIEW_ROOT
         MENUITEM SEPARATOR
         MENUITEM "Refresh\tF5", ID_VIEW_REFRESH
+        MENUITEM "Focus Filter\tCtrl+F", ID_VIEW_FOCUS_FILTER
+        MENUITEM "Clear Filter\tEsc", ID_VIEW_CLEAR_FILTER
+        MENUITEM "Focus Path\tCtrl+L", ID_VIEW_FOCUS_PATH
+        MENUITEM SEPARATOR
         MENUITEM "Flat View", ID_VIEW_FLAT
         MENUITEM "Locate In Tree", ID_VIEW_LOCATE_IN_TREE
+        MENUITEM SEPARATOR
+        MENUITEM "Reset Sort", ID_VIEW_RESET_SORT
+        MENUITEM "Auto Size Columns\tCtrl+Num+", ID_VIEW_AUTO_SIZE_COLUMNS
+        MENUITEM "Reset Columns", ID_VIEW_RESET_COLUMNS
     END
     POPUP "Help"
     BEGIN
+        MENUITEM "Keyboard Shortcuts", ID_HELP_KEYBOARD_SHORTCUTS
+        MENUITEM "Command Line Usage", ID_HELP_COMMAND_LINE
+        MENUITEM SEPARATOR
         MENUITEM "About", ID_HELP_ABOUT
     END
 END

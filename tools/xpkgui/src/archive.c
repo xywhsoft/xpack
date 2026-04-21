@@ -54,7 +54,7 @@ static const GuiFileTypeName arrGuiFileTypeNames[] = {
 
 static LONG g_openTempSequence = 0;
 
-#define GUI_ARCHIVE_COLUMN_COUNT 9
+#define GUI_ARCHIVE_COLUMN_COUNT XPKGUI_ARCHIVE_COLUMN_COUNT
 #define XPKGUI_INLINE_VIEW_LIMIT (8ull * 1024ull * 1024ull)
 
 static BOOL GuiPathMatchFolderPrefix(const WCHAR* fullPath, const WCHAR* folder, const WCHAR** remainderOut);
@@ -593,6 +593,7 @@ static BOOL GuiAddViewFileItem(GuiApp* app, size_t sourceIndex, const WCHAR* dis
 	wcsncpy_s(item.fullPath, _countof(item.fullPath), src->name, _TRUNCATE);
 	wcsncpy_s(item.sizeText, _countof(item.sizeText), src->sizeText, _TRUNCATE);
 	wcsncpy_s(item.packedText, _countof(item.packedText), src->packedText, _TRUNCATE);
+	wcsncpy_s(item.ratioText, _countof(item.ratioText), src->ratioText, _TRUNCATE);
 	wcsncpy_s(item.methodText, _countof(item.methodText), src->methodText, _TRUNCATE);
 	wcsncpy_s(item.fileTypeText, _countof(item.fileTypeText), src->fileTypeText, _TRUNCATE);
 	wcsncpy_s(item.modifiedText, _countof(item.modifiedText), src->modifiedText, _TRUNCATE);
@@ -656,6 +657,7 @@ static int GuiEnumArchiveCallback(xpkObject xpk, uint32_t pos, const void* info,
 
 	GuiFormatUInt64(item->fileSize, item->sizeText, _countof(item->sizeText));
 	GuiFormatUInt64(item->packedSize, item->packedText, _countof(item->packedText));
+	GuiFormatRatio(item->packedSize, item->fileSize, item->ratioText, _countof(item->ratioText));
 	wcsncpy_s(item->methodText, _countof(item->methodText), arrGuiMethodNames[item->flag & XPK_FLAG_COMP_MASK], _TRUNCATE);
 	GuiFormatFileType(GuiEntryFileType(item->flag), item->fileTypeText, _countof(item->fileTypeText));
 	GuiFormatTime(item->modifyTime, item->modifiedText, _countof(item->modifiedText));
@@ -683,14 +685,14 @@ static BOOL GuiLoadArchiveItems(GuiApp* app)
 static void GuiRefreshColumns(GuiApp* app)
 {
 	LVCOLUMNW col;
-	static const int widths[] = { 340, 110, 110, 120, 120, 170, 90, 110, 100 };
-	static const WCHAR* names[] = { L"Name / Path", L"Size", L"Packed", L"Method", L"File Type", L"Modified", L"ID", L"Hash", L"Attr" };
+	static const WCHAR* names[] = { L"Name / Path", L"Size", L"Packed", L"Ratio", L"Method", L"File Type", L"Modified", L"ID", L"Hash", L"Attr" };
 	int i;
 
 	if ( app->list == NULL ) {
 		return;
 	}
 
+	GuiCaptureColumnWidths(app);
 	while ( ListView_DeleteColumn(app->list, 0) ) {
 	}
 
@@ -698,7 +700,7 @@ static void GuiRefreshColumns(GuiApp* app)
 	col.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
 	for ( i = 0; i < (int)_countof(names); ++i ) {
 		col.pszText = (LPWSTR)names[i];
-		col.cx = widths[i];
+		col.cx = app->columnWidths[i] > 0 ? app->columnWidths[i] : 80;
 		col.iSubItem = i;
 		ListView_InsertColumn(app->list, i, &col);
 	}
@@ -862,6 +864,27 @@ static int GuiCompareTextInsensitive(const WCHAR* left, const WCHAR* right)
 	return 0;
 }
 
+static int GuiCompareRatio(uint64_t leftPacked, uint64_t leftSize, uint64_t rightPacked, uint64_t rightSize)
+{
+	double leftRatio;
+	double rightRatio;
+
+	if ( leftSize == 0 && rightSize == 0 ) {
+		return GuiCompareUnsigned64(leftPacked, rightPacked);
+	}
+	if ( leftSize == 0 ) {
+		return -1;
+	}
+	if ( rightSize == 0 ) {
+		return 1;
+	}
+	leftRatio = (double)leftPacked / (double)leftSize;
+	rightRatio = (double)rightPacked / (double)rightSize;
+	if ( leftRatio < rightRatio ) return -1;
+	if ( leftRatio > rightRatio ) return 1;
+	return 0;
+}
+
 static int __cdecl GuiArchiveItemCompare(void* context, const void* leftPtr, const void* rightPtr)
 {
 	const GuiSortContext* sort;
@@ -885,25 +908,28 @@ static int __cdecl GuiArchiveItemCompare(void* context, const void* leftPtr, con
 			cmp = GuiCompareUnsigned64(left->packedSize, right->packedSize);
 			break;
 		case 3:
-			cmp = GuiCompareTextInsensitive(left->methodText, right->methodText);
+			cmp = GuiCompareRatio(left->packedSize, left->fileSize, right->packedSize, right->fileSize);
 			break;
 		case 4:
-			cmp = GuiCompareTextInsensitive(left->fileTypeText, right->fileTypeText);
+			cmp = GuiCompareTextInsensitive(left->methodText, right->methodText);
 			break;
 		case 5:
-			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			cmp = GuiCompareTextInsensitive(left->fileTypeText, right->fileTypeText);
 			break;
 		case 6:
+			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			break;
+		case 7:
 			if ( left->fileIndex != 0 || right->fileIndex != 0 ) {
 				cmp = GuiCompareSigned64(left->fileIndex, right->fileIndex);
 			} else {
 				cmp = GuiCompareUnsigned64(left->pos, right->pos);
 			}
 			break;
-		case 7:
+		case 8:
 			cmp = GuiCompareUnsigned64(left->fileHash, right->fileHash);
 			break;
-		case 8:
+		case 9:
 			cmp = GuiCompareUnsigned64(left->attr, right->attr);
 			break;
 		default:
@@ -1010,25 +1036,28 @@ static int __cdecl GuiViewItemCompare(void* context, const void* leftPtr, const 
 			cmp = GuiCompareUnsigned64(left->packedSize, right->packedSize);
 			break;
 		case 3:
-			cmp = GuiCompareTextInsensitive(left->methodText, right->methodText);
+			cmp = GuiCompareRatio(left->packedSize, left->fileSize, right->packedSize, right->fileSize);
 			break;
 		case 4:
-			cmp = GuiCompareTextInsensitive(left->fileTypeText, right->fileTypeText);
+			cmp = GuiCompareTextInsensitive(left->methodText, right->methodText);
 			break;
 		case 5:
-			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			cmp = GuiCompareTextInsensitive(left->fileTypeText, right->fileTypeText);
 			break;
 		case 6:
+			cmp = GuiCompareSigned64((int64_t)left->modifyTime, (int64_t)right->modifyTime);
+			break;
+		case 7:
 			if ( left->fileIndex != 0 || right->fileIndex != 0 ) {
 				cmp = GuiCompareSigned64(left->fileIndex, right->fileIndex);
 			} else {
 				cmp = GuiCompareUnsigned64(left->pos, right->pos);
 			}
 			break;
-		case 7:
+		case 8:
 			cmp = GuiCompareUnsigned64(left->fileHash, right->fileHash);
 			break;
-		case 8:
+		case 9:
 			cmp = GuiCompareUnsigned64(left->attr, right->attr);
 			break;
 		default:
@@ -1167,14 +1196,15 @@ static BOOL GuiTextListMatchesFilter(const WCHAR* filterText, const WCHAR** fiel
 
 static BOOL GuiArchiveItemMatchesFilterText(const GuiArchiveItem* item, const WCHAR* displayName, const WCHAR* filterText)
 {
-	const WCHAR* fields[6];
+	const WCHAR* fields[7];
 
 	fields[0] = displayName;
 	fields[1] = item->name;
-	fields[2] = item->methodText;
-	fields[3] = item->idText;
-	fields[4] = item->hashText;
-	fields[5] = item->attrText;
+	fields[2] = item->ratioText;
+	fields[3] = item->methodText;
+	fields[4] = item->idText;
+	fields[5] = item->hashText;
+	fields[6] = item->attrText;
 	return GuiTextListMatchesFilter(filterText, fields, _countof(fields));
 }
 
@@ -1308,12 +1338,13 @@ static BOOL GuiRenderArchiveView(GuiApp* app)
 			ListView_InsertItem(app->list, &item);
 			ListView_SetItemText(app->list, (int)i, 1, app->viewItems[i].sizeText);
 			ListView_SetItemText(app->list, (int)i, 2, app->viewItems[i].packedText);
-			ListView_SetItemText(app->list, (int)i, 3, app->viewItems[i].methodText);
-			ListView_SetItemText(app->list, (int)i, 4, app->viewItems[i].fileTypeText);
-			ListView_SetItemText(app->list, (int)i, 5, app->viewItems[i].modifiedText);
-			ListView_SetItemText(app->list, (int)i, 6, app->viewItems[i].idText);
-			ListView_SetItemText(app->list, (int)i, 7, app->viewItems[i].hashText);
-			ListView_SetItemText(app->list, (int)i, 8, app->viewItems[i].attrText);
+			ListView_SetItemText(app->list, (int)i, 3, app->viewItems[i].ratioText);
+			ListView_SetItemText(app->list, (int)i, 4, app->viewItems[i].methodText);
+			ListView_SetItemText(app->list, (int)i, 5, app->viewItems[i].fileTypeText);
+			ListView_SetItemText(app->list, (int)i, 6, app->viewItems[i].modifiedText);
+			ListView_SetItemText(app->list, (int)i, 7, app->viewItems[i].idText);
+			ListView_SetItemText(app->list, (int)i, 8, app->viewItems[i].hashText);
+			ListView_SetItemText(app->list, (int)i, 9, app->viewItems[i].attrText);
 		}
 		GuiRestoreViewSelection(app, selectedSnapshot, selectedCount, &focusedSnapshot, hasFocused);
 		GuiUpdateSortHeader(app);
@@ -1598,6 +1629,19 @@ void GuiArchiveToggleSort(GuiApp* app, int column)
 		app->sortColumn = column;
 		app->sortAscending = TRUE;
 	}
+	GuiSaveSortSettings(app);
+	GuiRenderArchiveView(app);
+}
+
+void GuiArchiveResetSort(GuiApp* app)
+{
+	if ( app == NULL ) {
+		return;
+	}
+	app->sortColumn = 0;
+	app->sortAscending = TRUE;
+	app->sortInitialized = TRUE;
+	GuiSaveSortSettings(app);
 	GuiRenderArchiveView(app);
 }
 
@@ -1757,6 +1801,114 @@ BOOL GuiArchiveSave(GuiApp* app)
 	return GuiArchiveRefreshView(app);
 }
 
+static void GuiArchiveNormalizeFilePath(const WCHAR* path, WCHAR* outPath, size_t cchOutPath)
+{
+	WCHAR fullPath[MAX_PATH];
+	DWORD cchFullPath;
+
+	if ( outPath == NULL || cchOutPath == 0 ) {
+		return;
+	}
+	outPath[0] = L'\0';
+	if ( path == NULL || path[0] == L'\0' ) {
+		return;
+	}
+
+	cchFullPath = GetFullPathNameW(path, (DWORD)_countof(fullPath), fullPath, NULL);
+	if ( cchFullPath > 0 && cchFullPath < _countof(fullPath) ) {
+		wcsncpy_s(outPath, cchOutPath, fullPath, _TRUNCATE);
+		return;
+	}
+	wcsncpy_s(outPath, cchOutPath, path, _TRUNCATE);
+}
+
+BOOL GuiArchiveSaveAs(GuiApp* app)
+{
+	WCHAR currentPath[MAX_PATH];
+	WCHAR targetPath[MAX_PATH];
+	WCHAR normalizedCurrent[MAX_PATH];
+	WCHAR normalizedTarget[MAX_PATH];
+	BOOL copied;
+	DWORD copyError;
+
+	if ( app == NULL || app->archive == NULL || app->archivePath[0] == L'\0' ) {
+		return FALSE;
+	}
+
+	wcsncpy_s(currentPath, _countof(currentPath), app->archivePath, _TRUNCATE);
+	wcsncpy_s(targetPath, _countof(targetPath), app->archivePath, _TRUNCATE);
+	if ( !GuiSaveArchiveDialog(app->window, targetPath, _countof(targetPath)) ) {
+		return FALSE;
+	}
+
+	GuiArchiveNormalizeFilePath(currentPath, normalizedCurrent, _countof(normalizedCurrent));
+	GuiArchiveNormalizeFilePath(targetPath, normalizedTarget, _countof(normalizedTarget));
+	if ( normalizedTarget[0] == L'\0' ) {
+		return FALSE;
+	}
+	if ( _wcsicmp(normalizedCurrent, normalizedTarget) == 0 ) {
+		return GuiArchiveSave(app);
+	}
+
+	if ( !GuiArchiveSave(app) ) {
+		return FALSE;
+	}
+
+	GuiAppCloseArchive(app);
+	copied = CopyFileW(normalizedCurrent, normalizedTarget, FALSE);
+	copyError = copied ? ERROR_SUCCESS : GetLastError();
+	if ( !copied ) {
+		GuiShowSystemError(app->window, L"另存归档失败", copyError);
+		GuiArchiveOpenPath(app, normalizedCurrent, FALSE);
+		return FALSE;
+	}
+
+	if ( !GuiArchiveOpenPath(app, normalizedTarget, FALSE) ) {
+		GuiArchiveOpenPath(app, normalizedCurrent, FALSE);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+BOOL GuiArchiveShowArchiveInExplorer(GuiApp* app)
+{
+	WCHAR normalizedPath[MAX_PATH];
+	WCHAR parameters[(MAX_PATH * 2) + 32];
+	INT_PTR shellResult;
+
+	if ( app == NULL || app->archivePath[0] == L'\0' ) {
+		return FALSE;
+	}
+
+	GuiArchiveNormalizeFilePath(app->archivePath, normalizedPath, _countof(normalizedPath));
+	if ( normalizedPath[0] == L'\0' ) {
+		return FALSE;
+	}
+
+	_snwprintf_s(parameters, _countof(parameters), _TRUNCATE, L"/select,\"%s\"", normalizedPath);
+	shellResult = (INT_PTR)ShellExecuteW(app->window, L"open", L"explorer.exe", parameters, NULL, SW_SHOWNORMAL);
+	if ( shellResult <= 32 ) {
+		GuiShowSystemError(app->window, L"定位归档失败", (DWORD)shellResult);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+BOOL GuiArchiveCopyArchivePath(GuiApp* app)
+{
+	WCHAR normalizedPath[MAX_PATH];
+
+	if ( app == NULL || app->archivePath[0] == L'\0' ) {
+		return FALSE;
+	}
+
+	GuiArchiveNormalizeFilePath(app->archivePath, normalizedPath, _countof(normalizedPath));
+	if ( normalizedPath[0] == L'\0' ) {
+		return FALSE;
+	}
+	return GuiSetClipboardText(app->window, normalizedPath);
+}
+
 BOOL GuiArchivePromptNew(GuiApp* app, const WCHAR* suggestedPath, GuiArchiveOptions* optionsOut)
 {
 	GuiArchiveConfigDialogState state;
@@ -1764,14 +1916,14 @@ BOOL GuiArchivePromptNew(GuiApp* app, const WCHAR* suggestedPath, GuiArchiveOpti
 	ZeroMemory(&state, sizeof(state));
 	state.createMode = TRUE;
 	state.allowPackTypeEdit = TRUE;
-	state.options.packType = XPK_PACK_WIN32;
+	state.options.packType = app->packType;
 	state.options.defaultComp = app->defaultComp;
 	state.options.metaComp = app->metaComp;
 	state.options.infoComp = app->infoComp;
-	state.options.infoExtSize = 0;
-	state.options.volumeSize = 0;
+	state.options.infoExtSize = (state.options.packType == XPK_PACK_CORE) ? app->infoExtSize : 0;
+	state.options.volumeSize = app->volumeSize;
 	state.options.writePolicy = app->writePolicy;
-	state.options.solidMode = FALSE;
+	state.options.solidMode = app->solidMode;
 	if ( suggestedPath != NULL ) {
 		wcsncpy_s(state.options.archivePath, _countof(state.options.archivePath), suggestedPath, _TRUNCATE);
 	}
@@ -1781,6 +1933,15 @@ BOOL GuiArchivePromptNew(GuiApp* app, const WCHAR* suggestedPath, GuiArchiveOpti
 	}
 
 	*optionsOut = state.options;
+	app->packType = state.options.packType;
+	app->defaultComp = state.options.defaultComp;
+	app->metaComp = state.options.metaComp;
+	app->infoComp = state.options.infoComp;
+	app->infoExtSize = state.options.infoExtSize;
+	app->volumeSize = state.options.volumeSize;
+	app->writePolicy = state.options.writePolicy;
+	app->solidMode = state.options.solidMode;
+	GuiSaveArchiveDefaults(&state.options);
 	return TRUE;
 }
 
@@ -1933,6 +2094,46 @@ BOOL GuiArchiveCanCopySelectionHash(GuiApp* app)
 	return GuiArchiveCanOpenSelection(app);
 }
 
+BOOL GuiArchiveCanCopySelectionHashes(GuiApp* app)
+{
+	int index;
+
+	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
+		return FALSE;
+	}
+
+	index = -1;
+	while ( TRUE ) {
+		GuiViewItem* viewItem;
+
+		index = ListView_GetNextItem(app->list, index, LVNI_SELECTED);
+		if ( index < 0 ) {
+			break;
+		}
+		viewItem = GuiArchiveGetViewItemByListIndex(app, index);
+		if ( viewItem != NULL && viewItem->kind == GUI_VIEW_ITEM_FILE && viewItem->sourceIndex < app->itemCount ) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+BOOL GuiArchiveCanCopyVisibleHashes(GuiApp* app)
+{
+	size_t i;
+
+	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
+		return FALSE;
+	}
+
+	for ( i = 0; i < app->viewCount; ++i ) {
+		if ( app->viewItems[i].kind == GUI_VIEW_ITEM_FILE && app->viewItems[i].sourceIndex < app->itemCount ) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 BOOL GuiArchiveCanShowSelectionInExplorer(GuiApp* app)
 {
 	return GuiArchiveCanOpenSelection(app);
@@ -1977,7 +2178,7 @@ BOOL GuiArchiveCanCopySelection(GuiApp* app)
 {
 	int index;
 
-	if ( app == NULL || app->list == NULL ) {
+	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
 		return FALSE;
 	}
 
@@ -1997,9 +2198,25 @@ BOOL GuiArchiveCanCopySelection(GuiApp* app)
 	return FALSE;
 }
 
+BOOL GuiArchiveCanCopyVisibleDetails(GuiApp* app)
+{
+	size_t i;
+
+	if ( app == NULL || app->archive == NULL || app->list == NULL || app->viewCount == 0 ) {
+		return FALSE;
+	}
+
+	for ( i = 0; i < app->viewCount; ++i ) {
+		if ( GuiArchiveCanCopyViewItem(&app->viewItems[i]) ) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 static BOOL GuiViewItemMatchesSelectionPattern(const GuiViewItem* item, const WCHAR* patternText)
 {
-	const WCHAR* fields[7];
+	const WCHAR* fields[9];
 
 	if ( item == NULL || item->kind == GUI_VIEW_ITEM_PARENT ) {
 		return FALSE;
@@ -2007,12 +2224,13 @@ static BOOL GuiViewItemMatchesSelectionPattern(const GuiViewItem* item, const WC
 
 	fields[0] = item->name;
 	fields[1] = item->fullPath;
-	fields[2] = item->methodText;
-	fields[3] = item->fileTypeText;
-	fields[4] = item->idText;
-	fields[5] = item->hashText;
-	fields[6] = item->attrText;
-	fields[7] = item->modifiedText;
+	fields[2] = item->ratioText;
+	fields[3] = item->methodText;
+	fields[4] = item->fileTypeText;
+	fields[5] = item->idText;
+	fields[6] = item->hashText;
+	fields[7] = item->attrText;
+	fields[8] = item->modifiedText;
 	return GuiTextListMatchesFilter(patternText, fields, _countof(fields));
 }
 
@@ -2137,6 +2355,67 @@ BOOL GuiArchiveSelectByPattern(GuiApp* app)
 	ListView_SetItemState(app->list, firstSelected, LVIS_FOCUSED, LVIS_FOCUSED);
 	ListView_SetSelectionMark(app->list, firstSelected);
 	ListView_EnsureVisible(app->list, firstSelected, FALSE);
+	GuiSetMenuState(app);
+	GuiUpdateStatus(app);
+	return TRUE;
+}
+
+BOOL GuiArchiveDeselectByPattern(GuiApp* app)
+{
+	GuiInputDialogState dialogState;
+	size_t i;
+	int matchCount;
+	int firstSelected;
+
+	if ( !GuiArchiveCanSelectByPattern(app) ) {
+		return FALSE;
+	}
+
+	ZeroMemory(&dialogState, sizeof(dialogState));
+	dialogState.title = L"按模式取消选择";
+	dialogState.prompt = L"模式:";
+	if ( !GuiRunInputDialog(app->window, &dialogState) ) {
+		return FALSE;
+	}
+	if ( dialogState.value[0] == L'\0' ) {
+		MessageBoxW(app->window, L"请输入选择模式。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	matchCount = 0;
+	for ( i = 0; i < app->viewCount; ++i ) {
+		if ( !GuiViewItemMatchesSelectionPattern(&app->viewItems[i], dialogState.value) ) {
+			continue;
+		}
+		ListView_SetItemState(app->list, (int)i, 0, LVIS_SELECTED | LVIS_FOCUSED);
+		matchCount++;
+	}
+
+	if ( matchCount <= 0 ) {
+		MessageBoxW(app->window, L"当前视图中没有匹配项。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		GuiSetMenuState(app);
+		GuiUpdateStatus(app);
+		return FALSE;
+	}
+
+	firstSelected = -1;
+	for ( i = 0; i < app->viewCount; ++i ) {
+		if ( app->viewItems[i].kind == GUI_VIEW_ITEM_PARENT ) {
+			continue;
+		}
+		if ( (ListView_GetItemState(app->list, (int)i, LVIS_SELECTED) & LVIS_SELECTED) != 0 ) {
+			firstSelected = (int)i;
+			break;
+		}
+	}
+
+	if ( firstSelected >= 0 ) {
+		ListView_SetItemState(app->list, firstSelected, LVIS_FOCUSED, LVIS_FOCUSED);
+		ListView_SetSelectionMark(app->list, firstSelected);
+		ListView_EnsureVisible(app->list, firstSelected, FALSE);
+	} else {
+		ListView_SetSelectionMark(app->list, -1);
+	}
 	GuiSetMenuState(app);
 	GuiUpdateStatus(app);
 	return TRUE;
@@ -2786,6 +3065,7 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 	WCHAR text[2048];
 	WCHAR sizeText[64];
 	WCHAR packedText[64];
+	WCHAR ratioText[32];
 	WCHAR fileTypeText[64];
 	WCHAR hashText[32];
 	WCHAR createText[64];
@@ -2814,16 +3094,18 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 		}
 		GuiFormatUInt64(totalSize, sizeText, _countof(sizeText));
 		GuiFormatUInt64(totalPacked, packedText, _countof(packedText));
+		GuiFormatRatio(totalPacked, totalSize, ratioText, _countof(ratioText));
 		_snwprintf_s(
 			text,
 			_countof(text),
 			_TRUNCATE,
-			L"Pack Type: %s\r\nSelected Rows: %u\r\nFiles: %u\r\nTotal Size: %s\r\nTotal Packed: %s",
+			L"Pack Type: %s\r\nSelected Rows: %u\r\nFiles: %u\r\nTotal Size: %s\r\nTotal Packed: %s\r\nRatio: %s",
 			GuiPackTypeLabel(app->packType),
 			(unsigned)selectedRows,
 			(unsigned)fileCount,
 			sizeText,
-			packedText);
+			packedText,
+			ratioText);
 		MessageBoxW(app->window, text, L"Selection Properties", MB_OK | MB_ICONINFORMATION);
 		return TRUE;
 	}
@@ -2843,17 +3125,19 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 		}
 		GuiFormatUInt64(totalSize, sizeText, _countof(sizeText));
 		GuiFormatUInt64(totalPacked, packedText, _countof(packedText));
+		GuiFormatRatio(totalPacked, totalSize, ratioText, _countof(ratioText));
 		_snwprintf_s(
 			text,
 			_countof(text),
 			_TRUNCATE,
-			L"Type: Directory\r\nPack Type: %s\r\nName: %s\r\nPath: %s\r\nFiles: %u\r\nTotal Size: %s\r\nTotal Packed: %s",
+			L"Type: Directory\r\nPack Type: %s\r\nName: %s\r\nPath: %s\r\nFiles: %u\r\nTotal Size: %s\r\nTotal Packed: %s\r\nRatio: %s",
 			GuiPackTypeLabel(app->packType),
 			viewItem->name,
 			viewItem->fullPath,
 			(unsigned)fileCount,
 			sizeText,
-			packedText);
+			packedText,
+			ratioText);
 		MessageBoxW(app->window, text, L"Selection Properties", MB_OK | MB_ICONINFORMATION);
 		return TRUE;
 	}
@@ -2864,6 +3148,7 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 	}
 	GuiFormatUInt64(item->fileSize, sizeText, _countof(sizeText));
 	GuiFormatUInt64(item->packedSize, packedText, _countof(packedText));
+	GuiFormatRatio(item->packedSize, item->fileSize, ratioText, _countof(ratioText));
 	GuiFormatFileType(GuiEntryFileType(item->flag), fileTypeText, _countof(fileTypeText));
 	_snwprintf_s(hashText, _countof(hashText), _TRUNCATE, L"0x%08X", item->fileHash);
 	GuiFormatTime(item->createTime, createText, _countof(createText));
@@ -2873,12 +3158,13 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 			text,
 			_countof(text),
 			_TRUNCATE,
-			L"Type: File\r\nPack Type: %s\r\nName: %s\r\nPath: %s\r\nSize: %s\r\nPacked: %s\r\nMethod: %s\r\nFile Type: %s\r\nHash: %s\r\nCreated: %s\r\nModified: %s\r\nAccessed: %s\r\nAttr: %s\r\nPos: %u",
+			L"Type: File\r\nPack Type: %s\r\nName: %s\r\nPath: %s\r\nSize: %s\r\nPacked: %s\r\nRatio: %s\r\nMethod: %s\r\nFile Type: %s\r\nHash: %s\r\nCreated: %s\r\nModified: %s\r\nAccessed: %s\r\nAttr: %s\r\nPos: %u",
 			GuiPackTypeLabel(app->packType),
 			viewItem->name,
 			item->name,
 			sizeText,
 			packedText,
+			ratioText,
 			item->methodText,
 			fileTypeText,
 			hashText,
@@ -2892,12 +3178,13 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 			text,
 			_countof(text),
 			_TRUNCATE,
-			L"Type: File\r\nPack Type: %s\r\nName: %s\r\nIndex: %s\r\nSize: %s\r\nPacked: %s\r\nMethod: %s\r\nFile Type: %s\r\nHash: %s\r\nPos: %u",
+			L"Type: File\r\nPack Type: %s\r\nName: %s\r\nIndex: %s\r\nSize: %s\r\nPacked: %s\r\nRatio: %s\r\nMethod: %s\r\nFile Type: %s\r\nHash: %s\r\nPos: %u",
 			GuiPackTypeLabel(app->packType),
 			viewItem->name,
 			item->idText,
 			sizeText,
 			packedText,
+			ratioText,
 			item->methodText,
 			fileTypeText,
 			hashText,
@@ -2907,12 +3194,13 @@ BOOL GuiArchiveShowSelectionProperties(GuiApp* app)
 			text,
 			_countof(text),
 			_TRUNCATE,
-			L"Type: File\r\nPack Type: %s\r\nName: %s\r\nID: %s\r\nSize: %s\r\nPacked: %s\r\nMethod: %s\r\nFile Type: %s\r\nHash: %s\r\nPos: %u\r\nInfoExt Size: %u",
+			L"Type: File\r\nPack Type: %s\r\nName: %s\r\nID: %s\r\nSize: %s\r\nPacked: %s\r\nRatio: %s\r\nMethod: %s\r\nFile Type: %s\r\nHash: %s\r\nPos: %u\r\nInfoExt Size: %u",
 			GuiPackTypeLabel(app->packType),
 			viewItem->name,
 			item->idText,
 			sizeText,
 			packedText,
+			ratioText,
 			item->methodText,
 			fileTypeText,
 			hashText,
@@ -3047,6 +3335,35 @@ BOOL GuiArchiveCanRenameSelection(GuiApp* app)
 
 	viewItem = GuiArchiveGetSingleSelectedViewItem(app);
 	return viewItem != NULL && (viewItem->kind == GUI_VIEW_ITEM_FILE || viewItem->kind == GUI_VIEW_ITEM_DIR);
+}
+
+BOOL GuiArchiveCanMoveSelection(GuiApp* app)
+{
+	int index;
+
+	if ( app == NULL || app->archive == NULL || app->list == NULL || !GuiIsPathPackType(app->packType) ) {
+		return FALSE;
+	}
+
+	index = -1;
+	while ( TRUE ) {
+		GuiViewItem* viewItem;
+
+		index = ListView_GetNextItem(app->list, index, LVNI_SELECTED);
+		if ( index < 0 ) {
+			break;
+		}
+		viewItem = GuiArchiveGetViewItemByListIndex(app, index);
+		if ( viewItem != NULL && (viewItem->kind == GUI_VIEW_ITEM_FILE || viewItem->kind == GUI_VIEW_ITEM_DIR) ) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+BOOL GuiArchiveCanCopyToSelection(GuiApp* app)
+{
+	return GuiArchiveCanMoveSelection(app);
 }
 
 BOOL GuiArchiveCanSetSelectionFileIndex(GuiApp* app)
@@ -4011,16 +4328,307 @@ static BOOL GuiAppendWideText(WCHAR** textBuf, size_t* len, size_t* cap, const W
 	return TRUE;
 }
 
-BOOL GuiArchiveCopySelectionPaths(GuiApp* app)
+static BOOL GuiAppendTsvCell(WCHAR** textBuf, size_t* len, size_t* cap, const WCHAR* text)
+{
+	const WCHAR* p;
+	WCHAR ch[2];
+
+	if ( text == NULL ) {
+		return TRUE;
+	}
+
+	ch[1] = L'\0';
+	for ( p = text; *p != L'\0'; ++p ) {
+		ch[0] = (*p == L'\t' || *p == L'\r' || *p == L'\n') ? L' ' : *p;
+		if ( !GuiAppendWideText(textBuf, len, cap, ch) ) {
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+static BOOL GuiAppendTsvSeparator(WCHAR** textBuf, size_t* len, size_t* cap)
+{
+	return GuiAppendWideText(textBuf, len, cap, L"\t");
+}
+
+static BOOL GuiAppendViewItemDetailsTsvRow(WCHAR** textBuf, size_t* len, size_t* cap, const GuiViewItem* item)
+{
+	const WCHAR* kindText;
+
+	if ( item == NULL || !GuiArchiveCanCopyViewItem(item) ) {
+		return TRUE;
+	}
+
+	kindText = (item->kind == GUI_VIEW_ITEM_DIR) ? L"Dir" : L"File";
+	if ( !GuiAppendTsvCell(textBuf, len, cap, kindText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->name) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->fullPath[0] != L'\0' ? item->fullPath : item->name) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->sizeText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->packedText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->ratioText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->methodText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->fileTypeText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->modifiedText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->idText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	if ( !GuiAppendTsvCell(textBuf, len, cap, item->hashText) ) return FALSE;
+	if ( !GuiAppendTsvSeparator(textBuf, len, cap) ) return FALSE;
+	return GuiAppendTsvCell(textBuf, len, cap, item->attrText);
+}
+
+static BOOL GuiArchiveBuildDetailsTsv(GuiApp* app, BOOL selectedOnly, WCHAR** outText)
+{
+	WCHAR* textBuf;
+	size_t textLen;
+	size_t textCap;
+	BOOL copied;
+	BOOL ok;
+	int index;
+	size_t i;
+
+	if ( outText == NULL ) {
+		return FALSE;
+	}
+	*outText = NULL;
+	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
+		return FALSE;
+	}
+
+	textBuf = NULL;
+	textLen = 0;
+	textCap = 0;
+	copied = FALSE;
+	ok = GuiAppendWideText(&textBuf, &textLen, &textCap, L"Kind\tName\tPath\tSize\tPacked\tRatio\tMethod\tFile Type\tModified\tID\tHash\tAttr");
+	if ( ok ) {
+		if ( selectedOnly ) {
+			index = -1;
+			while ( TRUE ) {
+				GuiViewItem* viewItem;
+
+				index = ListView_GetNextItem(app->list, index, LVNI_SELECTED);
+				if ( index < 0 ) {
+					break;
+				}
+				viewItem = GuiArchiveGetViewItemByListIndex(app, index);
+				if ( !GuiArchiveCanCopyViewItem(viewItem) ) {
+					continue;
+				}
+				if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemDetailsTsvRow(&textBuf, &textLen, &textCap, viewItem) ) {
+					ok = FALSE;
+					break;
+				}
+				copied = TRUE;
+			}
+		} else {
+			for ( i = 0; i < app->viewCount; ++i ) {
+				if ( !GuiArchiveCanCopyViewItem(&app->viewItems[i]) ) {
+					continue;
+				}
+				if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemDetailsTsvRow(&textBuf, &textLen, &textCap, &app->viewItems[i]) ) {
+					ok = FALSE;
+					break;
+				}
+				copied = TRUE;
+			}
+		}
+	}
+
+	if ( !ok ) {
+		free(textBuf);
+		MessageBoxW(app->window, L"内存不足。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+	if ( !copied ) {
+		free(textBuf);
+		MessageBoxW(app->window, selectedOnly ? L"请选择文件或目录复制详细信息。" : L"当前视图没有可复制的文件或目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+	*outText = textBuf;
+	return TRUE;
+}
+
+static BOOL GuiArchiveCopyDetailsCore(GuiApp* app, BOOL selectedOnly)
+{
+	WCHAR* textBuf;
+
+	textBuf = NULL;
+	if ( !GuiArchiveBuildDetailsTsv(app, selectedOnly, &textBuf) ) {
+		return FALSE;
+	}
+	if ( !GuiSetClipboardText(app->window, textBuf) ) {
+		DWORD err;
+
+		err = GetLastError();
+		free(textBuf);
+		if ( err == 0 ) {
+			err = ERROR_GEN_FAILURE;
+		}
+		GuiShowSystemError(app->window, L"复制详细信息到剪贴板失败", err);
+		return FALSE;
+	}
+
+	free(textBuf);
+	return TRUE;
+}
+
+static BOOL GuiSaveTsvFileDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf)
+{
+	OPENFILENAMEW ofn;
+
+	if ( pathBuf == NULL || cchBuf == 0 ) {
+		return FALSE;
+	}
+
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = hwnd;
+	ofn.lpstrFilter = L"Tab-separated Values (*.tsv)\0*.tsv\0Text File (*.txt)\0*.txt\0All Files (*.*)\0*.*\0";
+	ofn.lpstrFile = pathBuf;
+	ofn.nMaxFile = cchBuf;
+	ofn.lpstrDefExt = L"tsv";
+	ofn.Flags = OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+	return GetSaveFileNameW(&ofn);
+}
+
+static BOOL GuiSaveTextFileDialog(HWND hwnd, WCHAR* pathBuf, DWORD cchBuf)
+{
+	OPENFILENAMEW ofn;
+
+	if ( pathBuf == NULL || cchBuf == 0 ) {
+		return FALSE;
+	}
+
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = hwnd;
+	ofn.lpstrFilter = L"Text File (*.txt)\0*.txt\0All Files (*.*)\0*.*\0";
+	ofn.lpstrFile = pathBuf;
+	ofn.nMaxFile = cchBuf;
+	ofn.lpstrDefExt = L"txt";
+	ofn.Flags = OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+	return GetSaveFileNameW(&ofn);
+}
+
+static BOOL GuiWriteUtf8BomTextFile(HWND owner, const WCHAR* path, const WCHAR* text)
+{
+	size_t cchText;
+	int byteCount;
+	DWORD totalBytes;
+	BYTE* bytes;
+	BOOL ok;
+
+	if ( path == NULL || path[0] == L'\0' || text == NULL ) {
+		return FALSE;
+	}
+
+	cchText = wcslen(text);
+	if ( cchText > 0x7FFFFFFFu ) {
+		SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+		GuiShowSystemError(owner, L"写出 TSV 失败", GetLastError());
+		return FALSE;
+	}
+
+	byteCount = WideCharToMultiByte(CP_UTF8, 0, text, (int)cchText, NULL, 0, NULL, NULL);
+	if ( byteCount < 0 || byteCount > 0x7FFFFFFC ) {
+		SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+		GuiShowSystemError(owner, L"写出 TSV 失败", GetLastError());
+		return FALSE;
+	}
+
+	totalBytes = (DWORD)byteCount + 3;
+	bytes = (BYTE*)malloc(totalBytes > 0 ? totalBytes : 3);
+	if ( bytes == NULL ) {
+		SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+		GuiShowSystemError(owner, L"写出 TSV 失败", GetLastError());
+		return FALSE;
+	}
+
+	bytes[0] = 0xEFu;
+	bytes[1] = 0xBBu;
+	bytes[2] = 0xBFu;
+	if ( byteCount > 0 && WideCharToMultiByte(CP_UTF8, 0, text, (int)cchText, (char*)bytes + 3, byteCount, NULL, NULL) != byteCount ) {
+		DWORD err;
+
+		err = GetLastError();
+		free(bytes);
+		GuiShowSystemError(owner, L"写出 TSV 失败", err != 0 ? err : ERROR_GEN_FAILURE);
+		return FALSE;
+	}
+
+	ok = GuiWriteWholeFile(path, bytes, totalBytes);
+	if ( !ok ) {
+		DWORD err;
+
+		err = GetLastError();
+		free(bytes);
+		GuiShowSystemError(owner, L"写出 TSV 失败", err != 0 ? err : ERROR_GEN_FAILURE);
+		return FALSE;
+	}
+
+	free(bytes);
+	return TRUE;
+}
+
+static BOOL GuiArchiveExportDetailsCore(GuiApp* app, BOOL selectedOnly)
+{
+	WCHAR* textBuf;
+	WCHAR pathBuf[MAX_PATH];
+	BOOL ok;
+
+	if ( app == NULL || app->archive == NULL ) {
+		return FALSE;
+	}
+
+	textBuf = NULL;
+	if ( !GuiArchiveBuildDetailsTsv(app, selectedOnly, &textBuf) ) {
+		return FALSE;
+	}
+
+	wcsncpy_s(pathBuf, _countof(pathBuf), app->archivePath, _TRUNCATE);
+	if ( pathBuf[0] == L'\0' ) {
+		wcsncpy_s(pathBuf, _countof(pathBuf), L"xpack_list", _TRUNCATE);
+	}
+	PathRemoveExtensionW(pathBuf);
+	wcscat_s(pathBuf, _countof(pathBuf), selectedOnly ? L"_selected.tsv" : L"_visible.tsv");
+
+	if ( !GuiSaveTsvFileDialog(app->window, pathBuf, _countof(pathBuf)) ) {
+		free(textBuf);
+		return FALSE;
+	}
+
+	ok = GuiWriteUtf8BomTextFile(app->window, pathBuf, textBuf);
+	free(textBuf);
+	if ( ok ) {
+		MessageBoxW(app->window, L"导出完成。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+	}
+	return ok;
+}
+
+static BOOL GuiArchiveBuildPathsText(GuiApp* app, BOOL selectedOnly, WCHAR** outText)
 {
 	WCHAR* textBuf;
 	size_t textLen;
 	size_t textCap;
 	int index;
+	size_t i;
 	BOOL pathPack;
 	BOOL copied;
 	BOOL ok;
 
+	if ( outText == NULL ) {
+		return FALSE;
+	}
+	*outText = NULL;
 	if ( app == NULL || app->archive == NULL || app->list == NULL ) {
 		return FALSE;
 	}
@@ -4033,7 +4641,7 @@ BOOL GuiArchiveCopySelectionPaths(GuiApp* app)
 	copied = FALSE;
 	ok = TRUE;
 
-	while ( TRUE ) {
+	while ( ok && selectedOnly ) {
 		GuiViewItem* viewItem;
 		const WCHAR* lineText;
 
@@ -4060,6 +4668,29 @@ BOOL GuiArchiveCopySelectionPaths(GuiApp* app)
 		}
 		copied = TRUE;
 	}
+	for ( i = 0; ok && !selectedOnly && i < app->viewCount; ++i ) {
+		GuiViewItem* viewItem;
+		const WCHAR* lineText;
+
+		viewItem = &app->viewItems[i];
+		if ( !GuiArchiveCanCopyViewItem(viewItem) ) {
+			continue;
+		}
+
+		lineText = pathPack ? viewItem->fullPath : viewItem->name;
+		if ( lineText == NULL || lineText[0] == L'\0' ) {
+			continue;
+		}
+		if ( copied && !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") ) {
+			ok = FALSE;
+			break;
+		}
+		if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, lineText) ) {
+			ok = FALSE;
+			break;
+		}
+		copied = TRUE;
+	}
 
 	if ( !ok ) {
 		free(textBuf);
@@ -4068,11 +4699,23 @@ BOOL GuiArchiveCopySelectionPaths(GuiApp* app)
 	}
 	if ( !copied ) {
 		free(textBuf);
-		MessageBoxW(app->window, L"请选择文件或目录进行复制。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		MessageBoxW(app->window, selectedOnly ? L"请选择文件或目录进行复制。" : L"当前视图没有可复制的文件或目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
 		return FALSE;
 	}
 	if ( textBuf == NULL ) {
 		MessageBoxW(app->window, L"内存不足。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+	*outText = textBuf;
+	return TRUE;
+}
+
+static BOOL GuiArchiveCopyPathsCore(GuiApp* app, BOOL selectedOnly)
+{
+	WCHAR* textBuf;
+
+	textBuf = NULL;
+	if ( !GuiArchiveBuildPathsText(app, selectedOnly, &textBuf) ) {
 		return FALSE;
 	}
 	if ( !GuiSetClipboardText(app->window, textBuf) ) {
@@ -4089,6 +4732,81 @@ BOOL GuiArchiveCopySelectionPaths(GuiApp* app)
 
 	free(textBuf);
 	return TRUE;
+}
+
+static BOOL GuiArchiveExportPathsCore(GuiApp* app, BOOL selectedOnly)
+{
+	WCHAR* textBuf;
+	WCHAR pathBuf[MAX_PATH];
+	BOOL ok;
+
+	if ( app == NULL || app->archive == NULL ) {
+		return FALSE;
+	}
+
+	textBuf = NULL;
+	if ( !GuiArchiveBuildPathsText(app, selectedOnly, &textBuf) ) {
+		return FALSE;
+	}
+
+	wcsncpy_s(pathBuf, _countof(pathBuf), app->archivePath, _TRUNCATE);
+	if ( pathBuf[0] == L'\0' ) {
+		wcsncpy_s(pathBuf, _countof(pathBuf), L"xpack_paths", _TRUNCATE);
+	}
+	PathRemoveExtensionW(pathBuf);
+	wcscat_s(pathBuf, _countof(pathBuf), selectedOnly ? L"_selected_paths.txt" : L"_visible_paths.txt");
+
+	if ( !GuiSaveTextFileDialog(app->window, pathBuf, _countof(pathBuf)) ) {
+		free(textBuf);
+		return FALSE;
+	}
+
+	ok = GuiWriteUtf8BomTextFile(app->window, pathBuf, textBuf);
+	free(textBuf);
+	if ( ok ) {
+		MessageBoxW(app->window, L"导出完成。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+	}
+	return ok;
+}
+
+BOOL GuiArchiveCopySelectionPaths(GuiApp* app)
+{
+	return GuiArchiveCopyPathsCore(app, TRUE);
+}
+
+BOOL GuiArchiveCopyVisiblePaths(GuiApp* app)
+{
+	return GuiArchiveCopyPathsCore(app, FALSE);
+}
+
+BOOL GuiArchiveExportSelectionPaths(GuiApp* app)
+{
+	return GuiArchiveExportPathsCore(app, TRUE);
+}
+
+BOOL GuiArchiveExportVisiblePaths(GuiApp* app)
+{
+	return GuiArchiveExportPathsCore(app, FALSE);
+}
+
+BOOL GuiArchiveCopySelectionDetails(GuiApp* app)
+{
+	return GuiArchiveCopyDetailsCore(app, TRUE);
+}
+
+BOOL GuiArchiveCopyVisibleDetails(GuiApp* app)
+{
+	return GuiArchiveCopyDetailsCore(app, FALSE);
+}
+
+BOOL GuiArchiveExportSelectionDetails(GuiApp* app)
+{
+	return GuiArchiveExportDetailsCore(app, TRUE);
+}
+
+BOOL GuiArchiveExportVisibleDetails(GuiApp* app)
+{
+	return GuiArchiveExportDetailsCore(app, FALSE);
 }
 
 BOOL GuiArchiveCopySelectionHash(GuiApp* app)
@@ -4118,6 +4836,180 @@ BOOL GuiArchiveCopySelectionHash(GuiApp* app)
 		return FALSE;
 	}
 	return TRUE;
+}
+
+static BOOL GuiAppendViewItemHashTsvRow(GuiApp* app, WCHAR** textBuf, size_t* textLen, size_t* textCap, const GuiViewItem* viewItem)
+{
+	const GuiArchiveItem* item;
+	const WCHAR* pathText;
+	WCHAR hashText[32];
+
+	if ( app == NULL || viewItem == NULL || viewItem->kind != GUI_VIEW_ITEM_FILE || viewItem->sourceIndex >= app->itemCount ) {
+		return TRUE;
+	}
+
+	item = &app->items[viewItem->sourceIndex];
+	pathText = GuiIsPathPackType(app->packType) ? viewItem->fullPath : viewItem->name;
+	_snwprintf_s(hashText, _countof(hashText), _TRUNCATE, L"0x%08X", item->fileHash);
+	if ( !GuiAppendTsvCell(textBuf, textLen, textCap, hashText) ) {
+		return FALSE;
+	}
+	if ( !GuiAppendTsvSeparator(textBuf, textLen, textCap) ) {
+		return FALSE;
+	}
+	return GuiAppendTsvCell(textBuf, textLen, textCap, pathText);
+}
+
+static BOOL GuiArchiveBuildHashesTsv(GuiApp* app, BOOL selectedOnly, WCHAR** outText)
+{
+	WCHAR* textBuf;
+	size_t textLen;
+	size_t textCap;
+	int index;
+	size_t i;
+	BOOL copied;
+	BOOL ok;
+
+	if ( outText == NULL ) {
+		return FALSE;
+	}
+	*outText = NULL;
+	if ( selectedOnly ? !GuiArchiveCanCopySelectionHashes(app) : !GuiArchiveCanCopyVisibleHashes(app) ) {
+		MessageBoxW(app != NULL ? app->window : NULL, selectedOnly ? L"请选择文件复制哈希。" : L"当前视图没有可复制哈希的文件。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	textBuf = NULL;
+	textLen = 0;
+	textCap = 0;
+	index = -1;
+	copied = FALSE;
+	ok = GuiAppendWideText(&textBuf, &textLen, &textCap, L"Hash\tPath");
+
+	while ( ok && selectedOnly ) {
+		GuiViewItem* viewItem;
+
+		index = ListView_GetNextItem(app->list, index, LVNI_SELECTED);
+		if ( index < 0 ) {
+			break;
+		}
+		viewItem = GuiArchiveGetViewItemByListIndex(app, index);
+		if ( viewItem == NULL || viewItem->kind != GUI_VIEW_ITEM_FILE || viewItem->sourceIndex >= app->itemCount ) {
+			continue;
+		}
+
+		if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemHashTsvRow(app, &textBuf, &textLen, &textCap, viewItem) ) {
+			ok = FALSE;
+			break;
+		}
+		copied = TRUE;
+	}
+	for ( i = 0; ok && !selectedOnly && i < app->viewCount; ++i ) {
+		GuiViewItem* viewItem;
+
+		viewItem = &app->viewItems[i];
+		if ( viewItem->kind != GUI_VIEW_ITEM_FILE || viewItem->sourceIndex >= app->itemCount ) {
+			continue;
+		}
+
+		if ( !GuiAppendWideText(&textBuf, &textLen, &textCap, L"\r\n") || !GuiAppendViewItemHashTsvRow(app, &textBuf, &textLen, &textCap, viewItem) ) {
+			ok = FALSE;
+			break;
+		}
+		copied = TRUE;
+	}
+
+	if ( !ok ) {
+		free(textBuf);
+		MessageBoxW(app->window, L"内存不足。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+	if ( !copied ) {
+		free(textBuf);
+		MessageBoxW(app->window, selectedOnly ? L"请选择文件复制哈希。" : L"当前视图没有可复制哈希的文件。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+	*outText = textBuf;
+	return TRUE;
+}
+
+static BOOL GuiArchiveCopyHashesCore(GuiApp* app, BOOL selectedOnly)
+{
+	WCHAR* textBuf;
+
+	textBuf = NULL;
+	if ( !GuiArchiveBuildHashesTsv(app, selectedOnly, &textBuf) ) {
+		return FALSE;
+	}
+	if ( !GuiSetClipboardText(app->window, textBuf) ) {
+		DWORD err;
+
+		err = GetLastError();
+		free(textBuf);
+		if ( err == 0 ) {
+			err = ERROR_GEN_FAILURE;
+		}
+		GuiShowSystemError(app->window, L"复制哈希到剪贴板失败", err);
+		return FALSE;
+	}
+
+	free(textBuf);
+	return TRUE;
+}
+
+static BOOL GuiArchiveExportHashesCore(GuiApp* app, BOOL selectedOnly)
+{
+	WCHAR* textBuf;
+	WCHAR pathBuf[MAX_PATH];
+	BOOL ok;
+
+	if ( app == NULL || app->archive == NULL ) {
+		return FALSE;
+	}
+
+	textBuf = NULL;
+	if ( !GuiArchiveBuildHashesTsv(app, selectedOnly, &textBuf) ) {
+		return FALSE;
+	}
+
+	wcsncpy_s(pathBuf, _countof(pathBuf), app->archivePath, _TRUNCATE);
+	if ( pathBuf[0] == L'\0' ) {
+		wcsncpy_s(pathBuf, _countof(pathBuf), L"xpack_hashes", _TRUNCATE);
+	}
+	PathRemoveExtensionW(pathBuf);
+	wcscat_s(pathBuf, _countof(pathBuf), selectedOnly ? L"_selected_hashes.tsv" : L"_visible_hashes.tsv");
+
+	if ( !GuiSaveTsvFileDialog(app->window, pathBuf, _countof(pathBuf)) ) {
+		free(textBuf);
+		return FALSE;
+	}
+
+	ok = GuiWriteUtf8BomTextFile(app->window, pathBuf, textBuf);
+	free(textBuf);
+	if ( ok ) {
+		MessageBoxW(app->window, L"导出完成。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+	}
+	return ok;
+}
+
+BOOL GuiArchiveCopySelectionHashes(GuiApp* app)
+{
+	return GuiArchiveCopyHashesCore(app, TRUE);
+}
+
+BOOL GuiArchiveCopyVisibleHashes(GuiApp* app)
+{
+	return GuiArchiveCopyHashesCore(app, FALSE);
+}
+
+BOOL GuiArchiveExportSelectionHashes(GuiApp* app)
+{
+	return GuiArchiveExportHashesCore(app, TRUE);
+}
+
+BOOL GuiArchiveExportVisibleHashes(GuiApp* app)
+{
+	return GuiArchiveExportHashesCore(app, FALSE);
 }
 
 BOOL GuiArchiveSetSelectionFileType(GuiApp* app)
@@ -5903,6 +6795,33 @@ static BOOL GuiBuildRenameTargetPath(GuiApp* app, const WCHAR* inputValue, WCHAR
 	return targetPath[0] != L'\0';
 }
 
+static BOOL GuiBuildMoveTargetFolder(GuiApp* app, const WCHAR* inputValue, WCHAR* targetPath, size_t cchTargetPath)
+{
+	WCHAR trimmed[XPKGUI_ITEM_TEXT];
+
+	if ( targetPath == NULL || cchTargetPath == 0 ) {
+		return FALSE;
+	}
+	targetPath[0] = L'\0';
+	if ( inputValue == NULL ) {
+		return FALSE;
+	}
+
+	wcsncpy_s(trimmed, _countof(trimmed), inputValue, _TRUNCATE);
+	StrTrimW(trimmed, L" \t");
+	if ( trimmed[0] == L'\0' || wcscmp(trimmed, L".") == 0 || wcscmp(trimmed, L"/") == 0 || wcscmp(trimmed, L"\\") == 0 ) {
+		return TRUE;
+	}
+
+	if ( app->currentFolder[0] != L'\0' && !app->flatView && wcschr(trimmed, L'/') == NULL && wcschr(trimmed, L'\\') == NULL ) {
+		GuiBuildChildViewPath(app->currentFolder, trimmed, targetPath, cchTargetPath);
+	} else {
+		wcsncpy_s(targetPath, cchTargetPath, trimmed, _TRUNCATE);
+	}
+	GuiNormalizeViewPath(targetPath, targetPath, cchTargetPath);
+	return TRUE;
+}
+
 static BOOL GuiSelectViewItemByFullPath(GuiApp* app, GuiViewItemKind kind, const WCHAR* fullPath)
 {
 	size_t i;
@@ -6181,6 +7100,75 @@ static BOOL GuiValidateRenamePairs(GuiApp* app, const GuiRenamePathPair* pairs, 
 	return TRUE;
 }
 
+static BOOL GuiValidateCopyPairs(GuiApp* app, const GuiRenamePathPair* pairs, int count)
+{
+	int i;
+	int j;
+	size_t k;
+
+	for ( i = 0; i < count; ++i ) {
+		if ( pairs[i].newPath[0] == L'\0' ) {
+			MessageBoxW(app->window, L"目标路径不能为空。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			return FALSE;
+		}
+		for ( j = i + 1; j < count; ++j ) {
+			if ( _wcsicmp(pairs[i].newPath, pairs[j].newPath) == 0 ) {
+				MessageBoxW(app->window, L"目标路径发生冲突。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+				return FALSE;
+			}
+		}
+		for ( k = 0; k < app->itemCount; ++k ) {
+			if ( _wcsicmp(app->items[k].name, pairs[i].newPath) == 0 ) {
+				MessageBoxW(app->window, L"目标路径已存在。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+				return FALSE;
+			}
+		}
+	}
+	return TRUE;
+}
+
+static const WCHAR* GuiPathLeafName(const WCHAR* path)
+{
+	const WCHAR* leaf;
+	const WCHAR* p;
+
+	if ( path == NULL ) {
+		return L"";
+	}
+	leaf = path;
+	for ( p = path; *p != L'\0'; ++p ) {
+		if ( *p == L'/' || *p == L'\\' ) {
+			leaf = p + 1;
+		}
+	}
+	return leaf;
+}
+
+static BOOL GuiAppendRenamePair(GuiApp* app, GuiRenamePathPair** pairs, int* count, int* capacity, const WCHAR* oldPath, const WCHAR* newPath)
+{
+	GuiRenamePathPair* newPairs;
+	int newCapacity;
+
+	if ( pairs == NULL || count == NULL || capacity == NULL || oldPath == NULL || newPath == NULL || oldPath[0] == L'\0' || newPath[0] == L'\0' ) {
+		return FALSE;
+	}
+	if ( *count >= *capacity ) {
+		newCapacity = (*capacity == 0) ? 32 : (*capacity * 2);
+		newPairs = (GuiRenamePathPair*)realloc(*pairs, (size_t)newCapacity * sizeof(**pairs));
+		if ( newPairs == NULL ) {
+			MessageBoxW(app != NULL ? app->window : NULL, L"内存不足。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			return FALSE;
+		}
+		*pairs = newPairs;
+		*capacity = newCapacity;
+	}
+	wcsncpy_s((*pairs)[*count].oldPath, _countof((*pairs)[*count].oldPath), oldPath, _TRUNCATE);
+	wcsncpy_s((*pairs)[*count].newPath, _countof((*pairs)[*count].newPath), newPath, _TRUNCATE);
+	(*pairs)[*count].oldLen = wcslen((*pairs)[*count].oldPath);
+	(*count)++;
+	return TRUE;
+}
+
 static int __cdecl GuiRenamePairCompare(void* context, const void* leftPtr, const void* rightPtr)
 {
 	BOOL descending;
@@ -6382,6 +7370,360 @@ BOOL GuiArchiveRenameSelection(GuiApp* app)
 	}
 
 	return GuiArchiveSave(app);
+}
+
+static BOOL GuiCollectSelectedMoveViewItems(GuiApp* app, GuiViewItem** itemsOut, int* countOut)
+{
+	GuiViewItem* items;
+	int count;
+	int capacity;
+	int index;
+
+	*itemsOut = NULL;
+	*countOut = 0;
+	if ( app == NULL || app->list == NULL ) {
+		return TRUE;
+	}
+
+	items = NULL;
+	count = 0;
+	capacity = 0;
+	index = -1;
+	while ( TRUE ) {
+		GuiViewItem* viewItem;
+
+		index = ListView_GetNextItem(app->list, index, LVNI_SELECTED);
+		if ( index < 0 ) {
+			break;
+		}
+		viewItem = GuiArchiveGetViewItemByListIndex(app, index);
+		if ( viewItem == NULL || (viewItem->kind != GUI_VIEW_ITEM_FILE && viewItem->kind != GUI_VIEW_ITEM_DIR) ) {
+			continue;
+		}
+		if ( count >= capacity ) {
+			GuiViewItem* newItems;
+			int newCapacity;
+
+			newCapacity = (capacity == 0) ? 16 : (capacity * 2);
+			newItems = (GuiViewItem*)realloc(items, (size_t)newCapacity * sizeof(*items));
+			if ( newItems == NULL ) {
+				free(items);
+				MessageBoxW(app->window, L"内存不足。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+				return FALSE;
+			}
+			items = newItems;
+			capacity = newCapacity;
+		}
+		items[count++] = *viewItem;
+	}
+
+	*itemsOut = items;
+	*countOut = count;
+	return TRUE;
+}
+
+static BOOL GuiMoveSelectionItemCoveredByDirectory(const GuiViewItem* items, int count, int itemIndex)
+{
+	int i;
+
+	if ( items == NULL || itemIndex < 0 || itemIndex >= count ) {
+		return FALSE;
+	}
+	for ( i = 0; i < count; ++i ) {
+		if ( i == itemIndex || items[i].kind != GUI_VIEW_ITEM_DIR ) {
+			continue;
+		}
+		if ( _wcsicmp(items[itemIndex].fullPath, items[i].fullPath) == 0 || GuiPathMatchFolderPrefix(items[itemIndex].fullPath, items[i].fullPath, NULL) ) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+static BOOL GuiAppendMovePairsForSelectionItem(GuiApp* app, const GuiViewItem* viewItem, const WCHAR* targetFolder, GuiRenamePathPair** pairs, int* count, int* capacity)
+{
+	WCHAR targetBase[XPKGUI_ITEM_TEXT];
+	const WCHAR* leaf;
+	size_t i;
+
+	if ( app == NULL || viewItem == NULL || targetFolder == NULL ) {
+		return FALSE;
+	}
+	leaf = GuiPathLeafName(viewItem->fullPath);
+	if ( leaf[0] == L'\0' ) {
+		return FALSE;
+	}
+	GuiBuildChildViewPath(targetFolder, leaf, targetBase, _countof(targetBase));
+	GuiNormalizeViewPath(targetBase, targetBase, _countof(targetBase));
+	if ( targetBase[0] == L'\0' ) {
+		return FALSE;
+	}
+
+	if ( viewItem->kind == GUI_VIEW_ITEM_FILE ) {
+		return GuiAppendRenamePair(app, pairs, count, capacity, viewItem->fullPath, targetBase);
+	}
+	if ( viewItem->kind != GUI_VIEW_ITEM_DIR ) {
+		return TRUE;
+	}
+
+	for ( i = 0; i < app->itemCount; ++i ) {
+		const WCHAR* suffix;
+		WCHAR newPath[XPKGUI_ITEM_TEXT];
+
+		if ( _wcsicmp(app->items[i].name, viewItem->fullPath) != 0 && !GuiPathMatchFolderPrefix(app->items[i].name, viewItem->fullPath, NULL) ) {
+			continue;
+		}
+		suffix = app->items[i].name + wcslen(viewItem->fullPath);
+		if ( suffix[0] == L'/' || suffix[0] == L'\\' ) {
+			_snwprintf_s(newPath, _countof(newPath), _TRUNCATE, L"%s%s", targetBase, suffix);
+		} else {
+			wcsncpy_s(newPath, _countof(newPath), targetBase, _TRUNCATE);
+		}
+		if ( !GuiAppendRenamePair(app, pairs, count, capacity, app->items[i].name, newPath) ) {
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+BOOL GuiArchiveMoveSelection(GuiApp* app)
+{
+	GuiInputDialogState dialogState;
+	GuiViewItem* selectedItems;
+	GuiRenamePathPair* pairs;
+	WCHAR targetFolder[XPKGUI_ITEM_TEXT];
+	int selectedCount;
+	int pairCount;
+	int pairCapacity;
+	int i;
+	int changedCount;
+	BOOL sortDescending;
+
+	if ( app == NULL || app->archive == NULL || !GuiArchiveCanMoveSelection(app) ) {
+		return FALSE;
+	}
+
+	ZeroMemory(&dialogState, sizeof(dialogState));
+	dialogState.title = L"移动到目录";
+	dialogState.prompt = (app->currentFolder[0] != L'\0' && !app->flatView) ? L"目标目录(相对当前目录，留空表示根目录):" : L"目标目录(留空表示根目录):";
+	if ( app->currentFolder[0] != L'\0' && !app->flatView ) {
+		wcsncpy_s(dialogState.value, _countof(dialogState.value), app->currentFolder, _TRUNCATE);
+	}
+	if ( !GuiRunInputDialog(app->window, &dialogState) ) {
+		return FALSE;
+	}
+	if ( !GuiBuildMoveTargetFolder(app, dialogState.value, targetFolder, _countof(targetFolder)) ) {
+		MessageBoxW(app->window, L"请输入有效的目标目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	selectedItems = NULL;
+	selectedCount = 0;
+	if ( !GuiCollectSelectedMoveViewItems(app, &selectedItems, &selectedCount) || selectedCount <= 0 ) {
+		free(selectedItems);
+		MessageBoxW(app->window, L"请选择文件或目录进行移动。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	pairs = NULL;
+	pairCount = 0;
+	pairCapacity = 0;
+	for ( i = 0; i < selectedCount; ++i ) {
+		if ( GuiMoveSelectionItemCoveredByDirectory(selectedItems, selectedCount, i) ) {
+			continue;
+		}
+		if ( !GuiAppendMovePairsForSelectionItem(app, &selectedItems[i], targetFolder, &pairs, &pairCount, &pairCapacity) ) {
+			free(selectedItems);
+			free(pairs);
+			return FALSE;
+		}
+	}
+	free(selectedItems);
+
+	if ( pairCount <= 0 ) {
+		free(pairs);
+		MessageBoxW(app->window, L"没有可移动的条目。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+	if ( !GuiValidateRenamePairs(app, pairs, pairCount) ) {
+		free(pairs);
+		return FALSE;
+	}
+
+	changedCount = 0;
+	for ( i = 0; i < pairCount; ++i ) {
+		if ( _wcsicmp(pairs[i].oldPath, pairs[i].newPath) != 0 ) {
+			changedCount++;
+		}
+	}
+	if ( changedCount <= 0 ) {
+		free(pairs);
+		MessageBoxW(app->window, L"选中项已经位于目标目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	sortDescending = TRUE;
+	qsort_s(pairs, (size_t)pairCount, sizeof(*pairs), GuiRenamePairCompare, &sortDescending);
+	if ( !GuiApplyRenamePairs(app, pairs, pairCount, L"移动条目") ) {
+		free(pairs);
+		return FALSE;
+	}
+	free(pairs);
+
+	if ( !GuiArchiveSave(app) ) {
+		return FALSE;
+	}
+	if ( targetFolder[0] == L'\0' ) {
+		GuiArchiveBrowseRoot(app);
+	} else {
+		GuiArchiveNavigateToFolder(app, targetFolder);
+	}
+	return TRUE;
+}
+
+static const GuiArchiveItem* GuiFindArchiveItemByPath(GuiApp* app, const WCHAR* path)
+{
+	size_t i;
+
+	if ( app == NULL || path == NULL || path[0] == L'\0' ) {
+		return NULL;
+	}
+	for ( i = 0; i < app->itemCount; ++i ) {
+		if ( _wcsicmp(app->items[i].name, path) == 0 ) {
+			return &app->items[i];
+		}
+	}
+	return NULL;
+}
+
+static BOOL GuiApplyCopyPairs(GuiApp* app, const GuiRenamePathPair* pairs, int count)
+{
+	int i;
+
+	for ( i = 0; i < count; ++i ) {
+		const GuiArchiveItem* sourceItem;
+		xpkWriteOptions writeOpt;
+		void* data;
+		uint64_t dataSize;
+		char oldUtf8[XPK_PATH_BYTES];
+		char newUtf8[XPK_PATH_BYTES];
+
+		sourceItem = GuiFindArchiveItemByPath(app, pairs[i].oldPath);
+		if ( sourceItem == NULL ) {
+			MessageBoxW(app->window, L"找不到要复制的源条目。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			return FALSE;
+		}
+		if ( !GuiUtf8FromWide(pairs[i].oldPath, oldUtf8, sizeof(oldUtf8)) || !GuiUtf8FromWide(pairs[i].newPath, newUtf8, sizeof(newUtf8)) ) {
+			MessageBoxW(app->window, L"路径转换失败。", XPKGUI_APP_TITLE, MB_OK | MB_ICONERROR);
+			return FALSE;
+		}
+
+		dataSize = 0;
+		data = xpkPathReadToMemory(app->archive, oldUtf8, &dataSize);
+		if ( data == NULL && dataSize > 0 ) {
+			GuiShowArchiveError(app, L"读取源条目");
+			return FALSE;
+		}
+
+		ZeroMemory(&writeOpt, sizeof(writeOpt));
+		writeOpt.compLevel = (uint8_t)(sourceItem->flag & XPK_FLAG_COMP_MASK);
+		writeOpt.writePolicy = app->writePolicy;
+		writeOpt.fileType = GuiEntryFileType(sourceItem->flag);
+		if ( xpkPathAddData(app->archive, newUtf8, data, dataSize, &writeOpt) != XPK_OK ) {
+			if ( data != NULL ) {
+				xpkFree(data);
+			}
+			GuiShowArchiveError(app, L"复制条目");
+			return FALSE;
+		}
+		if ( data != NULL ) {
+			xpkFree(data);
+		}
+		if ( sourceItem->attr != 0 && xpkPathSetAttr(app->archive, newUtf8, sourceItem->attr) != XPK_OK ) {
+			GuiShowArchiveError(app, L"复制 platformAttr");
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+BOOL GuiArchiveCopyToSelection(GuiApp* app)
+{
+	GuiInputDialogState dialogState;
+	GuiViewItem* selectedItems;
+	GuiRenamePathPair* pairs;
+	WCHAR targetFolder[XPKGUI_ITEM_TEXT];
+	int selectedCount;
+	int pairCount;
+	int pairCapacity;
+	int i;
+
+	if ( app == NULL || app->archive == NULL || !GuiArchiveCanCopyToSelection(app) ) {
+		return FALSE;
+	}
+
+	ZeroMemory(&dialogState, sizeof(dialogState));
+	dialogState.title = L"复制到目录";
+	dialogState.prompt = (app->currentFolder[0] != L'\0' && !app->flatView) ? L"目标目录(相对当前目录，留空表示根目录):" : L"目标目录(留空表示根目录):";
+	if ( app->currentFolder[0] != L'\0' && !app->flatView ) {
+		wcsncpy_s(dialogState.value, _countof(dialogState.value), app->currentFolder, _TRUNCATE);
+	}
+	if ( !GuiRunInputDialog(app->window, &dialogState) ) {
+		return FALSE;
+	}
+	if ( !GuiBuildMoveTargetFolder(app, dialogState.value, targetFolder, _countof(targetFolder)) ) {
+		MessageBoxW(app->window, L"请输入有效的目标目录。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	selectedItems = NULL;
+	selectedCount = 0;
+	if ( !GuiCollectSelectedMoveViewItems(app, &selectedItems, &selectedCount) || selectedCount <= 0 ) {
+		free(selectedItems);
+		MessageBoxW(app->window, L"请选择文件或目录进行复制。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+
+	pairs = NULL;
+	pairCount = 0;
+	pairCapacity = 0;
+	for ( i = 0; i < selectedCount; ++i ) {
+		if ( GuiMoveSelectionItemCoveredByDirectory(selectedItems, selectedCount, i) ) {
+			continue;
+		}
+		if ( !GuiAppendMovePairsForSelectionItem(app, &selectedItems[i], targetFolder, &pairs, &pairCount, &pairCapacity) ) {
+			free(selectedItems);
+			free(pairs);
+			return FALSE;
+		}
+	}
+	free(selectedItems);
+
+	if ( pairCount <= 0 ) {
+		free(pairs);
+		MessageBoxW(app->window, L"没有可复制的条目。", XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
+	if ( !GuiValidateCopyPairs(app, pairs, pairCount) ) {
+		free(pairs);
+		return FALSE;
+	}
+	if ( !GuiApplyCopyPairs(app, pairs, pairCount) ) {
+		free(pairs);
+		GuiArchiveOpenPath(app, app->archivePath, FALSE);
+		return FALSE;
+	}
+	free(pairs);
+
+	if ( !GuiArchiveSave(app) ) {
+		return FALSE;
+	}
+	if ( targetFolder[0] == L'\0' ) {
+		GuiArchiveBrowseRoot(app);
+	} else {
+		GuiArchiveNavigateToFolder(app, targetFolder);
+	}
+	return TRUE;
 }
 
 BOOL GuiArchiveSetSelectionFileIndex(GuiApp* app)
@@ -6607,7 +7949,9 @@ static BOOL GuiShowPropertiesCore(const WCHAR* archivePath, xpkObject archive, x
 		(unsigned long long)statInfo.metaBytes,
 		(unsigned long long)statInfo.entryTableBytes);
 
-	MessageBoxW(NULL, message, XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+	if ( !GuiIsSmokeMode() ) {
+		MessageBoxW(NULL, message, XPKGUI_APP_TITLE, MB_OK | MB_ICONINFORMATION);
+	}
 	return TRUE;
 }
 
